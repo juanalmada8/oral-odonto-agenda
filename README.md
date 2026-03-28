@@ -1,4 +1,4 @@
-# odonto-agenda-ai
+# oral-odonto-agenda
 
 MVP backend para gestion de turnos de un consultorio odontologico, construido con FastAPI, SQLAlchemy, PostgreSQL y Alembic. La logica se organiza como una mini organizacion de agentes internos, pero implementada como servicios simples, mantenibles y desacoplados.
 
