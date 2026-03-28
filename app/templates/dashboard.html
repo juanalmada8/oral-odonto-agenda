@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ORAL | Panel</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Panel operativo</div>
+        <h1>ORAL</h1>
+      </div>
+      <div class="topbar-actions">
+        <div class="badge">{{ current_user.full_name }} · {{ current_user.role.value }}</div>
+        <form method="post" action="/app/logout">
+          <button class="secondary" type="submit">Salir</button>
+        </form>
+      </div>
+    </header>
+
+    <main class="dashboard-grid">
+      <section class="panel panel-wide">
+        {% if message %}
+        <div class="alert alert-success">{{ message }}</div>
+        {% endif %}
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Agenda</div>
+            <h2>Turnos del dia</h2>
+          </div>
+          <form method="get" action="/app" class="inline-form">
+            <input type="date" name="selected_date" value="{{ agenda_date }}" />
+            <select name="professional_id">
+              <option value="">Todos</option>
+              {% for professional in professionals %}
+              <option value="{{ professional.id }}" {% if selected_professional_id == professional.id %}selected{% endif %}>
+                {{ professional.first_name }} {{ professional.last_name }}
+              </option>
+              {% endfor %}
+            </select>
+            <button type="submit">Filtrar</button>
+          </form>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>Paciente</th>
+                <th>Profesional</th>
+                <th>Estado</th>
+                <th>Motivo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for appointment in appointments %}
+              <tr>
+                <td>{{ appointment.starts_at.strftime("%H:%M") }}</td>
+                <td>{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}</td>
+                <td>{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>
+                <td>{{ appointment.status.value }}</td>
+                <td>{{ appointment.reason or "-" }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5">No hay turnos para la fecha seleccionada.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="eyebrow">Recepcion</div>
+        <h2>Alta de paciente</h2>
+        <form method="post" action="/app/patients" class="stack">
+          <input name="first_name" placeholder="Nombre" required />
+          <input name="last_name" placeholder="Apellido" required />
+          <input name="email" type="email" placeholder="Email" />
+          <input name="phone" placeholder="Telefono" />
+          <textarea name="observations" placeholder="Observaciones"></textarea>
+          <button type="submit">Crear paciente</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="eyebrow">Agenda</div>
+        <h2>Nuevo turno</h2>
+        <form method="post" action="/app/appointments" class="stack">
+          <select name="professional_id" required>
+            <option value="">Seleccionar profesional</option>
+            {% for professional in professionals %}
+            <option value="{{ professional.id }}">{{ professional.first_name }} {{ professional.last_name }}</option>
+            {% endfor %}
+          </select>
+          <select name="patient_id" required>
+            <option value="">Seleccionar paciente</option>
+            {% for patient in patients %}
+            <option value="{{ patient.id }}">{{ patient.first_name }} {{ patient.last_name }}</option>
+            {% endfor %}
+          </select>
+          <input name="starts_at" type="datetime-local" required />
+          <input name="duration_minutes" type="number" min="10" max="240" value="30" />
+          <input name="reason" placeholder="Motivo" />
+          <textarea name="notes" placeholder="Notas"></textarea>
+          <button type="submit">Reservar turno</button>
+        </form>
+      </section>
+
+      {% if is_admin %}
+      <section class="panel">
+        <div class="eyebrow">Admin</div>
+        <h2>Nuevo profesional</h2>
+        <form method="post" action="/app/professionals" class="stack">
+          <input name="first_name" placeholder="Nombre" required />
+          <input name="last_name" placeholder="Apellido" required />
+          <input name="specialty" placeholder="Especialidad" />
+          <input name="email" type="email" placeholder="Email" />
+          <input name="phone" placeholder="Telefono" />
+          <input name="default_appointment_duration" type="number" min="10" max="240" value="30" />
+          <button type="submit">Crear profesional</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="eyebrow">Admin</div>
+        <h2>Horario laboral</h2>
+        <form method="post" action="/app/working-hours" class="stack">
+          <select name="professional_id" required>
+            <option value="">Seleccionar profesional</option>
+            {% for professional in professionals %}
+            <option value="{{ professional.id }}">{{ professional.first_name }} {{ professional.last_name }}</option>
+            {% endfor %}
+          </select>
+          <select name="day_of_week" required>
+            <option value="0">Lunes</option>
+            <option value="1">Martes</option>
+            <option value="2">Miercoles</option>
+            <option value="3">Jueves</option>
+            <option value="4">Viernes</option>
+            <option value="5">Sabado</option>
+            <option value="6">Domingo</option>
+          </select>
+          <input name="start_time" type="time" required />
+          <input name="end_time" type="time" required />
+          <input name="slot_duration_minutes" type="number" min="10" max="240" value="30" />
+          <button type="submit">Guardar horario</button>
+        </form>
+      </section>
+      {% endif %}
+
+      <section class="panel">
+        <div class="eyebrow">Seguimiento</div>
+        <h2>Notificaciones</h2>
+        <div class="button-row">
+          <form method="post" action="/app/notifications/prepare">
+            <button type="submit">Preparar recordatorios</button>
+          </form>
+          <form method="post" action="/app/notifications/send">
+            <button class="secondary" type="submit">Enviar pendientes</button>
+          </form>
+        </div>
+        <div class="table-wrap compact">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Destino</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for notification in notifications %}
+              <tr>
+                <td>{{ notification.type.value }}</td>
+                <td>{{ notification.recipient }}</td>
+                <td>{{ notification.status.value }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="3">Sin notificaciones recientes.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="eyebrow">Configuracion</div>
+        <h2>Horarios cargados</h2>
+        <ul class="list">
+          {% for row in working_hours %}
+          <li>
+            {{ row.professional_id }} · dia {{ row.day_of_week }} · {{ row.start_time.strftime("%H:%M") }} a {{ row.end_time.strftime("%H:%M") }}
+          </li>
+          {% else %}
+          <li>No hay horarios cargados todavia.</li>
+          {% endfor %}
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

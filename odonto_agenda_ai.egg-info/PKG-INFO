@@ -1,0 +1,258 @@
+Metadata-Version: 2.4
+Name: odonto-agenda-ai
+Version: 0.1.0
+Summary: MVP de agenda odontologica con arquitectura modular por agentes.
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: alembic>=1.14.0
+Requires-Dist: fastapi>=0.115.0
+Requires-Dist: jinja2>=3.1.0
+Requires-Dist: psycopg[binary]>=3.2.0
+Requires-Dist: PyJWT>=2.10.0
+Requires-Dist: python-multipart>=0.0.20
+Requires-Dist: pydantic-settings>=2.6.0
+Requires-Dist: sqlalchemy>=2.0.36
+Requires-Dist: email-validator>=2.2.0
+Requires-Dist: uvicorn[standard]>=0.32.0
+Requires-Dist: openai>=1.68.0
+Provides-Extra: dev
+Requires-Dist: httpx>=0.28.0; extra == "dev"
+Requires-Dist: pytest>=8.3.0; extra == "dev"
+
+# odonto-agenda-ai
+
+MVP backend para gestion de turnos de un consultorio odontologico, construido con FastAPI, SQLAlchemy, PostgreSQL y Alembic. La logica se organiza como una mini organizacion de agentes internos, pero implementada como servicios simples, mantenibles y desacoplados.
+
+## Arquitectura
+
+- `reception_agent`: recibe solicitudes, valida datos y resuelve alta o busqueda del paciente.
+- `schedule_agent`: administra disponibilidad, creacion, reprogramacion y cancelacion de turnos, evitando superposiciones.
+- `followup_agent`: prepara confirmaciones y recordatorios, con integracion real para email y un punto de extension para WhatsApp.
+- `ai_agent`: modulo opcional desacoplado para interpretar mensajes libres o asistir con respuestas, con fallback si no hay `OPENAI_API_KEY`.
+- `auth_service`: maneja usuarios internos, roles y autenticacion JWT simple para admin y recepcion.
+
+## Estructura
+
+```text
+odonto-agenda-ai/
+├── app/
+│   ├── api/
+│   ├── core/
+│   ├── db/
+│   ├── integrations/
+│   ├── models/
+│   ├── schemas/
+│   ├── services/
+│   ├── tasks/
+│   └── utils/
+├── alembic/
+├── tests/
+├── .env.example
+├── Dockerfile
+├── docker-compose.yml
+├── pyproject.toml
+└── README.md
+```
+
+## Modelo de datos
+
+- `Patient`: datos del paciente y observaciones.
+- `Professional`: odontologos o profesionales del consultorio.
+- `WorkingHours`: horarios laborales configurables por profesional y dia de semana.
+- `HolidayBlock`: bloqueos de feriados o dias no laborables, globales o por profesional.
+- `Appointment`: turno con estado, duracion, observaciones y relacion con paciente y profesional.
+- `Notification`: cola de notificaciones para confirmaciones y recordatorios.
+- `AuditLog`: logs basicos de acciones importantes.
+
+## Requisitos
+
+- Python 3.12+
+- Docker y Docker Compose, si queres correr todo containerizado
+
+## Instalacion local
+
+1. Crear entorno virtual:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+2. Copiar variables de entorno:
+
+```bash
+cp .env.example .env
+```
+
+3. Instalar dependencias:
+
+```bash
+pip install -e ".[dev]"
+```
+
+4. Levantar PostgreSQL y MailHog con Docker:
+
+```bash
+docker compose up -d db mailhog
+```
+
+5. Ejecutar migraciones:
+
+```bash
+alembic upgrade head
+```
+
+6. Iniciar la API:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+7. Cargar datos demo:
+
+```bash
+python -m app.tasks.seed_demo
+```
+
+8. Abrir Swagger o la UI:
+
+```text
+http://localhost:8000/docs
+http://localhost:8000/app/login
+```
+
+Credenciales demo:
+
+- `admin / demo12345`
+- `recepcion / demo12345`
+
+## Ejecucion con Docker
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Servicios disponibles:
+
+- API: `http://localhost:8000`
+- Swagger: `http://localhost:8000/docs`
+- MailHog UI: `http://localhost:8025`
+
+## Migraciones
+
+Crear una nueva migracion:
+
+```bash
+alembic revision -m "descripcion"
+```
+
+Aplicar migraciones:
+
+```bash
+alembic upgrade head
+```
+
+## Testing
+
+Ejecutar tests:
+
+```bash
+pytest
+```
+
+Los tests cubren:
+
+- login y acceso autenticado
+- alta de pacientes
+- creacion de turnos
+- validacion de superposicion de horarios
+
+## UI minima
+
+La app ahora incluye una interfaz web ligera para probar el flujo operativo sin depender solo de Swagger:
+
+- login en `/app/login`
+- panel de recepcion en `/app`
+- alta de pacientes
+- alta de turnos
+- vista de agenda del dia
+- botones para preparar y enviar recordatorios
+- seccion admin para crear profesionales y horarios
+
+La UI usa la misma logica de negocio que la API, no un flujo paralelo.
+
+## Autenticacion y roles
+
+La API protege los endpoints principales con JWT Bearer o cookie de sesion web.
+
+Roles iniciales:
+
+- `admin`: configuracion general, profesionales, horarios y operacion completa
+- `receptionist`: operacion diaria de pacientes, turnos y seguimiento
+
+Endpoints utiles:
+
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/auth/me`
+- `GET /api/v1/auth/users` solo admin
+- `POST /api/v1/auth/users` solo admin
+
+## Endpoints principales
+
+- `GET/POST/PUT/DELETE /api/v1/patients`
+- `GET/POST/PUT/DELETE /api/v1/professionals`
+- `GET/POST/PUT /api/v1/appointments`
+- `POST /api/v1/appointments/{id}/reschedule`
+- `POST /api/v1/appointments/{id}/cancel`
+- `POST /api/v1/appointments/{id}/confirm`
+- `POST /api/v1/appointments/{id}/complete`
+- `GET /api/v1/appointments/daily`
+- `GET /api/v1/appointments/weekly`
+- `GET /api/v1/availability`
+- `GET /api/v1/availability/week`
+- `GET/POST/PUT/DELETE /api/v1/availability/working-hours`
+- `GET/POST/DELETE /api/v1/availability/holidays`
+- `GET /api/v1/notifications`
+- `POST /api/v1/notifications/prepare-reminders`
+- `POST /api/v1/notifications/send-pending`
+
+## IA opcional
+
+El modulo `app/services/ai_agent.py` queda preparado para usar OpenAI solamente en casos donde agregue valor real, por ejemplo:
+
+- interpretar mensajes libres de pacientes
+- sugerir respuestas naturales
+- resumir observaciones
+
+No se usa IA para validar horarios, evitar superposiciones ni resolver logica deterministica.
+
+## Recordatorios
+
+El flujo de recordatorios funciona asi:
+
+1. al crear un turno, el sistema puede encolar una confirmacion por email
+2. el `followup_agent` detecta turnos proximos y crea recordatorios
+3. `app/tasks/send_reminders.py` permite correr el procesamiento manual o via cron
+
+## Notas de diseno
+
+- Se priorizo un MVP funcional y escalable, sin CQRS, colas externas ni microservicios innecesarios.
+- Los agentes internos son servicios Python bien delimitados, faciles de entender y testear.
+- La app usa FastAPI sync y SQLAlchemy sync para mantener el stack simple en esta etapa.
+- La integracion de WhatsApp queda preparada, pero sin forzar una dependencia externa todavia.
+
+## Git
+
+No pude crear el repositorio remoto desde aca. Para dejarlo versionado y subirlo despues:
+
+```bash
+cd /Users/juanmartin/financejon/odonto-agenda-ai
+git init
+git add .
+git commit -m "Initial commit: odonto agenda ai MVP"
+git branch -M main
+git remote add origin <TU_REPO_GITHUB>
+git push -u origin main
+```

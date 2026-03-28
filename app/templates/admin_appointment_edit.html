@@ -1,0 +1,22 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<section class="surface narrow-surface">
+  <div class="eyebrow">Edición manual</div>
+  <h2>{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}</h2>
+  <p class="muted">Profesional: {{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</p>
+
+  <form method="post" action="/app/appointments/{{ appointment.id }}/edit" class="form-grid">
+    <input name="starts_at" type="datetime-local" value="{{ appointment.starts_at.strftime('%Y-%m-%dT%H:%M') }}" required />
+    <input name="duration_minutes" type="number" min="10" max="240" value="{{ appointment.duration_minutes }}" />
+    <select name="status" required>
+      {% for status in status_options %}
+      <option value="{{ status }}" {% if appointment.status.value == status %}selected{% endif %}>{{ status }}</option>
+      {% endfor %}
+    </select>
+    <input name="reason" value="{{ appointment.reason or '' }}" placeholder="Motivo" />
+    <textarea name="notes" placeholder="Notas">{{ appointment.notes or '' }}</textarea>
+    <button type="submit">Guardar cambios</button>
+  </form>
+</section>
+{% endblock %}

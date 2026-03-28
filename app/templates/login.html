@@ -1,0 +1,54 @@
+{% set brand_logo = request.url_for('static', path='brand/Sin título-4-04.png') %}
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ORAL | Ingreso interno</title>
+    <link rel="icon" type="image/png" href="{{ brand_logo }}" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="login-body">
+    <div class="login-shell">
+      <main class="login-layout">
+        <section class="login-showcase">
+          <div class="login-showcase-inner">
+            <div class="brand-badge brand-badge-showcase">
+              <img class="brand-logo brand-logo-wide brand-logo-showcase" src="{{ brand_logo }}" alt="ORAL odontología familiar" />
+            </div>
+            <div>
+              <div class="eyebrow">Ingreso interno</div>
+              <h2>Recepción y administración clínica en un solo lugar.</h2>
+            </div>
+            <p>
+              Un panel pensado para operar el día con más claridad, menos ruido y una estética coherente con la identidad de ORAL.
+            </p>
+            <div class="brand-accent">Buenos Aires</div>
+          </div>
+        </section>
+
+        <section class="login-card">
+          <div class="eyebrow">Equipo ORAL</div>
+          <h1>Entrar al panel</h1>
+          <p class="muted">La reserva del paciente vive en la web pública. Este acceso es solo para recepción y administración.</p>
+          {% if error %}
+          <div class="alert alert-error">{{ error }}</div>
+          {% endif %}
+          <form method="post" action="/app/login" class="stack">
+            <label>
+              Usuario
+              <input type="text" name="username" placeholder="admin" required />
+            </label>
+            <label>
+              Password
+              <input type="password" name="password" placeholder="demo12345" required />
+            </label>
+            <button type="submit">Entrar</button>
+          </form>
+          <p class="muted small">Si todavía no cargaste datos demo, ejecutá `python -m app.tasks.seed_demo`.</p>
+          <p class="muted small"><a class="cta-link subtle-link" href="/reservar">Ir a reserva para pacientes</a></p>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

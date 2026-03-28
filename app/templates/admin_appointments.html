@@ -1,0 +1,101 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<section class="surface">
+  <div class="surface-head">
+    <div>
+      <div class="eyebrow">Agenda administrativa</div>
+      <h2>Buscar y operar turnos</h2>
+    </div>
+    <form method="get" action="/app/appointments" class="toolbar-form">
+      <input type="date" name="selected_date" value="{{ agenda_date }}" />
+      <select name="professional_id">
+        <option value="">Todos los profesionales</option>
+        {% for professional in professionals %}
+        <option value="{{ professional.id }}" {% if selected_professional_id == professional.id %}selected{% endif %}>
+          {{ professional.first_name }} {{ professional.last_name }}
+        </option>
+        {% endfor %}
+      </select>
+      <select name="status_filter">
+        <option value="">Todos los estados</option>
+        {% for status in status_options %}
+        <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Filtrar</button>
+    </form>
+  </div>
+
+  <details class="foldout">
+    <summary>Crear turno manual</summary>
+    <form method="post" action="/app/appointments" class="form-grid">
+      <select name="patient_id" required>
+        <option value="">Paciente</option>
+        {% for patient in patients %}
+        <option value="{{ patient.id }}">{{ patient.last_name }}, {{ patient.first_name }} · DNI {{ patient.dni }}</option>
+        {% endfor %}
+      </select>
+      <select name="professional_id" required>
+        <option value="">Profesional</option>
+        {% for professional in professionals %}
+        <option value="{{ professional.id }}">{{ professional.first_name }} {{ professional.last_name }}</option>
+        {% endfor %}
+      </select>
+      <input name="starts_at" type="datetime-local" required />
+      <input name="duration_minutes" type="number" min="10" max="240" value="30" />
+      <input name="reason" placeholder="Motivo" />
+      <textarea name="notes" placeholder="Notas"></textarea>
+      <button type="submit">Guardar turno</button>
+    </form>
+  </details>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Hora</th>
+          <th>Paciente</th>
+          <th>Profesional</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for appointment in appointments %}
+        <tr>
+          <td>{{ appointment.starts_at.strftime("%H:%M") }}</td>
+          <td>
+            <strong>{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}</strong>
+            <div class="muted small">DNI {{ appointment.patient.dni }}</div>
+          </td>
+          <td>{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>
+          <td><span class="status-badge status-{{ appointment.status.value }}">{{ appointment.status.value }}</span></td>
+          <td>
+            <div class="row-actions">
+              <a class="quick-link compact" href="/app/appointments/{{ appointment.id }}/edit">Editar</a>
+              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
+                <input type="hidden" name="action" value="confirm" />
+                <button class="ghost-button" type="submit">Confirmar</button>
+              </form>
+              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
+                <input type="hidden" name="action" value="complete" />
+                <button class="ghost-button" type="submit">Completar</button>
+              </form>
+              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
+                <input type="hidden" name="action" value="cancel" />
+                <button class="ghost-button danger" type="submit">Cancelar</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">No hay turnos para los filtros seleccionados.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

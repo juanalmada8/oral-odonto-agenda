@@ -1,0 +1,92 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<section class="content-grid">
+  <article class="surface surface-main">
+    <div class="surface-head">
+      <div>
+        <div class="eyebrow">Agenda profesional</div>
+        <h2>Disponibilidad por fecha</h2>
+        <p class="muted">Cada profesional habilita solo los días y horarios en los que realmente atiende en ORAL.</p>
+      </div>
+      <span class="section-pill">Sin horarios semanales fijos</span>
+    </div>
+
+    <details class="foldout" open>
+      <summary>Cargar disponibilidad puntual</summary>
+      <form method="post" action="/app/settings/availability-windows" class="form-grid">
+        <select name="professional_id" required>
+          <option value="">Profesional</option>
+          {% for professional in professionals %}
+          <option value="{{ professional.id }}">{{ professional.first_name }} {{ professional.last_name }}</option>
+          {% endfor %}
+        </select>
+        <input name="availability_date" type="date" required />
+        <div class="two-cols">
+          <input name="start_time" type="time" required />
+          <input name="end_time" type="time" required />
+        </div>
+        <input name="slot_duration_minutes" type="number" min="10" max="240" value="30" />
+        <textarea name="notes" placeholder="Opcional: observación interna para ese bloque"></textarea>
+        <button type="submit">Guardar disponibilidad</button>
+      </form>
+    </details>
+
+    <div class="cards-grid">
+      {% for professional in professionals %}
+      <article class="info-card">
+        <div class="card-title-row">
+          <div>
+            <h3>{{ professional.first_name }} {{ professional.last_name }}</h3>
+            <p class="muted">{{ professional.specialty or "Sin especialidad" }}</p>
+          </div>
+          <span class="section-pill">{{ grouped_windows[professional.id]|length }} fechas</span>
+        </div>
+
+        <ul class="clean-list compact-list">
+          {% for row in grouped_windows[professional.id] %}
+          <li>
+            <div>
+              <strong>{{ row.availability_date.strftime("%d/%m/%Y") }}</strong>
+              <div class="muted small">{{ row.start_time.strftime("%H:%M") }} a {{ row.end_time.strftime("%H:%M") }}</div>
+              {% if row.notes %}
+              <div class="muted small">{{ row.notes }}</div>
+              {% endif %}
+            </div>
+            <div class="row-actions">
+              <span class="muted small">{{ row.slot_duration_minutes or professional.default_appointment_duration }} min</span>
+              <form method="post" action="/app/settings/availability-windows/{{ row.id }}/delete" onsubmit="return confirm('¿Querés eliminar esta disponibilidad?');">
+                <button class="ghost-button danger" type="submit">Borrar</button>
+              </form>
+            </div>
+          </li>
+          {% else %}
+          <li><span>Sin disponibilidades futuras cargadas</span><strong>-</strong></li>
+          {% endfor %}
+        </ul>
+      </article>
+      {% endfor %}
+    </div>
+  </article>
+
+  <aside class="stack-layout">
+    <article class="surface">
+      <div class="eyebrow">Seguimiento</div>
+      <h2>Motor de notificaciones</h2>
+      <ul class="clean-list">
+        <li><span>Pendientes</span><strong>{{ notification_summary.pending }}</strong></li>
+        <li><span>Enviadas</span><strong>{{ notification_summary.sent }}</strong></li>
+        <li><span>Fallidas</span><strong>{{ notification_summary.failed }}</strong></li>
+      </ul>
+      <div class="button-row">
+        <form method="post" action="/app/notifications/prepare">
+          <button type="submit">Preparar recordatorios</button>
+        </form>
+        <form method="post" action="/app/notifications/send">
+          <button class="secondary" type="submit">Despachar pendientes</button>
+        </form>
+      </div>
+    </article>
+  </aside>
+</section>
+{% endblock %}

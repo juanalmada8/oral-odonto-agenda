@@ -1,0 +1,41 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<section class="surface narrow-surface">
+  <div class="eyebrow">Edición administrativa</div>
+  <h2>{{ professional.first_name }} {{ professional.last_name }}</h2>
+
+  <form method="post" action="/app/professionals/{{ professional.id }}/edit" class="form-grid">
+    <input name="first_name" value="{{ professional.first_name }}" placeholder="Nombre" required />
+    <input name="last_name" value="{{ professional.last_name }}" placeholder="Apellido" required />
+    <input name="specialty" value="{{ professional.specialty or '' }}" placeholder="Especialidad" />
+    <input name="email" type="email" value="{{ professional.email or '' }}" placeholder="Email" />
+    <input name="phone" value="{{ professional.phone or '' }}" placeholder="Teléfono" />
+    <input
+      name="default_appointment_duration"
+      type="number"
+      min="10"
+      max="240"
+      value="{{ professional.default_appointment_duration }}"
+      placeholder="Duración por defecto"
+      required
+    />
+    <label class="checkbox-row">
+      <input type="checkbox" name="is_active" value="true" {% if professional.is_active %}checked{% endif %} />
+      Profesional activo
+    </label>
+    <div class="button-row">
+      <button type="submit">Guardar cambios</button>
+      <button
+        class="ghost-button danger"
+        type="submit"
+        formaction="/app/professionals/{{ professional.id }}/delete"
+        formmethod="post"
+        onclick="return confirm('¿Querés borrar este profesional? Si tiene historial no se podrá eliminar.');"
+      >
+        Borrar profesional
+      </button>
+    </div>
+  </form>
+</section>
+{% endblock %}

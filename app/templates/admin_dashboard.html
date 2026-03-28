@@ -1,0 +1,106 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<section class="metrics-grid">
+  <article class="metric-card">
+    <span class="metric-label">Turnos del día</span>
+    <strong class="metric-value">{{ summary.total }}</strong>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Confirmados</span>
+    <strong class="metric-value">{{ summary.confirmed }}</strong>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Pendientes</span>
+    <strong class="metric-value">{{ summary.reserved }}</strong>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Notificaciones pendientes</span>
+    <strong class="metric-value">{{ summary.pending_notifications }}</strong>
+  </article>
+</section>
+
+<section class="surface surface-main">
+  <div class="surface-head">
+    <div>
+      <div class="eyebrow">Operación diaria</div>
+      <h2>Turnos del día</h2>
+    </div>
+    <form method="get" action="/app" class="toolbar-form">
+      <input type="date" name="selected_date" value="{{ agenda_date }}" />
+      <select name="professional_id">
+        <option value="">Todos los profesionales</option>
+        {% for professional in professionals %}
+        <option value="{{ professional.id }}" {% if selected_professional_id == professional.id %}selected{% endif %}>
+          {{ professional.first_name }} {{ professional.last_name }}
+        </option>
+        {% endfor %}
+      </select>
+      <button type="submit">Aplicar</button>
+    </form>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Hora</th>
+          <th>Paciente</th>
+          <th>Profesional</th>
+          <th>Estado</th>
+          <th>Motivo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for appointment in appointments %}
+        <tr>
+          <td>{{ appointment.starts_at.strftime("%H:%M") }}</td>
+          <td>
+            <strong>{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}</strong>
+            <div class="muted small">DNI {{ appointment.patient.dni }}</div>
+          </td>
+          <td>{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>
+          <td><span class="status-badge status-{{ appointment.status.value }}">{{ appointment.status.value }}</span></td>
+          <td>{{ appointment.reason or "-" }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">No hay turnos para la fecha seleccionada.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="surface dashboard-utility-bar">
+  <div class="surface-head">
+    <div>
+      <div class="eyebrow">Operación secundaria</div>
+      <h2>Atajos y estado</h2>
+    </div>
+    <span class="section-pill">{{ summary.pending_notifications }} pendientes</span>
+  </div>
+  <div class="utility-content">
+    <div class="utility-stats">
+      <div class="utility-stat">
+        <span class="muted small">Reservas por confirmar</span>
+        <strong>{{ summary.reserved }}</strong>
+      </div>
+      <div class="utility-stat">
+        <span class="muted small">Turnos completados hoy</span>
+        <strong>{{ summary.completed }}</strong>
+      </div>
+      <div class="utility-stat">
+        <span class="muted small">Notificaciones pendientes</span>
+        <strong>{{ summary.pending_notifications }}</strong>
+      </div>
+    </div>
+    <div class="utility-links">
+      {% for action in next_actions %}
+      <a class="quick-link" href="{{ action.href }}">{{ action.label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

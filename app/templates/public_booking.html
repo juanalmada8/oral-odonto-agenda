@@ -1,0 +1,254 @@
+{% set brand_logo = request.url_for('static', path='brand/oral-logo-blue-cropped.png') %}
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ORAL | Reserva de turnos</title>
+    <link rel="icon" type="image/png" href="{{ brand_logo }}" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="public-body">
+    <div class="public-shell">
+      <div class="public-topbar">
+        <a class="topbar-brand" href="/reservar">
+          <img class="brand-logo brand-logo-wide brand-logo-topbar" src="{{ brand_logo }}" alt="ORAL odontología familiar" />
+        </a>
+        <a class="cta-link" href="/app/login">Ingreso del equipo</a>
+      </div>
+
+      <header class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">Reserva online</div>
+          <h1>Reservá tu turno sin vueltas</h1>
+          <p class="muted">
+            Una experiencia simple, clara y amable para elegir profesional, fecha real disponible y dejar tu reserva en pocos pasos.
+          </p>
+          <div class="hero-actions">
+            <a class="hero-scroll-button" href="#booking-flow" data-scroll-target="#booking-flow">Agendar consulta</a>
+          </div>
+        </div>
+
+        <div class="hero-visual">
+          <div class="hero-visual-inner">
+            <div class="hero-kicker">ORAL odontología familiar</div>
+            <div class="hero-visual-copy">
+              <h2>Elegí profesional, mirá fechas reales y reservá en minutos.</h2>
+              <p>Sin llamadas, sin idas y vueltas, sin probar días al azar.</p>
+            </div>
+            <div class="hero-highlights">
+              <span>Fechas reales disponibles</span>
+              <span>Reserva simple</span>
+              <span>Confirmación clara</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section id="booking-flow" class="booking-section" data-reveal>
+        <div class="booking-section-head">
+          <div>
+            <div class="eyebrow">Agenda online</div>
+            <h2>Elegí tu fecha y completá la reserva</h2>
+          </div>
+          <p class="muted">Primero mirás disponibilidad real. Después dejás tus datos y confirmás el turno.</p>
+        </div>
+
+        {% if message %}
+        <div class="booking-feedback booking-feedback-success" role="status" aria-live="polite">
+          <div class="booking-feedback-icon" aria-hidden="true">✓</div>
+          <div class="booking-feedback-copy">
+            <strong>Reserva confirmada</strong>
+            <p>{{ message }}</p>
+          </div>
+        </div>
+        {% endif %}
+        {% if error %}
+        <div class="booking-feedback booking-feedback-error" role="alert">
+          <div class="booking-feedback-icon" aria-hidden="true">!</div>
+          <div class="booking-feedback-copy">
+            <strong>No pudimos confirmar el turno</strong>
+            <p>{{ error }}</p>
+          </div>
+        </div>
+        {% endif %}
+
+      <main class="booking-layout">
+        <section class="panel booking-sidebar">
+        <div class="surface-head">
+          <div>
+            <div class="eyebrow">Paso 1</div>
+            <h2>Elegí profesional y fecha</h2>
+          </div>
+          <span class="section-pill">Solo fechas reales</span>
+        </div>
+        <form method="get" action="/reservar" class="stack" id="availability-form">
+          <select name="professional_id" required>
+            {% for professional in professionals %}
+            <option value="{{ professional.id }}" {% if selected_professional and selected_professional.id == professional.id %}selected{% endif %}>
+              {{ professional.first_name }} {{ professional.last_name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <select name="selected_date" {% if not available_dates %}disabled{% endif %} required>
+            {% if available_dates %}
+            {% for item in available_dates %}
+            <option value="{{ item.value }}" {% if selected_date == item.value %}selected{% endif %}>
+              {{ item.label }} · {{ item.slots }} horarios
+            </option>
+            {% endfor %}
+            {% else %}
+            <option value="">Sin fechas disponibles</option>
+            {% endif %}
+          </select>
+          <button type="submit" {% if not available_dates %}disabled{% endif %}>Ver horarios</button>
+        </form>
+        {% if available_dates %}
+        <div class="date-pill-grid">
+          {% for item in available_dates[:6] %}
+          <span class="date-pill {% if selected_date == item.value %}active{% endif %}">
+            {{ item.label }}
+          </span>
+          {% endfor %}
+        </div>
+        <p class="muted small booking-note">Te mostramos solo fechas con disponibilidad real para ese profesional.</p>
+        {% else %}
+        <p class="muted small booking-note">Este profesional no tiene fechas habilitadas por ahora. Elegí otro o volvé más tarde.</p>
+        {% endif %}
+        </section>
+
+        <section class="panel booking-main">
+        <div class="surface-head">
+          <div>
+            <div class="eyebrow">Paso 2</div>
+            <h2>Completá tus datos</h2>
+          </div>
+          <span class="section-pill">Confirmación simple</span>
+        </div>
+        {% if selected_professional %}
+        <p class="muted">
+          Profesional seleccionado:
+          <strong>{{ selected_professional.first_name }} {{ selected_professional.last_name }}</strong>
+          para el día <strong>{{ selected_date_label }}</strong>.
+        </p>
+        {% endif %}
+        <form method="post" action="/reservar" class="stack">
+          <input type="hidden" name="professional_id" value="{{ selected_professional.id if selected_professional else '' }}" />
+          <select name="starts_at" required>
+            <option value="">Seleccioná un horario</option>
+            {% for slot in available_slots %}
+            <option value="{{ slot.starts_at.isoformat() }}">
+              {{ slot.starts_at.strftime("%H:%M") }} a {{ slot.ends_at.strftime("%H:%M") }}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="two-cols">
+            <input name="dni" placeholder="DNI" required />
+            <input name="phone" placeholder="Teléfono" />
+          </div>
+          <div class="two-cols">
+            <input name="first_name" placeholder="Nombre" required />
+            <input name="last_name" placeholder="Apellido" required />
+          </div>
+          <div class="two-cols">
+            <input name="email" type="email" placeholder="Email para confirmación" />
+            <input name="reason" placeholder="Motivo del turno" />
+          </div>
+          <textarea name="observations" placeholder="Observaciones o antecedentes breves"></textarea>
+          <textarea name="notes" placeholder="Mensaje adicional para el consultorio"></textarea>
+          <button type="submit" {% if not available_slots %}disabled{% endif %}>Reservar turno</button>
+        </form>
+        {% if not available_slots %}
+        <p class="muted small booking-note">No hay horarios disponibles para esa combinación. Probá con otra fecha o profesional.</p>
+        {% endif %}
+        </section>
+      </main>
+      </section>
+    </div>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const scrollButton = document.querySelector("[data-scroll-target]");
+        const bookingSection = document.querySelector("#booking-flow");
+
+        if (scrollButton && bookingSection) {
+          scrollButton.addEventListener("click", (event) => {
+            event.preventDefault();
+            bookingSection.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+
+          if (window.location.hash === "#booking-flow") {
+            bookingSection.classList.add("is-visible");
+          }
+        }
+
+        document.addEventListener("submit", async (event) => {
+          const availabilityForm = event.target.closest("#availability-form");
+          if (!availabilityForm) return;
+
+          event.preventDefault();
+
+          const submitButton = availabilityForm.querySelector('button[type="submit"]');
+          const params = new URLSearchParams(new FormData(availabilityForm));
+          const url = `/reservar?${params.toString()}`;
+          const currentBookingSection = document.querySelector("#booking-flow");
+          const preservedScrollY = window.scrollY;
+
+          try {
+            if (submitButton) {
+              submitButton.disabled = true;
+              submitButton.textContent = "Buscando horarios...";
+            }
+
+            const response = await fetch(url, {
+              headers: { "X-Requested-With": "fetch" },
+            });
+
+            if (!response.ok) {
+              throw new Error("booking-refresh-failed");
+            }
+
+            const html = await response.text();
+            const parsed = new DOMParser().parseFromString(html, "text/html");
+            const nextBookingSection = parsed.querySelector("#booking-flow");
+
+            if (!nextBookingSection || !currentBookingSection) {
+              throw new Error("booking-section-missing");
+            }
+
+            nextBookingSection.classList.add("is-visible");
+            currentBookingSection.replaceWith(nextBookingSection);
+            window.history.replaceState({}, "", url);
+
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: preservedScrollY, behavior: "auto" });
+            });
+          } catch (error) {
+            window.location.href = `${url}#booking-flow`;
+          } finally {
+            if (submitButton) {
+              submitButton.disabled = false;
+              submitButton.textContent = "Ver horarios";
+            }
+          }
+        });
+
+        const revealItems = document.querySelectorAll("[data-reveal]");
+        if (!revealItems.length) return;
+
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("is-visible");
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0.18 }
+        );
+
+        revealItems.forEach((item) => observer.observe(item));
+      });
+    </script>
+  </body>
+</html>

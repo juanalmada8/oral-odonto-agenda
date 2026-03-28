@@ -1,0 +1,33 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<section class="surface narrow-surface">
+  <div class="eyebrow">Edición manual</div>
+  <h2>{{ patient.first_name }} {{ patient.last_name }}</h2>
+
+  <form method="post" action="/app/patients/{{ patient.id }}/edit" class="form-grid">
+    <input name="dni" value="{{ patient.dni }}" placeholder="DNI" required />
+    <input name="first_name" value="{{ patient.first_name }}" placeholder="Nombre" required />
+    <input name="last_name" value="{{ patient.last_name }}" placeholder="Apellido" required />
+    <input name="email" type="email" value="{{ patient.email or '' }}" placeholder="Email" />
+    <input name="phone" value="{{ patient.phone or '' }}" placeholder="Teléfono" />
+    <textarea name="observations" placeholder="Observaciones">{{ patient.observations or '' }}</textarea>
+    <label class="checkbox-row">
+      <input type="checkbox" name="is_active" value="true" {% if patient.is_active %}checked{% endif %} />
+      Paciente activo
+    </label>
+    <div class="button-row">
+      <button type="submit">Guardar cambios</button>
+      <button
+        class="ghost-button danger"
+        type="submit"
+        formaction="/app/patients/{{ patient.id }}/delete"
+        formmethod="post"
+        onclick="return confirm('¿Querés borrar este paciente? Si tiene historial no se podrá eliminar.');"
+      >
+        Borrar paciente
+      </button>
+    </div>
+  </form>
+</section>
+{% endblock %}

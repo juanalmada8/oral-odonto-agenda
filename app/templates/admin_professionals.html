@@ -1,0 +1,58 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<section class="surface">
+  <div class="surface-head">
+    <div>
+      <div class="eyebrow">Estructura médica</div>
+      <h2>Profesionales</h2>
+    </div>
+    <span class="section-pill">Altas y mantenimiento ocasional</span>
+  </div>
+
+  <details class="foldout">
+    <summary>Alta de profesional</summary>
+    <form method="post" action="/app/professionals" class="form-grid">
+      <input name="first_name" placeholder="Nombre" required />
+      <input name="last_name" placeholder="Apellido" required />
+      <input name="specialty" placeholder="Especialidad" />
+      <input name="email" type="email" placeholder="Email" />
+      <input name="phone" placeholder="Teléfono" />
+      <input name="default_appointment_duration" type="number" min="10" max="240" value="30" />
+      <button type="submit">Guardar profesional</button>
+    </form>
+  </details>
+
+  <div class="cards-grid">
+    {% for professional in professionals %}
+    <article class="info-card">
+      <div class="card-title-row">
+        <div>
+          <h3>{{ professional.first_name }} {{ professional.last_name }}</h3>
+          <p class="muted">{{ professional.specialty or "Sin especialidad cargada" }}</p>
+        </div>
+        <div class="card-actions-top">
+          <span class="status-badge {% if professional.is_active %}status-confirmed{% else %}status-cancelled{% endif %}">
+            {% if professional.is_active %}activo{% else %}inactivo{% endif %}
+          </span>
+        </div>
+      </div>
+      <ul class="clean-list compact-list">
+        <li><span>Email</span><strong>{{ professional.email or "-" }}</strong></li>
+        <li><span>Teléfono</span><strong>{{ professional.phone or "-" }}</strong></li>
+        <li><span>Duración por defecto</span><strong>{{ professional.default_appointment_duration }} min</strong></li>
+        <li><span>Fechas habilitadas</span><strong>{{ windows_count[professional.id] }}</strong></li>
+      </ul>
+      <div class="card-footer-actions">
+        <a class="quick-link compact" href="/app/professionals/{{ professional.id }}/edit">Editar</a>
+        <form method="post" action="/app/professionals/{{ professional.id }}/delete" onsubmit="return confirm('¿Querés borrar este profesional? Si tiene historial no se podrá eliminar.');">
+          <button class="ghost-button danger" type="submit">Borrar</button>
+        </form>
+      </div>
+    </article>
+    {% else %}
+    <p class="muted">No hay profesionales cargados.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

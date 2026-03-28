@@ -1,0 +1,72 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<section class="surface">
+  <div class="surface-head">
+    <div>
+      <div class="eyebrow">Pacientes</div>
+      <h2>Gestión secundaria</h2>
+    </div>
+    <form method="get" action="/app/patients" class="toolbar-form">
+      <input type="search" name="query" value="{{ query }}" placeholder="Buscar por nombre o DNI" />
+      <button type="submit">Buscar</button>
+    </form>
+  </div>
+
+  <details class="foldout">
+    <summary>Alta manual de paciente</summary>
+    <form method="post" action="/app/patients" class="form-grid">
+      <input name="dni" placeholder="DNI" required />
+      <input name="first_name" placeholder="Nombre" required />
+      <input name="last_name" placeholder="Apellido" required />
+      <input name="email" type="email" placeholder="Email" />
+      <input name="phone" placeholder="Teléfono" />
+      <textarea name="observations" placeholder="Observaciones"></textarea>
+      <button type="submit">Guardar paciente</button>
+    </form>
+  </details>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>DNI</th>
+          <th>Paciente</th>
+          <th>Contacto</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for patient in patients %}
+        <tr>
+          <td><strong>{{ patient.dni }}</strong></td>
+          <td>{{ patient.first_name }} {{ patient.last_name }}</td>
+          <td>
+            <div>{{ patient.email or "-" }}</div>
+            <div class="muted small">{{ patient.phone or "-" }}</div>
+          </td>
+          <td>
+            <span class="status-badge {% if patient.is_active %}status-confirmed{% else %}status-cancelled{% endif %}">
+              {% if patient.is_active %}activo{% else %}inactivo{% endif %}
+            </span>
+          </td>
+          <td>
+            <div class="row-actions">
+              <a class="quick-link compact" href="/app/patients/{{ patient.id }}/edit">Editar</a>
+              <form method="post" action="/app/patients/{{ patient.id }}/delete" onsubmit="return confirm('¿Querés borrar este paciente? Si tiene historial no se podrá eliminar.');">
+                <button class="ghost-button danger" type="submit">Borrar</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">No se encontraron pacientes.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
