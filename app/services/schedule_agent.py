@@ -77,7 +77,13 @@ class ScheduleAgent:
         duration = payload.duration_minutes or professional.default_appointment_duration
         ends_at = calculate_end(starts_at, duration)
 
-        self._validate_slot(db, professional=professional, starts_at=starts_at, ends_at=ends_at)
+        self._validate_slot(
+            db,
+            professional=professional,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            patient_id=patient.id,
+        )
 
         appointment = Appointment(
             patient_id=patient.id,
@@ -131,6 +137,7 @@ class ScheduleAgent:
                 professional=professional,
                 starts_at=starts_at,
                 ends_at=ends_at,
+                patient_id=appointment.patient_id,
                 exclude_appointment_id=appointment.id,
             )
             appointment.starts_at = starts_at
@@ -408,6 +415,7 @@ class ScheduleAgent:
         professional: Professional,
         starts_at: datetime,
         ends_at: datetime,
+        patient_id: int | None = None,
         exclude_appointment_id: int | None = None,
     ) -> None:
         if starts_at >= ends_at:
@@ -422,6 +430,14 @@ class ScheduleAgent:
             exclude_appointment_id=exclude_appointment_id,
         ):
             raise DomainError("The selected time overlaps an existing appointment", status_code=409)
+        if patient_id and self._has_patient_overlap(
+            db,
+            patient_id=patient_id,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            exclude_appointment_id=exclude_appointment_id,
+        ):
+            raise DomainError("The patient already has another appointment in that time range", status_code=409)
 
     def _fits_availability_windows(self, db: Session, *, professional_id: int, starts_at: datetime, ends_at: datetime) -> bool:
         blocks = list(
@@ -474,6 +490,26 @@ class ScheduleAgent:
         query = (
             select(Appointment)
             .where(Appointment.professional_id == professional_id)
+            .where(Appointment.status != AppointmentStatus.CANCELLED)
+            .where(Appointment.starts_at < ends_at)
+            .where(Appointment.ends_at > starts_at)
+        )
+        if exclude_appointment_id:
+            query = query.where(Appointment.id != exclude_appointment_id)
+        return db.scalar(query) is not None
+
+    def _has_patient_overlap(
+        self,
+        db: Session,
+        *,
+        patient_id: int,
+        starts_at: datetime,
+        ends_at: datetime,
+        exclude_appointment_id: int | None = None,
+    ) -> bool:
+        query = (
+            select(Appointment)
+            .where(Appointment.patient_id == patient_id)
             .where(Appointment.status != AppointmentStatus.CANCELLED)
             .where(Appointment.starts_at < ends_at)
             .where(Appointment.ends_at > starts_at)

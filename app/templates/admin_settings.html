@@ -74,6 +74,12 @@
       <div class="eyebrow">Seguimiento</div>
       <h2>Motor de notificaciones</h2>
       <ul class="clean-list">
+        <li>
+          <span>SMTP</span>
+          <strong>{% if smtp_configured %}configurado{% else %}sin configurar{% endif %}</strong>
+        </li>
+        <li><span>Reminders</span><strong>{{ reminder_hours_ahead }}h antes</strong></li>
+        <li><span>Remitente</span><strong>{{ smtp_sender or "-" }}</strong></li>
         <li><span>Pendientes</span><strong>{{ notification_summary.pending }}</strong></li>
         <li><span>Enviadas</span><strong>{{ notification_summary.sent }}</strong></li>
         <li><span>Fallidas</span><strong>{{ notification_summary.failed }}</strong></li>
