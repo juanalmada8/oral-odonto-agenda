@@ -123,6 +123,7 @@ def public_booking_page(
     request: Request,
     selected_date: date | None = None,
     professional_id: str | None = None,
+    booking_id: int | None = None,
     db: Session = Depends(get_db),
     professional_service: ProfessionalService = Depends(get_professional_service),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
@@ -132,6 +133,7 @@ def public_booking_page(
     selected_professional = None
     available_slots = []
     available_dates: list[dict[str, str | int]] = []
+    booking_summary: dict[str, str] | None = None
 
     professional_id_value = int(professional_id) if professional_id else None
 
@@ -163,6 +165,19 @@ def public_booking_page(
                 day=agenda_date,
             )
 
+    if booking_id:
+        try:
+            booked = schedule_agent.get_appointment(db, booking_id)
+            if selected_professional and booked.professional_id == selected_professional.id:
+                booking_summary = {
+                    "professional": f"{booked.professional.first_name} {booked.professional.last_name}",
+                    "date": booked.starts_at.strftime("%d/%m/%Y"),
+                    "time": booked.starts_at.strftime("%H:%M"),
+                    "status": booked.status.value,
+                }
+        except DomainError:
+            booking_summary = None
+
     return templates.TemplateResponse(
         request,
         "public_booking.html",
@@ -173,6 +188,7 @@ def public_booking_page(
             "selected_date_label": agenda_date.strftime("%d/%m/%Y"),
             "available_dates": available_dates,
             "available_slots": available_slots,
+            "booking_summary": booking_summary,
             "message": request.query_params.get("message"),
             "error": request.query_params.get("error"),
         },
@@ -200,7 +216,7 @@ def create_public_booking(
     redirect_base = f"/reservar?professional_id={professional_id}&selected_date={selected_dt.date().isoformat()}"
 
     try:
-        schedule_agent.create_appointment(
+        appointment = schedule_agent.create_appointment(
             db,
             AppointmentCreate(
                 professional_id=professional_id,
@@ -221,8 +237,13 @@ def create_public_booking(
             followup_agent=followup_agent,
             actor="public_booking",
         )
+        success_path = (
+            f"/reservar?professional_id={professional_id}"
+            f"&selected_date={selected_dt.date().isoformat()}"
+            f"&booking_id={appointment.id}"
+        )
         return redirect_with_message(
-            "/reservar",
+            success_path,
             message="Tu turno fue reservado. Si cargaste email, te vamos a enviar la confirmacion.",
             fragment="booking-flow",
         )
@@ -328,6 +349,7 @@ def appointments_page(
     selected_date: date | None = None,
     professional_id: str | None = None,
     status_filter: str | None = None,
+    patient_query: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     professional_service: ProfessionalService = Depends(get_professional_service),
@@ -336,11 +358,39 @@ def appointments_page(
 ):
     agenda_date = selected_date or date.today()
     professional_id_value = int(professional_id) if professional_id else None
+    normalized_patient_query = (patient_query or "").strip()
     professionals = active_professionals(db, professional_service)
     patients = reception_agent.list_patients(db)
     appointments = schedule_agent.get_daily_agenda(db, day=agenda_date, professional_id=professional_id_value)
+    status_counts = serialize_status_counts(appointments)
+    filtered_appointments = appointments
+
     if status_filter:
-        appointments = [appointment for appointment in appointments if appointment.status.value == status_filter]
+        filtered_appointments = [
+            appointment for appointment in filtered_appointments if appointment.status.value == status_filter
+        ]
+    if normalized_patient_query:
+        query = normalized_patient_query.lower()
+        filtered_appointments = [
+            appointment
+            for appointment in filtered_appointments
+            if query in appointment.patient.first_name.lower()
+            or query in appointment.patient.last_name.lower()
+            or query in appointment.patient.dni.lower()
+            or query in appointment.professional.first_name.lower()
+            or query in appointment.professional.last_name.lower()
+            or query in (appointment.reason or "").lower()
+        ]
+
+    filter_params = {"selected_date": agenda_date.isoformat()}
+    if professional_id_value:
+        filter_params["professional_id"] = str(professional_id_value)
+    if status_filter:
+        filter_params["status_filter"] = status_filter
+    if normalized_patient_query:
+        filter_params["patient_query"] = normalized_patient_query
+    filters_querystring = urlencode(filter_params)
+
     return render_admin(
         request,
         template_name="admin_appointments.html",
@@ -350,11 +400,21 @@ def appointments_page(
         active_page="appointments",
         professionals=professionals,
         patients=patients,
-        appointments=appointments,
+        appointments=filtered_appointments,
         agenda_date=agenda_date.isoformat(),
         selected_professional_id=professional_id_value,
         selected_status=status_filter,
+        patient_query=normalized_patient_query,
         status_options=[status.value for status in AppointmentStatus],
+        stats={
+            "total": len(appointments),
+            "reserved": status_counts[AppointmentStatus.RESERVED.value],
+            "confirmed": status_counts[AppointmentStatus.CONFIRMED.value],
+            "completed": status_counts[AppointmentStatus.COMPLETED.value],
+            "cancelled": status_counts[AppointmentStatus.CANCELLED.value],
+            "shown": len(filtered_appointments),
+        },
+        filters_querystring=filters_querystring,
     )
 
 
@@ -401,10 +461,22 @@ def create_manual_appointment(
 def update_appointment_status(
     appointment_id: int,
     action: str = Form(...),
+    selected_date: str = Form(""),
+    professional_id: str = Form(""),
+    status_filter: str = Form(""),
+    patient_query: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
 ):
+    redirect_params = {"selected_date": selected_date or date.today().isoformat()}
+    if professional_id:
+        redirect_params["professional_id"] = professional_id
+    if status_filter:
+        redirect_params["status_filter"] = status_filter
+    if patient_query:
+        redirect_params["patient_query"] = patient_query
+
     try:
         if action == "confirm":
             appointment = schedule_agent.confirm_appointment(db, appointment_id, actor=current_user.username)
@@ -414,12 +486,20 @@ def update_appointment_status(
             appointment = schedule_agent.cancel_appointment(db, appointment_id, actor=current_user.username)
         else:
             raise DomainError("Unsupported appointment action", status_code=400)
+        redirect_params["selected_date"] = selected_date or appointment.starts_at.date().isoformat()
+        if professional_id:
+            redirect_params["professional_id"] = professional_id
+        if status_filter:
+            redirect_params["status_filter"] = status_filter
+        if patient_query:
+            redirect_params["patient_query"] = patient_query
+
         return redirect_with_message(
-            f"/app/appointments?selected_date={appointment.starts_at.date().isoformat()}",
+            f"/app/appointments?{urlencode(redirect_params)}",
             message="Estado de turno actualizado",
         )
     except Exception as exc:
-        return redirect_with_message("/app/appointments", error=str(exc))
+        return redirect_with_message(f"/app/appointments?{urlencode(redirect_params)}", error=str(exc))
 
 
 @router.get("/app/appointments/{appointment_id}/edit", response_class=HTMLResponse)
@@ -755,6 +835,9 @@ def settings_page(
         professionals=professionals,
         grouped_windows=grouped_windows,
         notification_summary=notification_summary,
+        smtp_configured=followup_agent.email_client.is_configured(),
+        smtp_sender=followup_agent.settings.email_from,
+        reminder_hours_ahead=followup_agent.settings.reminder_hours_ahead,
     )
 
 

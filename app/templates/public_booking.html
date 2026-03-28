@@ -60,6 +60,14 @@
           <div class="booking-feedback-copy">
             <strong>Reserva confirmada</strong>
             <p>{{ message }}</p>
+            {% if booking_summary %}
+            <ul class="booking-feedback-meta">
+              <li><span>Profesional</span><strong>{{ booking_summary.professional }}</strong></li>
+              <li><span>Fecha</span><strong>{{ booking_summary.date }}</strong></li>
+              <li><span>Horario</span><strong>{{ booking_summary.time }}</strong></li>
+              <li><span>Estado</span><strong>{{ booking_summary.status }}</strong></li>
+            </ul>
+            {% endif %}
           </div>
         </div>
         {% endif %}
