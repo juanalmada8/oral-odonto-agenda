@@ -184,8 +184,11 @@ class ScheduleAgent:
 
     def cancel_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, actor: str = "schedule_agent") -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
-        appointment.status = AppointmentStatus.CANCELLED
-        appointment.cancelled_at = datetime.now().replace(microsecond=0)
+        if appointment.status == AppointmentStatus.CANCELLED:
+            raise DomainError("Appointment is already cancelled", status_code=409)
+        if appointment.status == AppointmentStatus.COMPLETED:
+            raise DomainError("Completed appointments cannot be cancelled from this action", status_code=409)
+        self._set_status(appointment, AppointmentStatus.CANCELLED)
         if notes:
             appointment.notes = notes
         create_audit_log(
@@ -201,8 +204,13 @@ class ScheduleAgent:
 
     def confirm_appointment(self, db: Session, appointment_id: int, *, actor: str = "schedule_agent") -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
-        appointment.status = AppointmentStatus.CONFIRMED
-        appointment.confirmed_at = datetime.now().replace(microsecond=0)
+        if appointment.status == AppointmentStatus.CANCELLED:
+            raise DomainError("Cancelled appointments must be reactivated first", status_code=409)
+        if appointment.status == AppointmentStatus.COMPLETED:
+            raise DomainError("Completed appointments cannot be confirmed", status_code=409)
+        if appointment.status == AppointmentStatus.CONFIRMED:
+            raise DomainError("Appointment is already confirmed", status_code=409)
+        self._set_status(appointment, AppointmentStatus.CONFIRMED)
         create_audit_log(
             db,
             action="appointment.confirmed",
@@ -216,7 +224,11 @@ class ScheduleAgent:
 
     def complete_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, actor: str = "schedule_agent") -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
-        appointment.status = AppointmentStatus.COMPLETED
+        if appointment.status == AppointmentStatus.CANCELLED:
+            raise DomainError("Cancelled appointments must be reactivated first", status_code=409)
+        if appointment.status == AppointmentStatus.COMPLETED:
+            raise DomainError("Appointment is already completed", status_code=409)
+        self._set_status(appointment, AppointmentStatus.COMPLETED)
         if notes:
             appointment.notes = notes
         create_audit_log(
@@ -226,6 +238,22 @@ class ScheduleAgent:
             entity_id=str(appointment.id),
             actor=actor,
             description="Appointment completed",
+        )
+        db.commit()
+        return self.get_appointment(db, appointment.id)
+
+    def reserve_appointment(self, db: Session, appointment_id: int, *, actor: str = "schedule_agent") -> Appointment:
+        appointment = self.get_appointment(db, appointment_id)
+        if appointment.status != AppointmentStatus.CANCELLED:
+            raise DomainError("Only cancelled appointments can be reactivated", status_code=409)
+        self._set_status(appointment, AppointmentStatus.RESERVED)
+        create_audit_log(
+            db,
+            action="appointment.reserved",
+            entity_name="appointment",
+            entity_id=str(appointment.id),
+            actor=actor,
+            description="Appointment moved to reserved",
         )
         db.commit()
         return self.get_appointment(db, appointment.id)
@@ -517,3 +545,20 @@ class ScheduleAgent:
         if exclude_appointment_id:
             query = query.where(Appointment.id != exclude_appointment_id)
         return db.scalar(query) is not None
+
+    def _set_status(self, appointment: Appointment, status: AppointmentStatus) -> None:
+        now = datetime.now().replace(microsecond=0)
+        appointment.status = status
+        if status == AppointmentStatus.RESERVED:
+            appointment.confirmed_at = None
+            appointment.cancelled_at = None
+            return
+        if status == AppointmentStatus.CONFIRMED:
+            appointment.confirmed_at = now
+            appointment.cancelled_at = None
+            return
+        if status == AppointmentStatus.CANCELLED:
+            appointment.cancelled_at = now
+            return
+        if status == AppointmentStatus.COMPLETED:
+            appointment.cancelled_at = None

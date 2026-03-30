@@ -1,10 +1,12 @@
 """Reception agent: validates incoming requests and resolves patient identity."""
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
+from app.core.enums import AppointmentStatus
 from app.core.exceptions import DomainError
 from app.models.appointment import Appointment
+from app.models.notification import Notification
 from app.models.patient import Patient
 from app.schemas.patient import PatientCreate, PatientUpdate, PatientUpsert
 from app.utils.audit import create_audit_log
@@ -78,12 +80,33 @@ class ReceptionAgent:
 
     def delete_patient(self, db: Session, patient_id: int, actor: str = "reception_agent") -> None:
         patient = self.get_patient(db, patient_id)
-        has_history = db.scalar(select(Appointment.id).where(Appointment.patient_id == patient.id).limit(1))
-        if has_history:
+        has_active_appointments = db.scalar(
+            select(Appointment.id)
+            .where(Appointment.patient_id == patient.id)
+            .where(Appointment.status.in_([AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED]))
+            .limit(1)
+        )
+        if has_active_appointments:
             raise DomainError(
-                "No se puede borrar el paciente porque tiene historial de turnos. Desactivalo o editalo.",
+                "No se puede borrar el paciente porque tiene turnos activos (reservados o confirmados).",
                 status_code=409,
             )
+
+        appointment_ids = list(db.scalars(select(Appointment.id).where(Appointment.patient_id == patient.id)))
+        if appointment_ids:
+            db.execute(
+                update(Notification)
+                .where(Notification.appointment_id.in_(appointment_ids))
+                .values(appointment_id=None)
+            )
+            db.execute(delete(Appointment).where(Appointment.id.in_(appointment_ids)))
+
+        db.execute(
+            update(Notification)
+            .where(Notification.patient_id == patient.id)
+            .values(patient_id=None)
+        )
+
         create_audit_log(
             db,
             action="patient.deleted",

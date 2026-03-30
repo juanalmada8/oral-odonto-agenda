@@ -129,7 +129,7 @@ def public_booking_page(
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
 ):
     professionals = active_professionals(db, professional_service)
-    agenda_date = selected_date or date.today()
+    agenda_date: date | None = selected_date
     selected_professional = None
     available_slots = []
     available_dates: list[dict[str, str | int]] = []
@@ -137,8 +137,8 @@ def public_booking_page(
 
     professional_id_value = int(professional_id) if professional_id else None
 
-    if professionals:
-        selected_professional = professionals[0] if professional_id_value is None else next(
+    if professionals and professional_id_value is not None:
+        selected_professional = next(
             (professional for professional in professionals if professional.id == professional_id_value),
             None,
         )
@@ -157,13 +157,14 @@ def public_booking_page(
                 for available_day, slot_count in available_dates_raw
             ]
             available_date_values = {item["value"] for item in available_dates}
-            if available_dates and agenda_date.isoformat() not in available_date_values:
+            if available_dates and (agenda_date is None or agenda_date.isoformat() not in available_date_values):
                 agenda_date = date.fromisoformat(available_dates[0]["value"])
-            available_slots = schedule_agent.get_daily_availability(
-                db,
-                professional_id=selected_professional.id,
-                day=agenda_date,
-            )
+            if agenda_date:
+                available_slots = schedule_agent.get_daily_availability(
+                    db,
+                    professional_id=selected_professional.id,
+                    day=agenda_date,
+                )
 
     if booking_id:
         try:
@@ -184,8 +185,8 @@ def public_booking_page(
         {
             "professionals": professionals,
             "selected_professional": selected_professional,
-            "selected_date": agenda_date.isoformat(),
-            "selected_date_label": agenda_date.strftime("%d/%m/%Y"),
+            "selected_date": agenda_date.isoformat() if agenda_date else "",
+            "selected_date_label": agenda_date.strftime("%d/%m/%Y") if agenda_date else "",
             "available_dates": available_dates,
             "available_slots": available_slots,
             "booking_summary": booking_summary,
@@ -478,7 +479,9 @@ def update_appointment_status(
         redirect_params["patient_query"] = patient_query
 
     try:
-        if action == "confirm":
+        if action == "reserve":
+            appointment = schedule_agent.reserve_appointment(db, appointment_id, actor=current_user.username)
+        elif action == "confirm":
             appointment = schedule_agent.confirm_appointment(db, appointment_id, actor=current_user.username)
         elif action == "complete":
             appointment = schedule_agent.complete_appointment(db, appointment_id, actor=current_user.username)

@@ -267,6 +267,73 @@ p {
   border-color: rgba(191, 75, 75, 0.12);
 }
 
+.confirm-modal[hidden] {
+  display: none;
+}
+
+.confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.confirm-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 18, 28, 0.52);
+  backdrop-filter: blur(4px);
+}
+
+.confirm-modal__panel {
+  position: relative;
+  width: min(560px, 100%);
+  border-radius: 22px;
+  border: 1px solid rgba(15, 35, 51, 0.12);
+  background: linear-gradient(165deg, #ffffff 0%, #f8fbfd 100%);
+  box-shadow: 0 34px 72px rgba(8, 22, 34, 0.22);
+  padding: 26px;
+  animation: modal-enter 140ms ease-out;
+}
+
+.confirm-modal__title {
+  margin: 0 0 10px;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.confirm-modal__message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.08rem;
+  line-height: 1.55;
+}
+
+.confirm-modal__actions {
+  margin-top: 22px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm-modal__actions .ghost-button {
+  min-width: 120px;
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .booking-feedback {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1233,6 +1300,25 @@ button:disabled {
   width: 18px;
   min-height: 18px;
   margin: 0;
+}
+
+.availability-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-stack {
+  display: grid;
+  gap: 6px;
+}
+
+.ghost-button.compact {
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.92rem;
 }
 
 .login-body {
