@@ -45,7 +45,14 @@
       </ul>
       <div class="card-footer-actions">
         <a class="quick-link compact" href="/app/professionals/{{ professional.id }}/edit">Editar</a>
-        <form method="post" action="/app/professionals/{{ professional.id }}/delete" onsubmit="return confirm('¿Querés borrar este profesional? Si tiene historial no se podrá eliminar.');">
+        <form
+          method="post"
+          action="/app/professionals/{{ professional.id }}/delete"
+          class="js-confirm-form"
+          data-confirm-title="Borrar profesional"
+          data-confirm-message="¿Querés borrar este profesional? Si tiene turnos activos o historial bloqueado no se va a eliminar."
+          data-confirm-accept="Borrar"
+        >
           <button class="ghost-button danger" type="submit">Borrar</button>
         </form>
       </div>

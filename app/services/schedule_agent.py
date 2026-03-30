@@ -77,7 +77,13 @@ class ScheduleAgent:
         duration = payload.duration_minutes or professional.default_appointment_duration
         ends_at = calculate_end(starts_at, duration)
 
-        self._validate_slot(db, professional=professional, starts_at=starts_at, ends_at=ends_at)
+        self._validate_slot(
+            db,
+            professional=professional,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            patient_id=patient.id,
+        )
 
         appointment = Appointment(
             patient_id=patient.id,
@@ -131,6 +137,7 @@ class ScheduleAgent:
                 professional=professional,
                 starts_at=starts_at,
                 ends_at=ends_at,
+                patient_id=appointment.patient_id,
                 exclude_appointment_id=appointment.id,
             )
             appointment.starts_at = starts_at
@@ -177,8 +184,11 @@ class ScheduleAgent:
 
     def cancel_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, actor: str = "schedule_agent") -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
-        appointment.status = AppointmentStatus.CANCELLED
-        appointment.cancelled_at = datetime.now().replace(microsecond=0)
+        if appointment.status == AppointmentStatus.CANCELLED:
+            raise DomainError("Appointment is already cancelled", status_code=409)
+        if appointment.status == AppointmentStatus.COMPLETED:
+            raise DomainError("Completed appointments cannot be cancelled from this action", status_code=409)
+        self._set_status(appointment, AppointmentStatus.CANCELLED)
         if notes:
             appointment.notes = notes
         create_audit_log(
@@ -194,8 +204,13 @@ class ScheduleAgent:
 
     def confirm_appointment(self, db: Session, appointment_id: int, *, actor: str = "schedule_agent") -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
-        appointment.status = AppointmentStatus.CONFIRMED
-        appointment.confirmed_at = datetime.now().replace(microsecond=0)
+        if appointment.status == AppointmentStatus.CANCELLED:
+            raise DomainError("Cancelled appointments must be reactivated first", status_code=409)
+        if appointment.status == AppointmentStatus.COMPLETED:
+            raise DomainError("Completed appointments cannot be confirmed", status_code=409)
+        if appointment.status == AppointmentStatus.CONFIRMED:
+            raise DomainError("Appointment is already confirmed", status_code=409)
+        self._set_status(appointment, AppointmentStatus.CONFIRMED)
         create_audit_log(
             db,
             action="appointment.confirmed",
@@ -209,7 +224,11 @@ class ScheduleAgent:
 
     def complete_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, actor: str = "schedule_agent") -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
-        appointment.status = AppointmentStatus.COMPLETED
+        if appointment.status == AppointmentStatus.CANCELLED:
+            raise DomainError("Cancelled appointments must be reactivated first", status_code=409)
+        if appointment.status == AppointmentStatus.COMPLETED:
+            raise DomainError("Appointment is already completed", status_code=409)
+        self._set_status(appointment, AppointmentStatus.COMPLETED)
         if notes:
             appointment.notes = notes
         create_audit_log(
@@ -219,6 +238,22 @@ class ScheduleAgent:
             entity_id=str(appointment.id),
             actor=actor,
             description="Appointment completed",
+        )
+        db.commit()
+        return self.get_appointment(db, appointment.id)
+
+    def reserve_appointment(self, db: Session, appointment_id: int, *, actor: str = "schedule_agent") -> Appointment:
+        appointment = self.get_appointment(db, appointment_id)
+        if appointment.status != AppointmentStatus.CANCELLED:
+            raise DomainError("Only cancelled appointments can be reactivated", status_code=409)
+        self._set_status(appointment, AppointmentStatus.RESERVED)
+        create_audit_log(
+            db,
+            action="appointment.reserved",
+            entity_name="appointment",
+            entity_id=str(appointment.id),
+            actor=actor,
+            description="Appointment moved to reserved",
         )
         db.commit()
         return self.get_appointment(db, appointment.id)
@@ -408,6 +443,7 @@ class ScheduleAgent:
         professional: Professional,
         starts_at: datetime,
         ends_at: datetime,
+        patient_id: int | None = None,
         exclude_appointment_id: int | None = None,
     ) -> None:
         if starts_at >= ends_at:
@@ -422,6 +458,14 @@ class ScheduleAgent:
             exclude_appointment_id=exclude_appointment_id,
         ):
             raise DomainError("The selected time overlaps an existing appointment", status_code=409)
+        if patient_id and self._has_patient_overlap(
+            db,
+            patient_id=patient_id,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            exclude_appointment_id=exclude_appointment_id,
+        ):
+            raise DomainError("The patient already has another appointment in that time range", status_code=409)
 
     def _fits_availability_windows(self, db: Session, *, professional_id: int, starts_at: datetime, ends_at: datetime) -> bool:
         blocks = list(
@@ -481,3 +525,40 @@ class ScheduleAgent:
         if exclude_appointment_id:
             query = query.where(Appointment.id != exclude_appointment_id)
         return db.scalar(query) is not None
+
+    def _has_patient_overlap(
+        self,
+        db: Session,
+        *,
+        patient_id: int,
+        starts_at: datetime,
+        ends_at: datetime,
+        exclude_appointment_id: int | None = None,
+    ) -> bool:
+        query = (
+            select(Appointment)
+            .where(Appointment.patient_id == patient_id)
+            .where(Appointment.status != AppointmentStatus.CANCELLED)
+            .where(Appointment.starts_at < ends_at)
+            .where(Appointment.ends_at > starts_at)
+        )
+        if exclude_appointment_id:
+            query = query.where(Appointment.id != exclude_appointment_id)
+        return db.scalar(query) is not None
+
+    def _set_status(self, appointment: Appointment, status: AppointmentStatus) -> None:
+        now = datetime.now().replace(microsecond=0)
+        appointment.status = status
+        if status == AppointmentStatus.RESERVED:
+            appointment.confirmed_at = None
+            appointment.cancelled_at = None
+            return
+        if status == AppointmentStatus.CONFIRMED:
+            appointment.confirmed_at = now
+            appointment.cancelled_at = None
+            return
+        if status == AppointmentStatus.CANCELLED:
+            appointment.cancelled_at = now
+            return
+        if status == AppointmentStatus.COMPLETED:
+            appointment.cancelled_at = None

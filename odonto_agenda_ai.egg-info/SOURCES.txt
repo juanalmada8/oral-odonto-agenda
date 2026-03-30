@@ -29,6 +29,7 @@ app/integrations/whatsapp.py
 app/models/__init__.py
 app/models/appointment.py
 app/models/audit_log.py
+app/models/availability_window.py
 app/models/holiday_block.py
 app/models/mixins.py
 app/models/notification.py

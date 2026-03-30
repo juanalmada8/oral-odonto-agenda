@@ -74,6 +74,12 @@
           <td>
             <div class="row-actions">
               <a class="quick-link compact" href="/app/appointments/{{ appointment.id }}/edit">Editar</a>
+              {% if appointment.status.value == "cancelled" %}
+              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
+                <input type="hidden" name="action" value="reserve" />
+                <button class="ghost-button" type="submit">Reactivar</button>
+              </form>
+              {% elif appointment.status.value == "reserved" %}
               <form method="post" action="/app/appointments/{{ appointment.id }}/status">
                 <input type="hidden" name="action" value="confirm" />
                 <button class="ghost-button" type="submit">Confirmar</button>
@@ -86,6 +92,16 @@
                 <input type="hidden" name="action" value="cancel" />
                 <button class="ghost-button danger" type="submit">Cancelar</button>
               </form>
+              {% elif appointment.status.value == "confirmed" %}
+              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
+                <input type="hidden" name="action" value="complete" />
+                <button class="ghost-button" type="submit">Completar</button>
+              </form>
+              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
+                <input type="hidden" name="action" value="cancel" />
+                <button class="ghost-button danger" type="submit">Cancelar</button>
+              </form>
+              {% endif %}
             </div>
           </td>
         </tr>

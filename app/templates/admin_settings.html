@@ -22,11 +22,48 @@
           {% endfor %}
         </select>
         <input name="availability_date" type="date" required />
-        <div class="two-cols">
-          <input name="start_time" type="time" required />
-          <input name="end_time" type="time" required />
+        <div class="availability-presets">
+          <span class="muted small">Atajos:</span>
+          <button type="button" class="ghost-button compact js-availability-preset" data-start="09:00" data-end="13:00">Mañana 9-13</button>
+          <button type="button" class="ghost-button compact js-availability-preset" data-start="14:00" data-end="18:00">Tarde 14-18</button>
+          <button type="button" class="ghost-button compact js-availability-preset" data-start="09:00" data-end="18:00">Jornada 9-18</button>
         </div>
-        <input name="slot_duration_minutes" type="number" min="10" max="240" value="30" />
+        <div class="two-cols">
+          <div class="field-stack">
+            <label class="muted small" for="availability-start-time">Desde</label>
+            <select id="availability-start-time" name="start_time" required>
+              <option value="">Hora inicio</option>
+              {% for hour in range(7, 22) %}
+              {% for minute in [0, 15, 30, 45] %}
+              {% set value = '%02d:%02d' % (hour, minute) %}
+              <option value="{{ value }}" {% if value == "09:00" %}selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field-stack">
+            <label class="muted small" for="availability-end-time">Hasta</label>
+            <select id="availability-end-time" name="end_time" required>
+              <option value="">Hora fin</option>
+              {% for hour in range(7, 22) %}
+              {% for minute in [0, 15, 30, 45] %}
+              {% set value = '%02d:%02d' % (hour, minute) %}
+              <option value="{{ value }}" {% if value == "13:00" %}selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="field-stack">
+          <label class="muted small" for="availability-slot-duration">Duración de cada turno</label>
+          <select id="availability-slot-duration" name="slot_duration_minutes" required>
+            <option value="15">15 min</option>
+            <option value="20">20 min</option>
+            <option value="30" selected>30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">60 min</option>
+          </select>
+        </div>
         <textarea name="notes" placeholder="Opcional: observación interna para ese bloque"></textarea>
         <button type="submit">Guardar disponibilidad</button>
       </form>
@@ -55,7 +92,14 @@
             </div>
             <div class="row-actions">
               <span class="muted small">{{ row.slot_duration_minutes or professional.default_appointment_duration }} min</span>
-              <form method="post" action="/app/settings/availability-windows/{{ row.id }}/delete" onsubmit="return confirm('¿Querés eliminar esta disponibilidad?');">
+              <form
+                method="post"
+                action="/app/settings/availability-windows/{{ row.id }}/delete"
+                class="js-confirm-form"
+                data-confirm-title="Borrar disponibilidad"
+                data-confirm-message="¿Querés eliminar este bloque de disponibilidad?"
+                data-confirm-accept="Eliminar"
+              >
                 <button class="ghost-button danger" type="submit">Borrar</button>
               </form>
             </div>
@@ -74,6 +118,12 @@
       <div class="eyebrow">Seguimiento</div>
       <h2>Motor de notificaciones</h2>
       <ul class="clean-list">
+        <li>
+          <span>SMTP</span>
+          <strong>{% if smtp_configured %}configurado{% else %}sin configurar{% endif %}</strong>
+        </li>
+        <li><span>Reminders</span><strong>{{ reminder_hours_ahead }}h antes</strong></li>
+        <li><span>Remitente</span><strong>{{ smtp_sender or "-" }}</strong></li>
         <li><span>Pendientes</span><strong>{{ notification_summary.pending }}</strong></li>
         <li><span>Enviadas</span><strong>{{ notification_summary.sent }}</strong></li>
         <li><span>Fallidas</span><strong>{{ notification_summary.failed }}</strong></li>
@@ -89,4 +139,19 @@
     </article>
   </aside>
 </section>
+<script>
+  (() => {
+    const startSelect = document.getElementById("availability-start-time");
+    const endSelect = document.getElementById("availability-end-time");
+    if (!startSelect || !endSelect) return;
+
+    document.querySelectorAll(".js-availability-preset").forEach((button) => {
+      button.addEventListener("click", () => {
+        const { start, end } = button.dataset;
+        if (start) startSelect.value = start;
+        if (end) endSelect.value = end;
+      });
+    });
+  })();
+</script>
 {% endblock %}
