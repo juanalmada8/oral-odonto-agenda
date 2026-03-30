@@ -54,7 +54,14 @@
           <td>
             <div class="row-actions">
               <a class="quick-link compact" href="/app/patients/{{ patient.id }}/edit">Editar</a>
-              <form method="post" action="/app/patients/{{ patient.id }}/delete" onsubmit="return confirm('¿Querés borrar este paciente? Si tiene historial no se podrá eliminar.');">
+              <form
+                method="post"
+                action="/app/patients/{{ patient.id }}/delete"
+                class="js-confirm-form"
+                data-confirm-title="Borrar paciente"
+                data-confirm-message="¿Querés borrar este paciente? Si tiene turnos activos no se va a poder eliminar."
+                data-confirm-accept="Borrar"
+              >
                 <button class="ghost-button danger" type="submit">Borrar</button>
               </form>
             </div>

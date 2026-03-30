@@ -23,39 +23,8 @@
         <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>
         {% endfor %}
       </select>
-      <input
-        type="text"
-        name="patient_query"
-        value="{{ patient_query }}"
-        placeholder="Paciente, DNI, profesional o motivo"
-      />
       <button type="submit">Filtrar</button>
-      <a class="quick-link compact" href="/app/appointments?selected_date={{ agenda_date }}">Limpiar</a>
     </form>
-  </div>
-
-  <div class="metrics-grid">
-    <article class="metric-card">
-      <span class="metric-label">Mostrando</span>
-      <strong class="metric-value">{{ stats.shown }}</strong>
-      <div class="muted small">de {{ stats.total }} turnos del día</div>
-    </article>
-    <article class="metric-card">
-      <span class="metric-label">Reservados</span>
-      <strong class="metric-value">{{ stats.reserved }}</strong>
-    </article>
-    <article class="metric-card">
-      <span class="metric-label">Confirmados</span>
-      <strong class="metric-value">{{ stats.confirmed }}</strong>
-    </article>
-    <article class="metric-card">
-      <span class="metric-label">Completados</span>
-      <strong class="metric-value">{{ stats.completed }}</strong>
-    </article>
-    <article class="metric-card">
-      <span class="metric-label">Cancelados</span>
-      <strong class="metric-value">{{ stats.cancelled }}</strong>
-    </article>
   </div>
 
   <details class="foldout">
@@ -88,7 +57,6 @@
           <th>Hora</th>
           <th>Paciente</th>
           <th>Profesional</th>
-          <th>Motivo</th>
           <th>Estado</th>
           <th>Acciones</th>
         </tr>
@@ -102,38 +70,35 @@
             <div class="muted small">DNI {{ appointment.patient.dni }}</div>
           </td>
           <td>{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>
-          <td>{{ appointment.reason or "-" }}</td>
           <td><span class="status-badge status-{{ appointment.status.value }}">{{ appointment.status.value }}</span></td>
           <td>
             <div class="row-actions">
               <a class="quick-link compact" href="/app/appointments/{{ appointment.id }}/edit">Editar</a>
-              {% if appointment.status.value == "reserved" %}
+              {% if appointment.status.value == "cancelled" %}
+              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
+                <input type="hidden" name="action" value="reserve" />
+                <button class="ghost-button" type="submit">Reactivar</button>
+              </form>
+              {% elif appointment.status.value == "reserved" %}
               <form method="post" action="/app/appointments/{{ appointment.id }}/status">
                 <input type="hidden" name="action" value="confirm" />
-                <input type="hidden" name="selected_date" value="{{ agenda_date }}" />
-                <input type="hidden" name="professional_id" value="{{ selected_professional_id or '' }}" />
-                <input type="hidden" name="status_filter" value="{{ selected_status or '' }}" />
-                <input type="hidden" name="patient_query" value="{{ patient_query }}" />
                 <button class="ghost-button" type="submit">Confirmar</button>
               </form>
-              {% endif %}
-              {% if appointment.status.value in ["reserved", "confirmed"] %}
               <form method="post" action="/app/appointments/{{ appointment.id }}/status">
                 <input type="hidden" name="action" value="complete" />
-                <input type="hidden" name="selected_date" value="{{ agenda_date }}" />
-                <input type="hidden" name="professional_id" value="{{ selected_professional_id or '' }}" />
-                <input type="hidden" name="status_filter" value="{{ selected_status or '' }}" />
-                <input type="hidden" name="patient_query" value="{{ patient_query }}" />
                 <button class="ghost-button" type="submit">Completar</button>
               </form>
-              {% endif %}
-              {% if appointment.status.value != "cancelled" %}
               <form method="post" action="/app/appointments/{{ appointment.id }}/status">
                 <input type="hidden" name="action" value="cancel" />
-                <input type="hidden" name="selected_date" value="{{ agenda_date }}" />
-                <input type="hidden" name="professional_id" value="{{ selected_professional_id or '' }}" />
-                <input type="hidden" name="status_filter" value="{{ selected_status or '' }}" />
-                <input type="hidden" name="patient_query" value="{{ patient_query }}" />
+                <button class="ghost-button danger" type="submit">Cancelar</button>
+              </form>
+              {% elif appointment.status.value == "confirmed" %}
+              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
+                <input type="hidden" name="action" value="complete" />
+                <button class="ghost-button" type="submit">Completar</button>
+              </form>
+              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
+                <input type="hidden" name="action" value="cancel" />
                 <button class="ghost-button danger" type="submit">Cancelar</button>
               </form>
               {% endif %}
@@ -142,7 +107,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6">No hay turnos para los filtros seleccionados.</td>
+          <td colspan="5">No hay turnos para los filtros seleccionados.</td>
         </tr>
         {% endfor %}
       </tbody>
