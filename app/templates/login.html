@@ -30,7 +30,7 @@
         <section class="login-card">
           <div class="eyebrow">Equipo ORAL</div>
           <h1>Entrar al panel</h1>
-          <p class="muted">La reserva del paciente vive en la web pública. Este acceso es solo para recepción y administración.</p>
+          <p class="muted">Este acceso es solo para recepción y administración.</p>
           {% if error %}
           <div class="alert alert-error">{{ error }}</div>
           {% endif %}
@@ -45,8 +45,6 @@
             </label>
             <button type="submit">Entrar</button>
           </form>
-          <p class="muted small">Si todavía no cargaste datos demo, ejecutá `python -m app.tasks.seed_demo`.</p>
-          <p class="muted small"><a class="cta-link subtle-link" href="/reservar">Ir a reserva para pacientes</a></p>
         </section>
       </main>
     </div>

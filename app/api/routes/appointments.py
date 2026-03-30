@@ -96,9 +96,16 @@ def update_appointment(
     payload: AppointmentUpdate,
     db: Session = Depends(get_db),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
     current_user: User = Depends(get_current_user),
 ):
-    return schedule_agent.update_appointment(db, appointment_id, payload, actor=current_user.username)
+    return schedule_agent.update_appointment(
+        db,
+        appointment_id,
+        payload,
+        followup_agent=followup_agent,
+        actor=current_user.username,
+    )
 
 
 @router.post("/{appointment_id}/reschedule", response_model=AppointmentRead)
@@ -128,9 +135,15 @@ def confirm_appointment(
     appointment_id: int,
     db: Session = Depends(get_db),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
     current_user: User = Depends(get_current_user),
 ):
-    return schedule_agent.confirm_appointment(db, appointment_id, actor=current_user.username)
+    return schedule_agent.confirm_appointment(
+        db,
+        appointment_id,
+        followup_agent=followup_agent,
+        actor=current_user.username,
+    )
 
 
 @router.post("/{appointment_id}/complete", response_model=AppointmentRead)

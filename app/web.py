@@ -15,7 +15,7 @@ from app.api.deps import (
     get_reception_agent,
     get_schedule_agent,
 )
-from app.core.enums import AppointmentStatus, NotificationStatus, UserRole
+from app.core.enums import AppointmentStatus, NotificationStatus, NotificationType, UserRole
 from app.core.exceptions import DomainError
 from app.db.session import get_db
 from app.models.user import User
@@ -324,7 +324,7 @@ def dashboard(
         template_name="admin_dashboard.html",
         current_user=current_user,
         page_title="Dashboard operativo",
-        page_subtitle="La agenda del dia es el centro de la operacion. El resto acompaña.",
+        page_subtitle="Agenda y accionables del dia",
         active_page="dashboard",
         professionals=professionals,
         appointments=appointments,
@@ -335,7 +335,10 @@ def dashboard(
             {"label": "Gestionar turnos", "href": "/app/appointments", "meta": "Cambios manuales, filtros y estados"},
             {"label": "Gestionar pacientes", "href": "/app/patients", "meta": "Edición puntual y control por DNI"},
             *(
-                [{"label": "Configurar agenda", "href": "/app/settings", "meta": "Disponibilidad puntual y recordatorios"}]
+                [
+                    {"label": "Gestionar notificaciones", "href": "/app/notifications", "meta": "Preparar y despachar pendientes"},
+                    {"label": "Configurar agenda", "href": "/app/settings", "meta": "Disponibilidad puntual por fecha"},
+                ]
                 if current_user.role == UserRole.ADMIN
                 else []
             ),
@@ -391,6 +394,21 @@ def appointments_page(
     if normalized_patient_query:
         filter_params["patient_query"] = normalized_patient_query
     filters_querystring = urlencode(filter_params)
+    manual_available_dates: dict[str, list[dict[str, str | int]]] = {}
+    for professional in professionals:
+        available_dates_raw = schedule_agent.list_available_dates(
+            db,
+            professional_id=professional.id,
+            date_from=date.today(),
+        )
+        manual_available_dates[str(professional.id)] = [
+            {
+                "value": available_day.isoformat(),
+                "label": available_day.strftime("%d/%m/%Y"),
+                "slots": slot_count,
+            }
+            for available_day, slot_count in available_dates_raw
+        ]
 
     return render_admin(
         request,
@@ -416,6 +434,7 @@ def appointments_page(
             "shown": len(filtered_appointments),
         },
         filters_querystring=filters_querystring,
+        manual_available_dates=manual_available_dates,
     )
 
 
@@ -469,6 +488,7 @@ def update_appointment_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
     redirect_params = {"selected_date": selected_date or date.today().isoformat()}
     if professional_id:
@@ -482,7 +502,12 @@ def update_appointment_status(
         if action == "reserve":
             appointment = schedule_agent.reserve_appointment(db, appointment_id, actor=current_user.username)
         elif action == "confirm":
-            appointment = schedule_agent.confirm_appointment(db, appointment_id, actor=current_user.username)
+            appointment = schedule_agent.confirm_appointment(
+                db,
+                appointment_id,
+                followup_agent=followup_agent,
+                actor=current_user.username,
+            )
         elif action == "complete":
             appointment = schedule_agent.complete_appointment(db, appointment_id, actor=current_user.username)
         elif action == "cancel":
@@ -537,6 +562,7 @@ def edit_appointment_submit(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
     try:
         appointment = schedule_agent.update_appointment(
@@ -549,6 +575,7 @@ def edit_appointment_submit(
                 reason=reason or None,
                 notes=notes or None,
             ),
+            followup_agent=followup_agent,
             actor=current_user.username,
         )
         return redirect_with_message(
@@ -573,7 +600,7 @@ def patients_page(
         template_name="admin_patients.html",
         current_user=current_user,
         page_title="Pacientes",
-        page_subtitle="Gestion manual secundaria. El alta principal vive en la web publica.",
+        page_subtitle="Gestion manual de pacientes.",
         active_page="patients",
         patients=patients,
         query=query or "",
@@ -813,7 +840,6 @@ def settings_page(
     current_user: User = Depends(get_current_user),
     professional_service: ProfessionalService = Depends(get_professional_service),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
     ensure_admin(current_user)
     professionals = active_professionals(db, professional_service)
@@ -821,23 +847,55 @@ def settings_page(
     grouped_windows = defaultdict(list)
     for row in availability_windows:
         grouped_windows[row.professional_id].append(row)
-
-    notifications = followup_agent.list_notifications(db)
-    notification_summary = {
-        "pending": len([item for item in notifications if item.status == NotificationStatus.PENDING]),
-        "sent": len([item for item in notifications if item.status == NotificationStatus.SENT]),
-        "failed": len([item for item in notifications if item.status == NotificationStatus.FAILED]),
-    }
     return render_admin(
         request,
         template_name="admin_settings.html",
         current_user=current_user,
         page_title="Configuracion",
-        page_subtitle="Disponibilidad puntual por fecha y motor de seguimiento.",
+        page_subtitle="Disponibilidad puntual por fecha y ajustes de agenda.",
         active_page="settings",
         professionals=professionals,
         grouped_windows=grouped_windows,
+    )
+
+
+@router.get("/app/notifications", response_class=HTMLResponse)
+def notifications_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+):
+    ensure_admin(current_user)
+    now = datetime.now().replace(microsecond=0)
+    notifications = followup_agent.list_notifications(db)
+    pending_reminders = [
+        item
+        for item in notifications
+        if item.status == NotificationStatus.PENDING and item.type == NotificationType.REMINDER
+    ]
+    notification_summary = {
+        "pending": len(pending_reminders),
+        "sent": len([item for item in notifications if item.status == NotificationStatus.SENT]),
+        "failed": len([item for item in notifications if item.status == NotificationStatus.FAILED]),
+    }
+    ready_to_send_notifications = [
+        item
+        for item in pending_reminders
+        if item.scheduled_for <= now
+        and item.appointment
+        and item.appointment.status == AppointmentStatus.CONFIRMED
+    ]
+    return render_admin(
+        request,
+        template_name="admin_notifications.html",
+        current_user=current_user,
+        page_title="Notificaciones",
+        page_subtitle="Preparación y despacho operativo de confirmaciones y recordatorios.",
+        active_page="notifications",
         notification_summary=notification_summary,
+        ready_to_send_notifications=ready_to_send_notifications,
+        ready_to_send_count=len(ready_to_send_notifications),
         smtp_configured=followup_agent.email_client.is_configured(),
         smtp_sender=followup_agent.settings.email_from,
         reminder_hours_ahead=followup_agent.settings.reminder_hours_ahead,
@@ -898,7 +956,7 @@ def prepare_reminders_from_admin(
 ):
     ensure_admin(current_user)
     prepared = followup_agent.prepare_upcoming_reminders(db, actor=current_user.username)
-    return redirect_with_message("/app/settings", message=f"Recordatorios preparados: {prepared}")
+    return redirect_with_message("/app/notifications", message=f"Recordatorios preparados: {prepared}")
 
 
 @router.post("/app/notifications/send")
@@ -909,4 +967,4 @@ def send_notifications_from_admin(
 ):
     ensure_admin(current_user)
     result = followup_agent.send_pending_notifications(db, actor=current_user.username)
-    return redirect_with_message("/app/settings", message=f"Enviados: {result['sent']}, omitidos: {result['skipped']}")
+    return redirect_with_message("/app/notifications", message=f"Enviados: {result['sent']}, omitidos: {result['skipped']}")

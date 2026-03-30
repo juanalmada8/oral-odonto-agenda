@@ -62,6 +62,7 @@
             <a href="/app/patients" class="nav-link {% if active_page == 'patients' %}active{% endif %}">Pacientes</a>
             {% if current_user.role.value == "admin" %}
             <a href="/app/professionals" class="nav-link {% if active_page == 'professionals' %}active{% endif %}">Profesionales</a>
+            <a href="/app/notifications" class="nav-link {% if active_page == 'notifications' %}active{% endif %}">Notificaciones</a>
             <a href="/app/settings" class="nav-link {% if active_page == 'settings' %}active{% endif %}">Configuración</a>
             {% endif %}
           </nav>
@@ -71,12 +72,11 @@
           <div class="user-card">
             <div class="avatar">{{ current_user.full_name[:1] }}</div>
             <div class="user-meta">
-              <strong>{{ current_user.full_name }}</strong>
+              <strong>{{ current_user.username }}</strong>
               <div class="muted small">Perfil {{ current_user.role.value }}</div>
             </div>
           </div>
           <div class="sidebar-links">
-            <a class="ghost-link" href="/reservar">Web paciente</a>
             <form method="post" action="/app/logout">
               <button class="ghost-button ghost-button-sidebar" type="submit">Salir</button>
             </form>

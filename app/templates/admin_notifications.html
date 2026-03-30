@@ -1,0 +1,64 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<section>
+  <article class="surface surface-main notifications-surface">
+    <div class="eyebrow">Seguimiento</div>
+    <h2>Motor de notificaciones</h2>
+    <p class="muted">Vista operativa para preparar y despachar comunicaciones de turnos confirmados.</p>
+
+    <ul class="clean-list">
+      <li>
+        <span>SMTP</span>
+        <strong>{% if smtp_configured %}configurado{% else %}sin configurar{% endif %}</strong>
+      </li>
+      <li><span>Reminders</span><strong>{{ reminder_hours_ahead }}h antes</strong></li>
+      <li><span>Remitente</span><strong>{{ smtp_sender or "-" }}</strong></li>
+      <li><span>Pendientes</span><strong>{{ notification_summary.pending }}</strong></li>
+      <li><span>Enviadas</span><strong>{{ notification_summary.sent }}</strong></li>
+      <li><span>Fallidas</span><strong>{{ notification_summary.failed }}</strong></li>
+    </ul>
+
+    <div class="notification-preview">
+      <div class="notification-preview-head">
+        <strong>Se enviarán ahora (solo turnos confirmados)</strong>
+        <span class="section-pill">{{ ready_to_send_count }} pendientes para despacho</span>
+      </div>
+      {% if ready_to_send_notifications %}
+      <ul class="notification-preview-list">
+        {% for item in ready_to_send_notifications[:10] %}
+        <li>
+          <div>
+            <strong>{{ item.recipient }}</strong>
+            <div class="muted small">{{ item.subject }}</div>
+          </div>
+          <span class="muted small">{{ item.type.value }} · {{ item.scheduled_for.strftime("%d/%m %H:%M") }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% if ready_to_send_count > 10 %}
+      <p class="muted small">Mostrando 10 de {{ ready_to_send_count }} notificaciones listas para enviar.</p>
+      {% endif %}
+      {% else %}
+      <p class="muted small">No hay notificaciones pendientes con turnos confirmados para enviar ahora.</p>
+      {% endif %}
+    </div>
+
+    <div class="button-row">
+      <form method="post" action="/app/notifications/prepare">
+        <button type="submit">Preparar recordatorios</button>
+      </form>
+      <form
+        method="post"
+        action="/app/notifications/send"
+        class="js-confirm-form"
+        data-confirm-title="Despachar notificaciones"
+        data-confirm-message="Se enviarán {{ ready_to_send_count }} notificaciones pendientes ahora."
+        data-confirm-accept="Enviar ahora"
+      >
+        <button class="secondary" type="submit" {% if ready_to_send_count == 0 %}disabled{% endif %}>Despachar pendientes</button>
+      </form>
+    </div>
+  </article>
+</section>
+{% endblock %}

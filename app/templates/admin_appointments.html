@@ -29,24 +29,30 @@
 
   <details class="foldout">
     <summary>Crear turno manual</summary>
-    <form method="post" action="/app/appointments" class="form-grid">
+    <form method="post" action="/app/appointments" class="form-grid" id="manual-appointment-form">
       <select name="patient_id" required>
         <option value="">Paciente</option>
         {% for patient in patients %}
         <option value="{{ patient.id }}">{{ patient.last_name }}, {{ patient.first_name }} · DNI {{ patient.dni }}</option>
         {% endfor %}
       </select>
-      <select name="professional_id" required>
+      <select name="professional_id" id="manual-professional" required>
         <option value="">Profesional</option>
         {% for professional in professionals %}
         <option value="{{ professional.id }}">{{ professional.first_name }} {{ professional.last_name }}</option>
         {% endfor %}
       </select>
-      <input name="starts_at" type="datetime-local" required />
-      <input name="duration_minutes" type="number" min="10" max="240" value="30" />
+      <select name="manual_date" id="manual-date" disabled required>
+        <option value="">Elegí primero un profesional</option>
+      </select>
+      <select name="starts_at" id="manual-starts-at" disabled required>
+        <option value="">Elegí fecha para ver horarios</option>
+      </select>
+      <input name="duration_minutes" type="hidden" value="30" />
       <input name="reason" placeholder="Motivo" />
       <textarea name="notes" placeholder="Notas"></textarea>
-      <button type="submit">Guardar turno</button>
+      <p class="muted small" id="manual-slot-hint">Seleccioná profesional y fecha para habilitar horarios reales.</p>
+      <button type="submit" id="manual-submit" disabled>Guardar turno</button>
     </form>
   </details>
 
@@ -114,4 +120,121 @@
     </table>
   </div>
 </section>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const manualAvailableDates = {{ manual_available_dates | tojson }};
+    const professionalSelect = document.getElementById("manual-professional");
+    const dateSelect = document.getElementById("manual-date");
+    const slotSelect = document.getElementById("manual-starts-at");
+    const submitButton = document.getElementById("manual-submit");
+    const hint = document.getElementById("manual-slot-hint");
+
+    if (!professionalSelect || !dateSelect || !slotSelect || !submitButton || !hint) return;
+
+    const resetSlots = (message) => {
+      slotSelect.innerHTML = "";
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = message;
+      slotSelect.appendChild(option);
+      slotSelect.disabled = true;
+      submitButton.disabled = true;
+    };
+
+    const resetDates = (message) => {
+      dateSelect.innerHTML = "";
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = message;
+      dateSelect.appendChild(option);
+      dateSelect.disabled = true;
+      resetSlots("Elegí fecha para ver horarios");
+    };
+
+    const formatHour = (isoValue) => {
+      const parsed = new Date(isoValue);
+      if (Number.isNaN(parsed.getTime())) return "";
+      return parsed.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+    };
+
+    const loadSlots = async (professionalId, selectedDate) => {
+      resetSlots("Buscando horarios...");
+      hint.textContent = "Consultando horarios habilitados para ese profesional...";
+      try {
+        const response = await fetch(
+          `/api/v1/availability?professional_id=${encodeURIComponent(professionalId)}&date=${encodeURIComponent(selectedDate)}`
+        );
+        if (!response.ok) throw new Error("manual-slots-fetch-failed");
+        const payload = await response.json();
+        const slots = payload.slots || [];
+        if (!slots.length) {
+          resetSlots("Sin horarios para esa fecha");
+          hint.textContent = "No hay horarios disponibles para esa fecha. Elegí otra.";
+          return;
+        }
+
+        slotSelect.innerHTML = "";
+        const defaultOption = document.createElement("option");
+        defaultOption.value = "";
+        defaultOption.textContent = "Elegí horario";
+        slotSelect.appendChild(defaultOption);
+
+        slots.forEach((slot) => {
+          const option = document.createElement("option");
+          option.value = slot.starts_at;
+          option.textContent = `${formatHour(slot.starts_at)} a ${formatHour(slot.ends_at)}`;
+          slotSelect.appendChild(option);
+        });
+
+        slotSelect.disabled = false;
+        hint.textContent = "Seleccioná un horario disponible y guardá el turno.";
+      } catch (error) {
+        resetSlots("No se pudieron cargar horarios");
+        hint.textContent = "No pudimos cargar horarios ahora. Reintentá.";
+      }
+    };
+
+    professionalSelect.addEventListener("change", () => {
+      const professionalId = professionalSelect.value;
+      if (!professionalId) {
+        resetDates("Elegí primero un profesional");
+        hint.textContent = "Seleccioná profesional y fecha para habilitar horarios reales.";
+        return;
+      }
+
+      const availableDates = manualAvailableDates[String(professionalId)] || [];
+      if (!availableDates.length) {
+        resetDates("Este profesional no tiene fechas habilitadas");
+        hint.textContent = "Este profesional no tiene disponibilidad cargada por ahora.";
+        return;
+      }
+
+      dateSelect.innerHTML = "";
+      availableDates.forEach((item, index) => {
+        const option = document.createElement("option");
+        option.value = item.value;
+        option.textContent = `${item.label} · ${item.slots} horarios`;
+        if (index === 0) option.selected = true;
+        dateSelect.appendChild(option);
+      });
+      dateSelect.disabled = false;
+      void loadSlots(professionalId, dateSelect.value);
+    });
+
+    dateSelect.addEventListener("change", () => {
+      const professionalId = professionalSelect.value;
+      const selectedDate = dateSelect.value;
+      if (!professionalId || !selectedDate) {
+        resetSlots("Elegí fecha para ver horarios");
+        return;
+      }
+      void loadSlots(professionalId, selectedDate);
+    });
+
+    slotSelect.addEventListener("change", () => {
+      submitButton.disabled = !slotSelect.value;
+    });
+  });
+</script>
 {% endblock %}
