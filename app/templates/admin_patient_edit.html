@@ -18,16 +18,17 @@
     </label>
     <div class="button-row">
       <button type="submit">Guardar cambios</button>
-      <button
-        class="ghost-button danger"
-        type="submit"
-        formaction="/app/patients/{{ patient.id }}/delete"
-        formmethod="post"
-        onclick="return confirm('¿Querés borrar este paciente? Si tiene historial no se podrá eliminar.');"
-      >
-        Borrar paciente
-      </button>
     </div>
+  </form>
+  <form
+    method="post"
+    action="/app/patients/{{ patient.id }}/delete"
+    class="button-row js-confirm-form"
+    data-confirm-title="Borrar paciente"
+    data-confirm-message="¿Querés borrar este paciente? Si tiene turnos activos no se va a poder eliminar."
+    data-confirm-accept="Borrar"
+  >
+    <button class="ghost-button danger" type="submit">Borrar paciente</button>
   </form>
 </section>
 {% endblock %}

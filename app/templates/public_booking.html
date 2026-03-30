@@ -60,6 +60,14 @@
           <div class="booking-feedback-copy">
             <strong>Reserva confirmada</strong>
             <p>{{ message }}</p>
+            {% if booking_summary %}
+            <ul class="booking-feedback-meta">
+              <li><span>Profesional</span><strong>{{ booking_summary.professional }}</strong></li>
+              <li><span>Fecha</span><strong>{{ booking_summary.date }}</strong></li>
+              <li><span>Horario</span><strong>{{ booking_summary.time }}</strong></li>
+              <li><span>Estado</span><strong>{{ booking_summary.status }}</strong></li>
+            </ul>
+            {% endif %}
           </div>
         </div>
         {% endif %}
@@ -83,15 +91,18 @@
           <span class="section-pill">Solo fechas reales</span>
         </div>
         <form method="get" action="/reservar" class="stack" id="availability-form">
-          <select name="professional_id" required>
+          <select name="professional_id" data-auto-submit-on-change>
+            <option value="" {% if not selected_professional %}selected{% endif %}>Elegí un profesional</option>
             {% for professional in professionals %}
             <option value="{{ professional.id }}" {% if selected_professional and selected_professional.id == professional.id %}selected{% endif %}>
               {{ professional.first_name }} {{ professional.last_name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}
             </option>
             {% endfor %}
           </select>
-          <select name="selected_date" {% if not available_dates %}disabled{% endif %} required>
-            {% if available_dates %}
+          <select name="selected_date" {% if not selected_professional or not available_dates %}disabled{% endif %} required>
+            {% if not selected_professional %}
+            <option value="">Elegí primero un profesional</option>
+            {% elif available_dates %}
             {% for item in available_dates %}
             <option value="{{ item.value }}" {% if selected_date == item.value %}selected{% endif %}>
               {{ item.label }} · {{ item.slots }} horarios
@@ -101,9 +112,9 @@
             <option value="">Sin fechas disponibles</option>
             {% endif %}
           </select>
-          <button type="submit" {% if not available_dates %}disabled{% endif %}>Ver horarios</button>
+          <button type="submit" {% if not selected_professional or not available_dates %}disabled{% endif %}>Ver horarios</button>
         </form>
-        {% if available_dates %}
+        {% if selected_professional and available_dates %}
         <div class="date-pill-grid">
           {% for item in available_dates[:6] %}
           <span class="date-pill {% if selected_date == item.value %}active{% endif %}">
@@ -112,6 +123,8 @@
           {% endfor %}
         </div>
         <p class="muted small booking-note">Te mostramos solo fechas con disponibilidad real para ese profesional.</p>
+        {% elif not selected_professional %}
+        <p class="muted small booking-note">Seleccioná un profesional para ver sus fechas disponibles.</p>
         {% else %}
         <p class="muted small booking-note">Este profesional no tiene fechas habilitadas por ahora. Elegí otro o volvé más tarde.</p>
         {% endif %}
@@ -184,8 +197,10 @@
         document.addEventListener("submit", async (event) => {
           const availabilityForm = event.target.closest("#availability-form");
           if (!availabilityForm) return;
+          if (availabilityForm.dataset.submitting === "true") return;
 
           event.preventDefault();
+          availabilityForm.dataset.submitting = "true";
 
           const submitButton = availabilityForm.querySelector('button[type="submit"]');
           const params = new URLSearchParams(new FormData(availabilityForm));
@@ -225,11 +240,25 @@
           } catch (error) {
             window.location.href = `${url}#booking-flow`;
           } finally {
+            delete availabilityForm.dataset.submitting;
             if (submitButton) {
               submitButton.disabled = false;
               submitButton.textContent = "Ver horarios";
             }
           }
+        });
+
+        document.addEventListener("change", (event) => {
+          const professionalSelect = event.target.closest("#availability-form select[name='professional_id'][data-auto-submit-on-change]");
+          if (!professionalSelect) return;
+          const form = professionalSelect.form;
+          if (!form) return;
+          if (form.dataset.submitting === "true") return;
+          if (typeof form.requestSubmit === "function") {
+            form.requestSubmit();
+            return;
+          }
+          form.submit();
         });
 
         const revealItems = document.querySelectorAll("[data-reveal]");

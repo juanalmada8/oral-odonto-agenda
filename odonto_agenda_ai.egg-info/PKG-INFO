@@ -19,7 +19,7 @@ Provides-Extra: dev
 Requires-Dist: httpx>=0.28.0; extra == "dev"
 Requires-Dist: pytest>=8.3.0; extra == "dev"
 
-# odonto-agenda-ai
+# oral-odonto-agenda
 
 MVP backend para gestion de turnos de un consultorio odontologico, construido con FastAPI, SQLAlchemy, PostgreSQL y Alembic. La logica se organiza como una mini organizacion de agentes internos, pero implementada como servicios simples, mantenibles y desacoplados.
 
@@ -58,8 +58,7 @@ odonto-agenda-ai/
 
 - `Patient`: datos del paciente y observaciones.
 - `Professional`: odontologos o profesionales del consultorio.
-- `WorkingHours`: horarios laborales configurables por profesional y dia de semana.
-- `HolidayBlock`: bloqueos de feriados o dias no laborables, globales o por profesional.
+- `AvailabilityWindow`: disponibilidades puntuales por fecha y rango horario para cada profesional.
 - `Appointment`: turno con estado, duracion, observaciones y relacion con paciente y profesional.
 - `Notification`: cola de notificaciones para confirmaciones y recordatorios.
 - `AuditLog`: logs basicos de acciones importantes.
@@ -126,6 +125,25 @@ Credenciales demo:
 - `admin / demo12345`
 - `recepcion / demo12345`
 
+## Modo rapido sin Docker
+
+Si no tenes Docker disponible y queres probar el MVP rapido, podés usar SQLite local:
+
+```bash
+cp .env.sqlite.example .env
+source .venv/bin/activate
+alembic upgrade head
+python -m app.tasks.seed_demo
+uvicorn app.main:app --reload
+```
+
+En este modo:
+
+- la app funciona para pruebas locales
+- no necesitás PostgreSQL ni MailHog
+- los emails quedan preparados en la cola, pero no se enviarán realmente si `SMTP_HOST` está vacío
+- la base SQLite se guarda en `/tmp/odonto_agenda_local.db` para evitar problemas de permisos sobre la carpeta del proyecto
+
 ## Ejecucion con Docker
 
 ```bash
@@ -173,14 +191,22 @@ Los tests cubren:
 La app ahora incluye una interfaz web ligera para probar el flujo operativo sin depender solo de Swagger:
 
 - login en `/app/login`
-- panel de recepcion en `/app`
-- alta de pacientes
-- alta de turnos
-- vista de agenda del dia
-- botones para preparar y enviar recordatorios
-- seccion admin para crear profesionales y horarios
+- dashboard operativo en `/app`
+- reserva publica para pacientes en `/reservar`
+- navegación separada en `Dashboard`, `Turnos`, `Pacientes`, `Profesionales`, `Configuración`
+- agenda del día como módulo principal del dashboard
+- gestión manual secundaria de pacientes y turnos fuera de la home
+- configuración de agenda profesional y bloqueos en sección propia
+- botones para preparar y enviar recordatorios desde configuración
 
 La UI usa la misma logica de negocio que la API, no un flujo paralelo.
+
+## Criterios de negocio aplicados
+
+- La web pública del paciente es el canal principal para reservar turnos.
+- El panel admin quedó orientado a operación diaria, no a formularios masivos.
+- El identificador principal del paciente es el `DNI`.
+- Si un paciente vuelve a reservar con el mismo `DNI`, se reutiliza el registro y no se duplica.
 
 ## Autenticacion y roles
 
@@ -212,8 +238,7 @@ Endpoints utiles:
 - `GET /api/v1/appointments/weekly`
 - `GET /api/v1/availability`
 - `GET /api/v1/availability/week`
-- `GET/POST/PUT/DELETE /api/v1/availability/working-hours`
-- `GET/POST/DELETE /api/v1/availability/holidays`
+- `GET/POST/PUT/DELETE /api/v1/availability/windows`
 - `GET /api/v1/notifications`
 - `POST /api/v1/notifications/prepare-reminders`
 - `POST /api/v1/notifications/send-pending`

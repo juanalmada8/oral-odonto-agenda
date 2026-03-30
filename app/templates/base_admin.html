@@ -7,6 +7,40 @@
     <title>{{ page_title }} | ORAL</title>
     <link rel="icon" type="image/png" href="{{ brand_logo }}" />
     <link rel="stylesheet" href="/static/styles.css" />
+    <style>
+      #confirm-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 4000;
+        display: none;
+        place-items: center;
+        padding: 20px;
+      }
+      #confirm-modal.is-open {
+        display: grid;
+      }
+      #confirm-modal .confirm-modal__backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 18, 28, 0.52);
+        backdrop-filter: blur(4px);
+      }
+      #confirm-modal .confirm-modal__panel {
+        position: relative;
+        width: min(560px, 100%);
+        border-radius: 22px;
+        border: 1px solid rgba(15, 35, 51, 0.12);
+        background: linear-gradient(165deg, #ffffff 0%, #f8fbfd 100%);
+        box-shadow: 0 34px 72px rgba(8, 22, 34, 0.22);
+        padding: 26px;
+      }
+      #confirm-modal .confirm-modal__actions {
+        margin-top: 22px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+    </style>
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -70,5 +104,80 @@
         {% block content %}{% endblock %}
       </main>
     </div>
+
+    <div id="confirm-modal" class="confirm-modal" aria-hidden="true">
+      <div class="confirm-modal__backdrop" data-confirm-close></div>
+      <div class="confirm-modal__panel" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <h3 id="confirm-modal-title" class="confirm-modal__title">Confirmar acción</h3>
+        <p id="confirm-modal-message" class="confirm-modal__message">¿Querés continuar?</p>
+        <div class="confirm-modal__actions">
+          <button type="button" class="ghost-button" data-confirm-cancel>Cancelar</button>
+          <button type="button" class="ghost-button danger" data-confirm-accept>Aceptar</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const modal = document.getElementById("confirm-modal");
+        const title = document.getElementById("confirm-modal-title");
+        const message = document.getElementById("confirm-modal-message");
+        const cancelBtn = modal?.querySelector("[data-confirm-cancel]");
+        const acceptBtn = modal?.querySelector("[data-confirm-accept]");
+        const closeBtn = modal?.querySelector("[data-confirm-close]");
+
+        if (!modal || !title || !message || !cancelBtn || !acceptBtn || !closeBtn) return;
+
+        let pendingForm = null;
+        let pendingSubmitter = null;
+
+        const hideModal = () => {
+          modal.classList.remove("is-open");
+          modal.setAttribute("aria-hidden", "true");
+          pendingForm = null;
+          pendingSubmitter = null;
+        };
+
+        const showModal = ({ modalTitle, modalMessage, modalAccept }) => {
+          title.textContent = modalTitle || "Confirmar acción";
+          message.textContent = modalMessage || "¿Querés continuar?";
+          acceptBtn.textContent = modalAccept || "Aceptar";
+          modal.classList.add("is-open");
+          modal.setAttribute("aria-hidden", "false");
+        };
+
+        document.querySelectorAll("form.js-confirm-form").forEach((form) => {
+          form.addEventListener("submit", (event) => {
+            if (form.dataset.skipConfirm === "true") return;
+            event.preventDefault();
+            pendingForm = form;
+            pendingSubmitter = event.submitter || null;
+            showModal({
+              modalTitle: form.dataset.confirmTitle,
+              modalMessage: form.dataset.confirmMessage,
+              modalAccept: form.dataset.confirmAccept,
+            });
+          });
+        });
+
+        cancelBtn.addEventListener("click", hideModal);
+        closeBtn.addEventListener("click", hideModal);
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && modal.classList.contains("is-open")) hideModal();
+        });
+
+        acceptBtn.addEventListener("click", () => {
+          if (!pendingForm) return hideModal();
+          pendingForm.dataset.skipConfirm = "true";
+          if (pendingSubmitter && typeof pendingForm.requestSubmit === "function") {
+            pendingForm.requestSubmit(pendingSubmitter);
+          } else {
+            pendingForm.submit();
+          }
+          delete pendingForm.dataset.skipConfirm;
+          hideModal();
+        });
+      })();
+    </script>
   </body>
 </html>
