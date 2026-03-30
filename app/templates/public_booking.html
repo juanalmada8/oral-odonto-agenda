@@ -14,15 +14,13 @@
         <a class="topbar-brand" href="/reservar">
           <img class="brand-logo brand-logo-wide brand-logo-topbar" src="{{ brand_logo }}" alt="ORAL odontología familiar" />
         </a>
-        <a class="cta-link" href="/app/login">Ingreso del equipo</a>
       </div>
 
       <header class="hero">
         <div class="hero-copy">
-          <div class="eyebrow">Reserva online</div>
-          <h1>Reservá tu turno sin vueltas</h1>
+          <h1>Reservá tu turno</h1>
           <p class="muted">
-            Una experiencia simple, clara y amable para elegir profesional, fecha real disponible y dejar tu reserva en pocos pasos.
+            Elegí profesional, fecha y horario disponible.
           </p>
           <div class="hero-actions">
             <a class="hero-scroll-button" href="#booking-flow" data-scroll-target="#booking-flow">Agendar consulta</a>
@@ -33,13 +31,12 @@
           <div class="hero-visual-inner">
             <div class="hero-kicker">ORAL odontología familiar</div>
             <div class="hero-visual-copy">
-              <h2>Elegí profesional, mirá fechas reales y reservá en minutos.</h2>
-              <p>Sin llamadas, sin idas y vueltas, sin probar días al azar.</p>
+              <h2>Reserva online</h2>
+              <p>Solicitá tu turno en pocos pasos, con disponibilidad real por profesional.</p>
             </div>
             <div class="hero-highlights">
-              <span>Fechas reales disponibles</span>
+              <span>Disponibilidad real</span>
               <span>Reserva simple</span>
-              <span>Confirmación clara</span>
             </div>
           </div>
         </div>
@@ -48,10 +45,8 @@
       <section id="booking-flow" class="booking-section" data-reveal>
         <div class="booking-section-head">
           <div>
-            <div class="eyebrow">Agenda online</div>
-            <h2>Elegí tu fecha y completá la reserva</h2>
+            <h2>Reserva online</h2>
           </div>
-          <p class="muted">Primero mirás disponibilidad real. Después dejás tus datos y confirmás el turno.</p>
         </div>
 
         {% if message %}
@@ -85,10 +80,8 @@
         <section class="panel booking-sidebar">
         <div class="surface-head">
           <div>
-            <div class="eyebrow">Paso 1</div>
-            <h2>Elegí profesional y fecha</h2>
+            <h2>Profesional y fecha</h2>
           </div>
-          <span class="section-pill">Solo fechas reales</span>
         </div>
         <form method="get" action="/reservar" class="stack" id="availability-form">
           <select name="professional_id" data-auto-submit-on-change>
@@ -122,7 +115,7 @@
           </span>
           {% endfor %}
         </div>
-        <p class="muted small booking-note">Te mostramos solo fechas con disponibilidad real para ese profesional.</p>
+        <p class="muted small booking-note">Fechas disponibles para el profesional seleccionado.</p>
         {% elif not selected_professional %}
         <p class="muted small booking-note">Seleccioná un profesional para ver sus fechas disponibles.</p>
         {% else %}
@@ -133,10 +126,8 @@
         <section class="panel booking-main">
         <div class="surface-head">
           <div>
-            <div class="eyebrow">Paso 2</div>
-            <h2>Completá tus datos</h2>
+            <h2>Datos del paciente</h2>
           </div>
-          <span class="section-pill">Confirmación simple</span>
         </div>
         {% if selected_professional %}
         <p class="muted">

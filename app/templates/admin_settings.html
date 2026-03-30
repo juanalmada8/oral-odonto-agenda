@@ -1,7 +1,7 @@
 {% extends "base_admin.html" %}
 
 {% block content %}
-<section class="content-grid">
+<section>
   <article class="surface surface-main">
     <div class="surface-head">
       <div>
@@ -112,32 +112,6 @@
       {% endfor %}
     </div>
   </article>
-
-  <aside class="stack-layout">
-    <article class="surface">
-      <div class="eyebrow">Seguimiento</div>
-      <h2>Motor de notificaciones</h2>
-      <ul class="clean-list">
-        <li>
-          <span>SMTP</span>
-          <strong>{% if smtp_configured %}configurado{% else %}sin configurar{% endif %}</strong>
-        </li>
-        <li><span>Reminders</span><strong>{{ reminder_hours_ahead }}h antes</strong></li>
-        <li><span>Remitente</span><strong>{{ smtp_sender or "-" }}</strong></li>
-        <li><span>Pendientes</span><strong>{{ notification_summary.pending }}</strong></li>
-        <li><span>Enviadas</span><strong>{{ notification_summary.sent }}</strong></li>
-        <li><span>Fallidas</span><strong>{{ notification_summary.failed }}</strong></li>
-      </ul>
-      <div class="button-row">
-        <form method="post" action="/app/notifications/prepare">
-          <button type="submit">Preparar recordatorios</button>
-        </form>
-        <form method="post" action="/app/notifications/send">
-          <button class="secondary" type="submit">Despachar pendientes</button>
-        </form>
-      </div>
-    </article>
-  </aside>
 </section>
 <script>
   (() => {

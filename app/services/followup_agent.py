@@ -24,20 +24,46 @@ class FollowUpAgent:
     def queue_confirmation(self, db: Session, appointment: Appointment, actor: str = "followup_agent") -> Notification | None:
         if not appointment.patient.email:
             return None
-        return self._queue_notification(
+        now = datetime.now().replace(microsecond=0)
+        existing_confirmation = db.scalar(
+            select(Notification)
+            .where(Notification.appointment_id == appointment.id)
+            .where(Notification.type == NotificationType.CONFIRMATION)
+            .where(Notification.channel == NotificationChannel.EMAIL)
+            .order_by(Notification.id.desc())
+        )
+        subject = "Confirmacion de turno odontologico"
+        body = (
+            f"Hola {appointment.patient.first_name}, tu turno con "
+            f"{appointment.professional.first_name} {appointment.professional.last_name} "
+            f"quedo reservado para {appointment.starts_at:%Y-%m-%d %H:%M}."
+        )
+
+        if existing_confirmation:
+            if existing_confirmation.status == NotificationStatus.SENT:
+                return existing_confirmation
+            existing_confirmation.recipient = appointment.patient.email
+            existing_confirmation.subject = subject
+            existing_confirmation.body = body
+            existing_confirmation.scheduled_for = now
+            existing_confirmation.sent_at = None
+            existing_confirmation.error_message = None
+            existing_confirmation.status = NotificationStatus.PENDING
+            self._dispatch_notification(now, existing_confirmation)
+            return existing_confirmation
+
+        notification = self._queue_notification(
             db,
             appointment=appointment,
             type_=NotificationType.CONFIRMATION,
             recipient=appointment.patient.email,
-            subject="Confirmacion de turno odontologico",
-            body=(
-                f"Hola {appointment.patient.first_name}, tu turno con "
-                f"{appointment.professional.first_name} {appointment.professional.last_name} "
-                f"quedo reservado para {appointment.starts_at:%Y-%m-%d %H:%M}."
-            ),
-            scheduled_for=datetime.now().replace(microsecond=0),
+            subject=subject,
+            body=body,
+            scheduled_for=now,
             actor=actor,
         )
+        self._dispatch_notification(now, notification)
+        return notification
 
     def prepare_upcoming_reminders(
         self,
@@ -51,7 +77,7 @@ class FollowUpAgent:
         deadline = now + timedelta(hours=hours)
         appointments = db.scalars(
             select(Appointment)
-            .where(Appointment.status.in_([AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED]))
+            .where(Appointment.status == AppointmentStatus.CONFIRMED)
             .where(Appointment.starts_at >= now)
             .where(Appointment.starts_at <= deadline)
         ).all()
@@ -101,6 +127,20 @@ class FollowUpAgent:
 
         result = {"sent": 0, "skipped": 0}
         for notification in pending:
+            if notification.type == NotificationType.CONFIRMATION:
+                notification.status = NotificationStatus.SKIPPED
+                notification.error_message = "Confirmation notifications are sent immediately"
+                result["skipped"] += 1
+                continue
+
+            if notification.appointment_id and (
+                not notification.appointment or notification.appointment.status != AppointmentStatus.CONFIRMED
+            ):
+                notification.status = NotificationStatus.SKIPPED
+                notification.error_message = "Appointment is not confirmed"
+                result["skipped"] += 1
+                continue
+
             if notification.channel != NotificationChannel.EMAIL:
                 notification.status = NotificationStatus.SKIPPED
                 notification.error_message = "Channel not implemented yet"
@@ -114,14 +154,11 @@ class FollowUpAgent:
                 continue
 
             try:
-                self.email_client.send_email(
-                    recipient=notification.recipient,
-                    subject=notification.subject,
-                    body=notification.body,
-                )
-                notification.status = NotificationStatus.SENT
-                notification.sent_at = now
-                result["sent"] += 1
+                sent = self._dispatch_notification(now, notification)
+                if sent:
+                    result["sent"] += 1
+                else:
+                    result["skipped"] += 1
             except Exception as exc:  # pragma: no cover - network failures depend on environment
                 notification.status = NotificationStatus.FAILED
                 notification.error_message = str(exc)
@@ -175,3 +212,27 @@ class FollowUpAgent:
         )
         self.create_notification(db, notification, actor=actor)
         return notification
+
+    def _dispatch_notification(self, now: datetime, notification: Notification) -> bool:
+        if notification.channel != NotificationChannel.EMAIL:
+            notification.status = NotificationStatus.SKIPPED
+            notification.error_message = "Channel not implemented yet"
+            return False
+        if not self.email_client.is_configured():
+            notification.status = NotificationStatus.SKIPPED
+            notification.error_message = "SMTP not configured"
+            return False
+        try:
+            self.email_client.send_email(
+                recipient=notification.recipient,
+                subject=notification.subject,
+                body=notification.body,
+            )
+            notification.status = NotificationStatus.SENT
+            notification.sent_at = now
+            notification.error_message = None
+            return True
+        except Exception as exc:  # pragma: no cover - network failures depend on environment
+            notification.status = NotificationStatus.FAILED
+            notification.error_message = str(exc)
+            return False

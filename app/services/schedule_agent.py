@@ -122,6 +122,7 @@ class ScheduleAgent:
         appointment_id: int,
         payload: AppointmentUpdate,
         *,
+        followup_agent: FollowUpAgent | None = None,
         actor: str = "schedule_agent",
     ) -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
@@ -148,6 +149,8 @@ class ScheduleAgent:
             appointment.status = changes["status"]
             if appointment.status == AppointmentStatus.CONFIRMED:
                 appointment.confirmed_at = datetime.now().replace(microsecond=0)
+                if followup_agent:
+                    followup_agent.queue_confirmation(db, appointment, actor=actor)
             if appointment.status == AppointmentStatus.CANCELLED:
                 appointment.cancelled_at = datetime.now().replace(microsecond=0)
 
@@ -202,7 +205,14 @@ class ScheduleAgent:
         db.commit()
         return self.get_appointment(db, appointment.id)
 
-    def confirm_appointment(self, db: Session, appointment_id: int, *, actor: str = "schedule_agent") -> Appointment:
+    def confirm_appointment(
+        self,
+        db: Session,
+        appointment_id: int,
+        *,
+        followup_agent: FollowUpAgent | None = None,
+        actor: str = "schedule_agent",
+    ) -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
         if appointment.status == AppointmentStatus.CANCELLED:
             raise DomainError("Cancelled appointments must be reactivated first", status_code=409)
@@ -211,6 +221,8 @@ class ScheduleAgent:
         if appointment.status == AppointmentStatus.CONFIRMED:
             raise DomainError("Appointment is already confirmed", status_code=409)
         self._set_status(appointment, AppointmentStatus.CONFIRMED)
+        if followup_agent:
+            followup_agent.queue_confirmation(db, appointment, actor=actor)
         create_audit_log(
             db,
             action="appointment.confirmed",
