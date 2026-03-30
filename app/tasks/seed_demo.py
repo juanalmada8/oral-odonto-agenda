@@ -1,17 +1,12 @@
 from datetime import date, datetime, timedelta, time
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 
 from app.core.config import get_settings
-from app.core.enums import AppointmentStatus, UserRole
-from app.db.base import Base
+from app.core.enums import UserRole
 from app.db.session import SessionLocal
-from app.db import models  # noqa: F401
 from app.models.availability_window import AvailabilityWindow
 from app.models.appointment import Appointment
-from app.models.patient import Patient
-from app.models.professional import Professional
-from app.models.user import User
 from app.schemas.auth import UserCreate
 from app.schemas.availability import AvailabilityWindowCreate
 from app.schemas.patient import PatientCreate
@@ -25,10 +20,29 @@ from app.integrations.email import EmailClient
 from app.schemas.appointment import AppointmentCreate
 
 
+def _ensure_schema_ready(db) -> None:
+    required_tables = [
+        "users",
+        "patients",
+        "professionals",
+        "availability_windows",
+        "appointments",
+        "notifications",
+        "audit_logs",
+    ]
+    inspector = inspect(db.get_bind())
+    missing = [table for table in required_tables if not inspector.has_table(table)]
+    if missing:
+        raise RuntimeError(
+            "Database schema is not initialized. Run 'alembic upgrade head' before seeding demo data. "
+            f"Missing tables: {', '.join(missing)}"
+        )
+
+
 def main() -> None:
     db = SessionLocal()
     settings = get_settings()
-    Base.metadata.create_all(bind=db.get_bind())
+    _ensure_schema_ready(db)
     auth_service = AuthService(settings)
     reception_agent = ReceptionAgent()
     professional_service = ProfessionalService()

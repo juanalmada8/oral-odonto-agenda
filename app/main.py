@@ -1,5 +1,4 @@
 from pathlib import Path
-from contextlib import asynccontextmanager
 from urllib.parse import quote
 
 from fastapi import FastAPI, Request
@@ -10,21 +9,12 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
 from app.core.logging import configure_logging
-from app.db.base import Base
-from app.db.session import engine
-from app.db import models  # noqa: F401
 from app.web import router as web_router
 
 
 settings = get_settings()
 configure_logging(settings.debug)
 BASE_DIR = Path(__file__).resolve().parent
-
-
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    yield
 
 
 app = FastAPI(
@@ -37,7 +27,6 @@ app = FastAPI(
     docs_url="/docs" if settings.docs_enabled else None,
     redoc_url="/redoc" if settings.docs_enabled else None,
     openapi_url="/openapi.json" if settings.docs_enabled else None,
-    lifespan=lifespan,
 )
 
 
