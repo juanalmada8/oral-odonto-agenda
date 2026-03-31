@@ -9,6 +9,7 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
 from app.core.logging import configure_logging
+from app.db import models as _models  # noqa: F401  # Ensure all SQLAlchemy mappers are registered.
 from app.web import router as web_router
 
 

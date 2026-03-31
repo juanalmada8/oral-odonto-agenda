@@ -657,14 +657,14 @@ button:disabled {
 }
 
 .hero-copy h1 {
-  font-size: clamp(3rem, 5vw, 5.2rem);
+  font-size: clamp(2.75rem, 4.6vw, 4.7rem);
   line-height: 0.92;
   margin-bottom: 16px;
 }
 
 .hero-copy p {
   font-size: 1.18rem;
-  max-width: 560px;
+  max-width: 520px;
 }
 
 .hero-actions {
@@ -746,7 +746,7 @@ button:disabled {
 
 .hero-visual-copy h2 {
   color: white;
-  font-size: clamp(1.9rem, 2.6vw, 2.85rem);
+  font-size: clamp(2.05rem, 2.8vw, 3rem);
   line-height: 1;
   margin-bottom: 12px;
 }
@@ -772,6 +772,33 @@ button:disabled {
   color: white;
   font-size: 0.84rem;
   font-weight: 700;
+}
+
+.hero-local-accent {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.hero-local-accent .brand-accent {
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.hero-local-accent .brand-accent::before,
+.hero-local-accent .brand-accent::after {
+  width: 42px;
+  height: 7px;
+}
+
+.hero-local-accent .brand-accent::before {
+  background: rgba(239, 192, 241, 0.74);
+}
+
+.hero-local-accent .brand-accent::after {
+  background: rgba(222, 239, 61, 0.74);
 }
 
 .booking-section {
