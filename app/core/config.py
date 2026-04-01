@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import computed_field, field_validator
+from pydantic import computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -52,6 +52,19 @@ class Settings(BaseSettings):
         if normalized in {"0", "false", "no", "off", "release", "prod", "production"}:
             return False
         raise ValueError("Invalid debug value")
+
+    @model_validator(mode="after")
+    def validate_production_safety(self):
+        if self.app_env.lower() != "production":
+            return self
+
+        if self.secret_key == "change-me":
+            raise ValueError("SECRET_KEY must be changed in production")
+        if len(self.secret_key) < 32:
+            raise ValueError("SECRET_KEY must have at least 32 characters in production")
+        if self.database_url.startswith("sqlite"):
+            raise ValueError("DATABASE_URL must use PostgreSQL in production")
+        return self
 
 
 @lru_cache

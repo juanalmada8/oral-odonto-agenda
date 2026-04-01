@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install dev-up dev-down migrate seed run test lint format reminders
+.PHONY: help install dev-up dev-down migrate seed run test lint format reminders prod-check backup
 
 help:
 	@echo "Targets disponibles:"
@@ -14,6 +14,8 @@ help:
 	@echo "  lint       -> ejecutar ruff check"
 	@echo "  format     -> ejecutar ruff format"
 	@echo "  reminders  -> ejecutar task de despacho"
+	@echo "  prod-check -> validar configuración y conexión para producción"
+	@echo "  backup     -> generar backup PostgreSQL (pg_dump)"
 
 install:
 	pip install -e ".[dev]"
@@ -45,3 +47,8 @@ format:
 reminders:
 	python -m app.tasks.send_reminders
 
+prod-check:
+	python -m app.tasks.production_check
+
+backup:
+	bash ops/pg_backup.sh

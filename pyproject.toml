@@ -25,6 +25,7 @@ dependencies = [
 [project.scripts]
 odonto-seed-demo = "app.tasks.seed_demo:main"
 odonto-send-reminders = "app.tasks.send_reminders:main"
+odonto-prod-check = "app.tasks.production_check:main"
 
 [project.optional-dependencies]
 dev = [

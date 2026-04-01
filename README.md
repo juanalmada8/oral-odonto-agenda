@@ -130,7 +130,7 @@ Credenciales demo:
 
 ## Variables de entorno
 
-Ver `.env.example` y `.env.sqlite.example`.
+Ver `.env.example`, `.env.sqlite.example` y `.env.production.example`.
 
 Claves principales:
 
@@ -140,6 +140,26 @@ Claves principales:
 - `EMAIL_FROM`
 - `OPENAI_API_KEY` (opcional)
 - `REMINDER_HOURS_AHEAD`
+
+## Producción (PostgreSQL)
+
+Pasos mínimos:
+
+```bash
+cp .env.production.example .env
+alembic upgrade head
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Notas:
+
+- En `APP_ENV=production`, la app exige `SECRET_KEY` segura.
+- En `APP_ENV=production`, `DATABASE_URL` debe ser PostgreSQL (no SQLite).
+- La app no crea tablas automáticamente: siempre usar Alembic.
+
+Guía completa: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Checklist de variables: [docs/PROD_ENV_CHECKLIST.md](docs/PROD_ENV_CHECKLIST.md).
+Backups diarios: [docs/BACKUPS.md](docs/BACKUPS.md).
 
 ## Notificaciones por email (Gmail)
 
@@ -171,6 +191,12 @@ ruff check .
 
 # format (si querés aplicar formato ruff)
 ruff format .
+
+# chequeo preproducción (config + DB)
+python -m app.tasks.production_check
+
+# backup PostgreSQL (requiere pg_dump y DATABASE_URL)
+bash ops/pg_backup.sh
 ```
 
 También podés usar `make` (ver `Makefile`).
@@ -208,4 +234,3 @@ No incluye todavía (roadmap):
 - WhatsApp productivo
 - multiclínica / multisedes
 - reportes de negocio avanzados
-
