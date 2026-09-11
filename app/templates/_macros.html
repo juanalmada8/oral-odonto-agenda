@@ -1,0 +1,49 @@
+{% macro status_badge(status) -%}
+<span class="status-badge status-{{ status.value }}">{{ status | status_label }}</span>
+{%- endmacro %}
+
+{% macro payment_badge(appointment) -%}
+{% set payment = appointment.latest_payment %}
+{% if appointment.deposit_amount %}
+  {% if payment and payment.status.value == 'approved' %}
+  <span class="pay-badge pay-ok" title="Seña acreditada">Seña {{ appointment.deposit_amount | money }} ✓</span>
+  {% elif appointment.status.value == 'pending_payment' %}
+  <span class="pay-badge pay-waiting" title="Esperando el pago">Seña pendiente</span>
+  {% else %}
+  <span class="pay-badge" title="Seña no acreditada">Sin seña cobrada</span>
+  {% endif %}
+{% else %}
+  <span class="muted small">—</span>
+{% endif %}
+{%- endmacro %}
+
+{% set ACTION_LABELS = {
+  "confirm": "Confirmar",
+  "reserve": "Reservar",
+  "complete": "Atendido",
+  "no_show": "Ausente",
+  "cancel": "Cancelar",
+} %}
+
+{% macro appointment_actions(appointment, actions, return_to) -%}
+{% for action in actions %}
+  {% set label = ACTION_LABELS[action] %}
+  {% if action == 'reserve' and appointment.status.value in ['cancelled', 'expired'] %}{% set label = 'Reactivar' %}{% endif %}
+  {% if action == 'reserve' and appointment.status.value == 'pending_payment' %}{% set label = 'Reservar sin seña' %}{% endif %}
+  {% if action == 'confirm' and appointment.status.value == 'pending_payment' %}{% set label = 'Seña cobrada' %}{% endif %}
+  <form
+    method="post"
+    action="/app/appointments/{{ appointment.id }}/status"
+    {% if action == 'cancel' %}
+    class="js-confirm-form"
+    data-confirm-title="Cancelar turno"
+    data-confirm-message="Se cancela el turno de {{ appointment.patient.first_name }} {{ appointment.patient.last_name }} del {{ appointment.starts_at | long_date }} a las {{ appointment.starts_at.strftime('%H:%M') }} y se le avisa por email."
+    data-confirm-accept="Cancelar turno"
+    {% endif %}
+  >
+    <input type="hidden" name="action" value="{{ action }}" />
+    <input type="hidden" name="return_to" value="{{ return_to }}" />
+    <button class="ghost-button compact {% if action == 'cancel' %}danger{% endif %}" type="submit">{{ label }}</button>
+  </form>
+{% endfor %}
+{%- endmacro %}

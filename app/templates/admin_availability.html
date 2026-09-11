@@ -1,0 +1,142 @@
+{% extends "base_admin.html" %}
+
+{% macro time_select(name, selected) -%}
+<select name="{{ name }}" required>
+  {% for hour in range(7, 22) %}
+  {% for minute in [0, 15, 30, 45] %}
+  {% set value = '%02d:%02d' % (hour, minute) %}
+  <option value="{{ value }}" {% if value == selected %}selected{% endif %}>{{ value }}</option>
+  {% endfor %}
+  {% endfor %}
+</select>
+{%- endmacro %}
+
+{% macro duration_select() -%}
+<select name="slot_duration_minutes" required>
+  {% for minutes in [15, 20, 30, 40, 45, 60, 90] %}
+  <option value="{{ minutes }}" {% if minutes == 30 %}selected{% endif %}>{{ minutes }} min</option>
+  {% endfor %}
+</select>
+{%- endmacro %}
+
+{% macro professional_field() -%}
+{% if professionals | length == 1 %}
+<input type="hidden" name="professional_id" value="{{ professionals[0].id }}" />
+{% else %}
+<label class="field">
+  <span class="field-label">Profesional</span>
+  <select name="professional_id" required>
+    <option value="">Elegí un profesional</option>
+    {% for professional in professionals %}
+    <option value="{{ professional.id }}">{{ professional.first_name }} {{ professional.last_name }}</option>
+    {% endfor %}
+  </select>
+</label>
+{% endif %}
+{%- endmacro %}
+
+{% block content %}
+<section class="availability-tools">
+  <article class="surface">
+    <div class="eyebrow">Carga rápida</div>
+    <h2>Repetir cada semana</h2>
+    <p class="muted">Ej.: lunes, miércoles y viernes de 9 a 13 durante las próximas 4 semanas. Los días que ya tienen horarios superpuestos se saltean.</p>
+    <form method="post" action="/app/availability/recurring" class="form-grid">
+      {{ professional_field() }}
+      <fieldset class="weekday-picker">
+        <legend class="field-label">Días</legend>
+        {% for index, label in day_labels.items() %}
+        <label class="weekday-chip">
+          <input type="checkbox" name="weekdays" value="{{ index }}" {% if index < 5 %}checked{% endif %} />
+          <span>{{ label[:3] }}</span>
+        </label>
+        {% endfor %}
+      </fieldset>
+      <div class="two-cols">
+        <label class="field"><span class="field-label">Desde el día</span><input type="date" name="date_from" value="{{ today }}" min="{{ today }}" required /></label>
+        <label class="field"><span class="field-label">Hasta el día</span><input type="date" name="date_to" value="{{ default_until }}" min="{{ today }}" required /></label>
+      </div>
+      <div class="two-cols">
+        <label class="field"><span class="field-label">Horario desde</span>{{ time_select("start_time", "09:00") }}</label>
+        <label class="field"><span class="field-label">Horario hasta</span>{{ time_select("end_time", "13:00") }}</label>
+      </div>
+      <label class="field"><span class="field-label">Duración de cada turno</span>{{ duration_select() }}</label>
+      <button type="submit">Cargar disponibilidad</button>
+    </form>
+  </article>
+
+  <article class="surface">
+    <div class="eyebrow">Día puntual</div>
+    <h2>Agregar un bloque</h2>
+    <form method="post" action="/app/availability/windows" class="form-grid">
+      {{ professional_field() }}
+      <label class="field"><span class="field-label">Fecha</span><input name="availability_date" type="date" min="{{ today }}" required /></label>
+      <div class="two-cols">
+        <label class="field"><span class="field-label">Desde</span>{{ time_select("start_time", "09:00") }}</label>
+        <label class="field"><span class="field-label">Hasta</span>{{ time_select("end_time", "13:00") }}</label>
+      </div>
+      <label class="field"><span class="field-label">Duración de cada turno</span>{{ duration_select() }}</label>
+      <label class="field"><span class="field-label">Nota interna <em>(opcional)</em></span><input name="notes" /></label>
+      <button type="submit" class="secondary">Guardar bloque</button>
+    </form>
+
+    <details class="foldout">
+      <summary>Bloquear días (vacaciones, congresos)</summary>
+      <form
+        method="post"
+        action="/app/availability/clear"
+        class="form-grid js-confirm-form"
+        data-confirm-title="Bloquear días"
+        data-confirm-message="Se borran los horarios libres del período. Los días con turnos activos se mantienen hasta que los reprogrames."
+        data-confirm-accept="Bloquear"
+      >
+        {{ professional_field() }}
+        <div class="two-cols">
+          <label class="field"><span class="field-label">Desde</span><input type="date" name="date_from" min="{{ today }}" required /></label>
+          <label class="field"><span class="field-label">Hasta</span><input type="date" name="date_to" min="{{ today }}" required /></label>
+        </div>
+        <button type="submit" class="ghost-button danger">Bloquear período</button>
+      </form>
+    </details>
+  </article>
+</section>
+
+<section class="cards-grid availability-list">
+  {% for professional in professionals %}
+  <article class="info-card">
+    <div class="card-title-row">
+      <div>
+        <h3>{{ professional.first_name }} {{ professional.last_name }}</h3>
+        <p class="muted">{{ professional.specialty or "Sin especialidad" }}</p>
+      </div>
+      <span class="section-pill">{{ grouped_windows[professional.id] | length }} bloques</span>
+    </div>
+    <ul class="clean-list compact-list">
+      {% for row in grouped_windows[professional.id] %}
+      <li>
+        <div>
+          <strong>{{ row.availability_date | short_date }}</strong>
+          <span class="muted small">· {{ row.start_time.strftime("%H:%M") }} a {{ row.end_time.strftime("%H:%M") }} · {{ row.slot_duration_minutes or professional.default_appointment_duration }} min</span>
+          {% if row.notes %}<div class="muted small">{{ row.notes }}</div>{% endif %}
+        </div>
+        <form
+          method="post"
+          action="/app/availability/windows/{{ row.id }}/delete"
+          class="js-confirm-form"
+          data-confirm-title="Borrar disponibilidad"
+          data-confirm-message="¿Borrar el bloque del {{ row.availability_date | long_date }}? Si tiene turnos activos no se va a poder."
+          data-confirm-accept="Borrar"
+        >
+          <button class="ghost-button compact danger" type="submit">Borrar</button>
+        </form>
+      </li>
+      {% else %}
+      <li><span class="muted">Sin disponibilidad futura cargada.</span></li>
+      {% endfor %}
+    </ul>
+  </article>
+  {% else %}
+  <p class="muted">No hay profesionales activos.</p>
+  {% endfor %}
+</section>
+{% endblock %}

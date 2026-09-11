@@ -1,5 +1,5 @@
-from sqlalchemy import Boolean, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import UserRole
 from app.db.base import Base
@@ -20,3 +20,11 @@ class User(TimestampMixin, Base):
         server_default=UserRole.RECEPTIONIST.value,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    # Set for role=professional: the dentist this login belongs to (their agenda and availability).
+    professional_id: Mapped[int | None] = mapped_column(
+        ForeignKey("professional.id", ondelete="SET NULL"),
+        unique=True,
+        index=True,
+    )
+
+    professional = relationship("Professional")

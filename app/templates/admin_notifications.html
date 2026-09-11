@@ -1,64 +1,63 @@
 {% extends "base_admin.html" %}
 
 {% block content %}
-<section>
-  <article class="surface surface-main notifications-surface">
-    <div class="eyebrow">Seguimiento</div>
-    <h2>Motor de notificaciones</h2>
-    <p class="muted">Vista operativa para preparar y despachar comunicaciones de turnos confirmados.</p>
-
-    <ul class="clean-list">
-      <li>
-        <span>SMTP</span>
-        <strong>{% if smtp_configured %}configurado{% else %}sin configurar{% endif %}</strong>
-      </li>
-      <li><span>Reminders</span><strong>{{ reminder_hours_ahead }}h antes</strong></li>
-      <li><span>Remitente</span><strong>{{ smtp_sender or "-" }}</strong></li>
-      <li><span>Pendientes</span><strong>{{ notification_summary.pending }}</strong></li>
-      <li><span>Enviadas</span><strong>{{ notification_summary.sent }}</strong></li>
-      <li><span>Fallidas</span><strong>{{ notification_summary.failed }}</strong></li>
-    </ul>
-
-    <div class="notification-preview">
-      <div class="notification-preview-head">
-        <strong>Se enviarán ahora (solo turnos confirmados)</strong>
-        <span class="section-pill">{{ ready_to_send_count }} pendientes para despacho</span>
-      </div>
-      {% if ready_to_send_notifications %}
-      <ul class="notification-preview-list">
-        {% for item in ready_to_send_notifications[:10] %}
-        <li>
-          <div>
-            <strong>{{ item.recipient }}</strong>
-            <div class="muted small">{{ item.subject }}</div>
-          </div>
-          <span class="muted small">{{ item.type.value }} · {{ item.scheduled_for.strftime("%d/%m %H:%M") }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-      {% if ready_to_send_count > 10 %}
-      <p class="muted small">Mostrando 10 de {{ ready_to_send_count }} notificaciones listas para enviar.</p>
-      {% endif %}
-      {% else %}
-      <p class="muted small">No hay notificaciones pendientes con turnos confirmados para enviar ahora.</p>
-      {% endif %}
-    </div>
-
-    <div class="button-row">
-      <form method="post" action="/app/notifications/prepare">
-        <button type="submit">Preparar recordatorios</button>
-      </form>
-      <form
-        method="post"
-        action="/app/notifications/send"
-        class="js-confirm-form"
-        data-confirm-title="Despachar notificaciones"
-        data-confirm-message="Se enviarán {{ ready_to_send_count }} notificaciones pendientes ahora."
-        data-confirm-accept="Enviar ahora"
-      >
-        <button class="secondary" type="submit" {% if ready_to_send_count == 0 %}disabled{% endif %}>Despachar pendientes</button>
-      </form>
-    </div>
+<section class="metrics-grid">
+  <article class="metric-card">
+    <span class="metric-label">Email (SMTP)</span>
+    <strong class="metric-value metric-value-sm">{{ 'Activo' if smtp_configured else 'Sin configurar' }}</strong>
+    <span class="metric-foot">{{ smtp_sender or 'Configurá SMTP_HOST y EMAIL_FROM' }}</span>
   </article>
+  <article class="metric-card">
+    <span class="metric-label">WhatsApp</span>
+    <strong class="metric-value metric-value-sm">{{ 'Activo' if whatsapp_configured else 'Sin configurar' }}</strong>
+    <span class="metric-foot">{{ 'Cloud API de Meta' if whatsapp_configured else 'Ver docs/WHATSAPP.md' }}</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Enviadas</span>
+    <strong class="metric-value">{{ counts.sent }}</strong>
+    <span class="metric-foot">{{ sent_by_channel.email }} email · {{ sent_by_channel.whatsapp }} WhatsApp</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">En cola / fallidas</span>
+    <strong class="metric-value">{{ counts.pending }} / {{ counts.failed }}</strong>
+    <span class="metric-foot">Recordatorios {{ reminder_hours_ahead }} h antes</span>
+  </article>
+</section>
+
+<section class="surface surface-main">
+  <div class="surface-head">
+    <div>
+      <div class="eyebrow">Historial</div>
+      <h2>Últimas notificaciones</h2>
+      <p class="muted">El envío es automático y se reintenta si falla. Estos botones fuerzan una corrida manual.</p>
+    </div>
+    <div class="button-row">
+      <form method="post" action="/app/notifications/prepare"><button type="submit" class="secondary">Preparar recordatorios</button></form>
+      <form method="post" action="/app/notifications/send"><button type="submit">Enviar pendientes</button></form>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr><th>Programada</th><th>Canal</th><th>Tipo</th><th>Destinatario</th><th>Estado</th><th>Detalle</th></tr>
+      </thead>
+      <tbody>
+        {% set type_labels = {"confirmation": "Confirmación", "reminder": "Recordatorio", "cancellation": "Cancelación", "payment_link": "Link de pago", "custom": "Otro"} %}
+        {% set status_labels = {"pending": "En cola", "sent": "Enviada", "failed": "Fallida", "skipped": "Omitida"} %}
+        {% for item in notifications %}
+        <tr>
+          <td>{{ item.scheduled_for.strftime("%d/%m %H:%M") }}{% if item.sent_at %}<div class="muted small">enviada {{ item.sent_at.strftime("%d/%m %H:%M") }}</div>{% endif %}</td>
+          <td>{{ 'WhatsApp' if item.channel.value == 'whatsapp' else 'Email' }}</td>
+          <td>{{ type_labels[item.type.value] }}</td>
+          <td>{{ item.recipient | phone if item.channel.value == 'whatsapp' else item.recipient }}</td>
+          <td><span class="status-badge notif-{{ item.status.value }}">{{ status_labels[item.status.value] }}</span>{% if item.attempts > 1 %}<div class="muted small">{{ item.attempts }} intentos</div>{% endif %}</td>
+          <td class="small">{{ item.error_message or item.subject }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="empty-row">Todavía no se enviaron notificaciones.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
 {% endblock %}

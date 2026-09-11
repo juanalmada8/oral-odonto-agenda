@@ -115,6 +115,19 @@ def main() -> None:
             )
             professionals = professional_service.list_professionals(db)
 
+        if professionals and not auth_service.get_user_by_username(db, "laura"):
+            auth_service.create_user(
+                db,
+                UserCreate(
+                    username="laura",
+                    full_name=f"{professionals[0].first_name} {professionals[0].last_name}",
+                    email="laura.panel@example.com",
+                    password=DEMO_PASSWORD,
+                    role=UserRole.PROFESSIONAL,
+                    professional_id=professionals[0].id,
+                ),
+            )
+
         days = list(_next_business_days(BUSINESS_DAYS))
         for index, professional in enumerate(professionals[:2]):
             if db.scalar(select(AvailabilityWindow.id).where(AvailabilityWindow.professional_id == professional.id)):
@@ -178,6 +191,7 @@ def main() -> None:
         print("Demo data ready.")
         print(f"admin / {DEMO_PASSWORD}")
         print(f"recepcion / {DEMO_PASSWORD}")
+        print(f"laura / {DEMO_PASSWORD}  (profesional)")
     finally:
         db.close()
 

@@ -275,6 +275,11 @@
           if (slot) {
             const summary = document.querySelector("[data-summary-time]");
             if (summary) summary.textContent = slot.dataset.slotLabel;
+            const steps = document.querySelectorAll(".booking-steps li");
+            if (steps.length === 4) {
+              steps[1].className = "done";
+              steps[2].className = "current";
+            }
           }
         });
 

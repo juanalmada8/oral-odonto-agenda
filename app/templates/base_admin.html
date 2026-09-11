@@ -52,18 +52,26 @@
             </div>
             <div class="brand-meta">
               <strong>Agenda clínica</strong>
-              <div class="brand-caption">Recepción y operación diaria</div>
+              <div class="brand-caption">Turnos, señas y recordatorios</div>
             </div>
           </a>
 
-          <nav class="sidebar-nav">
-            <a href="/app" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+          {% set role = current_user.role.value %}
+          <nav class="sidebar-nav" aria-label="Secciones del panel">
+            <a href="/app" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">{{ 'Mi agenda' if role == 'professional' else 'Dashboard' }}</a>
             <a href="/app/appointments" class="nav-link {% if active_page == 'appointments' %}active{% endif %}">Turnos</a>
+            {% if role in ['admin', 'professional'] %}
+            <a href="/app/availability" class="nav-link {% if active_page == 'availability' %}active{% endif %}">{{ 'Mi disponibilidad' if role == 'professional' else 'Disponibilidad' }}</a>
+            {% endif %}
+            {% if role in ['admin', 'receptionist'] %}
             <a href="/app/patients" class="nav-link {% if active_page == 'patients' %}active{% endif %}">Pacientes</a>
-            {% if current_user.role.value == "admin" %}
+            {% endif %}
+            {% if role == 'admin' %}
             <a href="/app/professionals" class="nav-link {% if active_page == 'professionals' %}active{% endif %}">Profesionales</a>
+            <a href="/app/payments" class="nav-link {% if active_page == 'payments' %}active{% endif %}">Pagos</a>
             <a href="/app/notifications" class="nav-link {% if active_page == 'notifications' %}active{% endif %}">Notificaciones</a>
-            <a href="/app/settings" class="nav-link {% if active_page == 'settings' %}active{% endif %}">Configuración</a>
+            <a href="/app/metrics" class="nav-link {% if active_page == 'metrics' %}active{% endif %}">Métricas</a>
+            <a href="/app/users" class="nav-link {% if active_page == 'users' %}active{% endif %}">Usuarios</a>
             {% endif %}
           </nav>
         </div>
@@ -72,8 +80,8 @@
           <div class="user-card">
             <div class="avatar">{{ current_user.full_name[:1] }}</div>
             <div class="user-meta">
-              <strong>{{ current_user.username }}</strong>
-              <div class="muted small">Perfil {{ current_user.role.value }}</div>
+              <strong>{{ current_user.full_name }}</strong>
+              <div class="muted small">{{ current_user.role | role_label }}</div>
             </div>
           </div>
           <div class="sidebar-links">
@@ -87,11 +95,11 @@
       <main class="main-panel">
         <header class="page-header">
           <div>
-            <div class="eyebrow">Administración</div>
+            <div class="eyebrow">{{ current_user.role | role_label }}</div>
             <h1>{{ page_title }}</h1>
             <p class="muted">{{ page_subtitle }}</p>
           </div>
-          <div class="header-chip">Perfil {{ current_user.role.value }}</div>
+          <a class="header-chip" href="/reservar" target="_blank" rel="noopener">Ver reserva online ↗</a>
         </header>
 
         {% if message %}
