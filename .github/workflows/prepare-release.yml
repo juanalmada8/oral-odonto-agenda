@@ -19,7 +19,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Bump version and changelog
-        run: python3 ops/release.py prepare "${{ inputs.version }}"
+        env:
+          VERSION: ${{ inputs.version }}
+        # Inputs go through the environment, never interpolated into the shell command.
+        run: python3 ops/release.py prepare "$VERSION"
       - name: Open the release pull request
         env:
           GH_TOKEN: ${{ github.token }}

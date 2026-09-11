@@ -345,3 +345,19 @@ def test_metrics_page_and_csv_export(client, db_session, clinic):
     lines = export.content.decode("utf-8-sig").splitlines()
     assert lines[0].startswith("fecha;hora;duracion_min;profesional")
     assert lines[1].startswith("2026-03-30;09:00;30;Laura Gómez;Paciente222 Prueba;30111222;Atendido;consultorio")
+
+
+def test_csv_export_neutralizes_spreadsheet_formulas(client, db_session, clinic):
+    """The "motivo" is typed by the patient on the public site and lands in a file staff open in Excel."""
+    add_appointment(
+        db_session,
+        clinic["laura"],
+        starts_at=datetime(2026, 3, 30, 9, 0),
+        reason='=HYPERLINK("http://evil.example","cobrar")',
+    )
+    login(client, "admin")
+
+    export = client.get("/app/metrics/export.csv?date_from=2026-03-27&date_to=2026-03-31")
+
+    assert "'=HYPERLINK" in export.text
+    assert ";=HYPERLINK" not in export.text
