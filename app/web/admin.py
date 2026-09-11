@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import date, datetime
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -32,6 +32,7 @@ from app.services.followup_agent import FollowUpAgent
 from app.services.professional_service import ProfessionalService
 from app.services.reception_agent import ReceptionAgent
 from app.services.schedule_agent import ScheduleAgent
+from app.tasks.notifications import dispatch_due_notifications
 from app.utils.validation import parse_money
 from app.web.common import (
     active_professionals,
@@ -229,6 +230,7 @@ def appointments_page(
 
 @router.post("/app/appointments")
 def create_manual_appointment(
+    background_tasks: BackgroundTasks,
     patient_id: int = Form(...),
     professional_id: int = Form(...),
     starts_at: str = Form(...),
@@ -241,8 +243,8 @@ def create_manual_appointment(
     reception_agent: ReceptionAgent = Depends(get_reception_agent),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
-    selected_dt = datetime.fromisoformat(starts_at)
     try:
+        selected_dt = datetime.fromisoformat(starts_at)
         schedule_agent.create_appointment(
             db,
             AppointmentCreate(
@@ -258,6 +260,7 @@ def create_manual_appointment(
             followup_agent=followup_agent,
             actor=current_user.username,
         )
+        background_tasks.add_task(dispatch_due_notifications, followup_agent)
         return redirect_with_message(
             f"/app/appointments?selected_date={selected_dt.date().isoformat()}",
             message="Turno manual creado",
@@ -270,6 +273,7 @@ def create_manual_appointment(
 @router.post("/app/appointments/{appointment_id}/status")
 def update_appointment_status(
     appointment_id: int,
+    background_tasks: BackgroundTasks,
     action: str = Form(...),
     selected_date: str = Form(""),
     professional_id: str = Form(""),
@@ -319,6 +323,7 @@ def update_appointment_status(
         if patient_query:
             redirect_params["patient_query"] = patient_query
 
+        background_tasks.add_task(dispatch_due_notifications, followup_agent)
         return redirect_with_message(
             f"/app/appointments?{urlencode(redirect_params)}",
             message="Estado de turno actualizado",
@@ -352,6 +357,7 @@ def edit_appointment_page(
 @router.post("/app/appointments/{appointment_id}/edit")
 def edit_appointment_submit(
     appointment_id: int,
+    background_tasks: BackgroundTasks,
     starts_at: str = Form(...),
     duration_minutes: int = Form(30),
     status: str = Form(...),
@@ -376,6 +382,7 @@ def edit_appointment_submit(
             followup_agent=followup_agent,
             actor=current_user.username,
         )
+        background_tasks.add_task(dispatch_due_notifications, followup_agent)
         return redirect_with_message(
             f"/app/appointments?selected_date={appointment.starts_at.date().isoformat()}",
             message="Turno actualizado",

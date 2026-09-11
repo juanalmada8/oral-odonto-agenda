@@ -1906,6 +1906,20 @@ button:disabled {
   padding-inline: 24px;
 }
 
+.status-cancel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(15, 35, 51, 0.08);
+}
+
+.status-cancel p {
+  margin: 0;
+}
+
 .status-footnote {
   margin: 14px 0 0;
 }

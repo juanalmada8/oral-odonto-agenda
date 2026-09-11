@@ -13,6 +13,17 @@ y versionado semántico.
 
 ## [Unreleased]
 
+### Added — Notificaciones y bot de WhatsApp
+- Outbox de notificaciones con reintentos (backoff exponencial, `NOTIFICATION_MAX_ATTEMPTS`) y envío en
+  segundo plano apenas termina la operación; filas bloqueadas con `SKIP LOCKED` para no duplicar envíos.
+- Emails con diseño de marca (HTML + texto plano): confirmación, recordatorio y cancelación.
+- Recordatorios por WhatsApp Cloud API (plantilla aprobada con botones *Confirmo asistencia* /
+  *Necesito cancelar*) además del email; también para turnos reservados por el staff.
+- Bot de WhatsApp (`/webhooks/whatsapp`, firma `X-Hub-Signature-256`): confirma asistencia, cancela con
+  doble confirmación respetando `CANCELLATION_NOTICE_HOURS`, ignora números ajenos y reintentos de Meta.
+- El paciente puede cancelar desde el link de su turno (misma política de anticipación).
+- Tarea programada `odonto-run-scheduled`: vence holds impagos, prepara recordatorios y reintenta envíos.
+
 ### Added — Reserva con seña (Mercado Pago)
 - La reserva online bloquea el horario (`pending_payment`) y envía al paciente a pagar la seña con
   Checkout Pro; el turno se confirma solo cuando Mercado Pago aprueba el pago (webhook firmado con HMAC

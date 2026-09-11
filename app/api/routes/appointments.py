@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_followup_agent, get_reception_agent, get_schedule_agent, require_roles
@@ -17,6 +17,7 @@ from app.schemas.appointment import (
 from app.services.followup_agent import FollowUpAgent
 from app.services.reception_agent import ReceptionAgent
 from app.services.schedule_agent import ScheduleAgent
+from app.tasks.notifications import dispatch_due_notifications
 
 router = APIRouter(
     prefix="/appointments",
@@ -75,37 +76,43 @@ def get_appointment(
 @router.post("/", response_model=AppointmentRead, status_code=status.HTTP_201_CREATED)
 def create_appointment(
     payload: AppointmentCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
     reception_agent: ReceptionAgent = Depends(get_reception_agent),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
     current_user: User = Depends(get_current_user),
 ):
-    return schedule_agent.create_appointment(
+    appointment = schedule_agent.create_appointment(
         db,
         payload,
         reception_agent=reception_agent,
         followup_agent=followup_agent,
         actor=current_user.username,
     )
+    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    return appointment
 
 
 @router.put("/{appointment_id}", response_model=AppointmentRead)
 def update_appointment(
     appointment_id: int,
     payload: AppointmentUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
     current_user: User = Depends(get_current_user),
 ):
-    return schedule_agent.update_appointment(
+    appointment = schedule_agent.update_appointment(
         db,
         appointment_id,
         payload,
         followup_agent=followup_agent,
         actor=current_user.username,
     )
+    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    return appointment
 
 
 @router.post("/{appointment_id}/reschedule", response_model=AppointmentRead)
@@ -114,36 +121,56 @@ def reschedule_appointment(
     payload: AppointmentReschedule,
     db: Session = Depends(get_db),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
     current_user: User = Depends(get_current_user),
 ):
-    return schedule_agent.reschedule_appointment(db, appointment_id, payload, actor=current_user.username)
+    return schedule_agent.reschedule_appointment(
+        db,
+        appointment_id,
+        payload,
+        followup_agent=followup_agent,
+        actor=current_user.username,
+    )
 
 
 @router.post("/{appointment_id}/cancel", response_model=AppointmentRead)
 def cancel_appointment(
     appointment_id: int,
     payload: AppointmentStatusUpdate,
-    db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    current_user: User = Depends(get_current_user),
-):
-    return schedule_agent.cancel_appointment(db, appointment_id, notes=payload.notes, actor=current_user.username)
-
-
-@router.post("/{appointment_id}/confirm", response_model=AppointmentRead)
-def confirm_appointment(
-    appointment_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
     current_user: User = Depends(get_current_user),
 ):
-    return schedule_agent.confirm_appointment(
+    appointment = schedule_agent.cancel_appointment(
+        db,
+        appointment_id,
+        notes=payload.notes,
+        followup_agent=followup_agent,
+        actor=current_user.username,
+    )
+    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    return appointment
+
+
+@router.post("/{appointment_id}/confirm", response_model=AppointmentRead)
+def confirm_appointment(
+    appointment_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    current_user: User = Depends(get_current_user),
+):
+    appointment = schedule_agent.confirm_appointment(
         db,
         appointment_id,
         followup_agent=followup_agent,
         actor=current_user.username,
     )
+    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    return appointment
 
 
 @router.post("/{appointment_id}/complete", response_model=AppointmentRead)

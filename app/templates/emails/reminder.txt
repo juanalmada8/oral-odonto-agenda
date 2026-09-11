@@ -1,0 +1,14 @@
+{{ patient_first_name }}, se acerca tu turno.
+
+Día: {{ date_long_capitalized }}
+Horario: {{ time }} a {{ end_time }} h
+Profesional: {{ professional_name }}
+{% if clinic_address %}
+Dirección: {{ clinic_address }}
+{% endif %}
+
+Ver tu turno: {{ status_url }}
+
+Si no vas a poder venir, avisanos desde el link así otra persona puede usar el horario.
+
+{{ clinic_name }}{% if clinic_phone %} · Tel: {{ clinic_phone }}{% endif %}

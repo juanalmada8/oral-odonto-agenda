@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block preheader %}{{ date_long_capitalized }} a las {{ time }} h con {{ professional_name }}.{% endblock %}
+{% block content %}
+<p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#ff5b3a;">
+  {% if status == "confirmed" %}Turno confirmado{% else %}Turno reservado{% endif %}
+</p>
+<h1 style="margin:0 0 12px;font-size:28px;line-height:1.1;letter-spacing:-0.03em;color:#112433;">¡Te esperamos, {{ patient_first_name }}!</h1>
+<p style="margin:0;font-size:16px;line-height:1.6;color:#112433;">
+  {% if deposit_paid %}Recibimos tu seña y tu turno quedó confirmado.{% else %}Tu turno quedó registrado.{% endif %}
+  Estos son los detalles:
+</p>
+{% include "_details.html" %}
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 18px;">
+  <tr>
+    <td style="border-radius:999px;background:#ff5b3a;">
+      <a href="{{ status_url }}" style="display:inline-block;padding:14px 24px;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;">Ver mi turno</a>
+    </td>
+    <td style="padding-left:10px;">
+      <a href="{{ calendar_url }}" style="display:inline-block;padding:13px 20px;border:1px solid #d9e1e7;border-radius:999px;font-size:15px;font-weight:800;color:#0f5d83;text-decoration:none;">Agregar al calendario</a>
+    </td>
+  </tr>
+</table>
+<p style="margin:0 0 10px;font-size:14px;line-height:1.6;color:#66717a;">
+  Te vamos a mandar un recordatorio antes del turno. Si necesitás cancelar, hacelo desde
+  <a href="{{ status_url }}" style="color:#0f5d83;">el link de tu turno</a> o respondiendo el recordatorio de WhatsApp,
+  hasta {{ cancellation_notice_hours }} horas antes.
+</p>
+<p style="margin:0;font-size:13px;line-height:1.6;color:#66717a;">{{ deposit_policy }}</p>
+{% endblock %}

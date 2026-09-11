@@ -1,6 +1,7 @@
 import os
 from collections.abc import Generator
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 
 # Tests run against in-memory SQLite by default. Export TEST_DATABASE_URL (e.g. the CI PostgreSQL
 # service) to run the same suite on PostgreSQL, with the schema built by the Alembic migrations.
@@ -26,6 +27,8 @@ from app.db import models  # noqa: E402,F401
 from app.db import session as db_session_module  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
+from app.models.availability_window import AvailabilityWindow  # noqa: E402
+from app.models.professional import Professional  # noqa: E402
 from app.main import app  # noqa: E402
 from app.schemas.auth import UserCreate  # noqa: E402
 from app.services.auth_service import AuthService  # noqa: E402
@@ -35,6 +38,7 @@ IS_SQLITE = settings.database_url.startswith("sqlite")
 
 # Friday 2026-03-27 10:00 in the clinic timezone. Fixed so date-based rules are deterministic.
 FROZEN_NOW = datetime(2026, 3, 27, 10, 0, 0)
+MONDAY = date(2026, 3, 30)
 
 if IS_SQLITE:
     engine = create_engine(settings.database_url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
@@ -141,3 +145,31 @@ def token_headers(user) -> dict[str, str]:
 @pytest.fixture()
 def auth_headers(db_session: Session) -> dict[str, str]:
     return token_headers(create_user(db_session, username="admin", role=UserRole.ADMIN))
+
+
+@pytest.fixture()
+def make_professional(db_session):
+    def factory(*, deposit: Decimal | None = Decimal("10000"), days=(MONDAY,), name="Laura") -> int:
+        professional = Professional(
+            first_name=name,
+            last_name="Gómez",
+            specialty="General",
+            default_appointment_duration=30,
+            deposit_amount=deposit,
+        )
+        db_session.add(professional)
+        db_session.flush()
+        for day in days:
+            db_session.add(
+                AvailabilityWindow(
+                    professional_id=professional.id,
+                    availability_date=day,
+                    start_time=time(9, 0),
+                    end_time=time(12, 0),
+                    slot_duration_minutes=30,
+                )
+            )
+        db_session.commit()
+        return professional.id
+
+    return factory

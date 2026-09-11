@@ -28,7 +28,17 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_model: str = "gpt-5-mini"
 
-    reminder_hours_ahead: int = 24
+    reminder_hours_ahead: int = Field(default=24, ge=1, le=168)
+    notification_max_attempts: int = Field(default=4, ge=1, le=10)
+
+    # WhatsApp Cloud API (Meta). Reminders use an approved template with two quick-reply buttons.
+    whatsapp_access_token: str | None = None
+    whatsapp_phone_number_id: str | None = None
+    whatsapp_app_secret: str | None = None
+    whatsapp_verify_token: str | None = None
+    whatsapp_api_version: str = "v21.0"
+    whatsapp_reminder_template: str = "recordatorio_turno"
+    whatsapp_template_language: str = "es_AR"
 
     # Clinic identity shown to patients (emails, WhatsApp, booking pages).
     clinic_name: str = "ORAL odontología familiar"
@@ -119,6 +129,8 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL must use PostgreSQL in production")
         if not self.public_base_url.startswith("https://"):
             raise ValueError("PUBLIC_BASE_URL must be an https:// URL in production")
+        if self.whatsapp_access_token and not self.whatsapp_app_secret:
+            raise ValueError("WHATSAPP_APP_SECRET is required to verify WhatsApp webhooks in production")
         if self.deposit_default_amount > 0 and not self.mercadopago_access_token:
             raise ValueError("MERCADOPAGO_ACCESS_TOKEN is required when DEPOSIT_DEFAULT_AMOUNT > 0 in production")
         return self

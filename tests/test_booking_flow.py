@@ -9,41 +9,11 @@ from sqlalchemy import select
 from app.core.config import get_settings
 from app.core.enums import AppointmentStatus, NotificationType, PaymentStatus
 from app.models.appointment import Appointment
-from app.models.availability_window import AvailabilityWindow
 from app.models.notification import Notification
 from app.models.patient import Patient
-from app.models.professional import Professional
 
 MONDAY = date(2026, 3, 30)
 settings = get_settings()
-
-
-@pytest.fixture()
-def make_professional(db_session):
-    def factory(*, deposit: Decimal | None = Decimal("10000"), days=(MONDAY,), name="Laura") -> int:
-        professional = Professional(
-            first_name=name,
-            last_name="Gómez",
-            specialty="General",
-            default_appointment_duration=30,
-            deposit_amount=deposit,
-        )
-        db_session.add(professional)
-        db_session.flush()
-        for day in days:
-            db_session.add(
-                AvailabilityWindow(
-                    professional_id=professional.id,
-                    availability_date=day,
-                    start_time=time(9, 0),
-                    end_time=time(12, 0),
-                    slot_duration_minutes=30,
-                )
-            )
-        db_session.commit()
-        return professional.id
-
-    return factory
 
 
 def booking_form(professional_id: int, starts_at: str = "2026-03-30T09:00:00", **overrides) -> dict:

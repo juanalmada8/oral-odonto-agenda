@@ -100,6 +100,42 @@ class BookingAgent:
     def retry_checkout(self, db: Session, appointment: Appointment) -> BookingResult:
         return self._with_checkout(db, appointment)
 
+    def can_cancel_online(self, appointment: Appointment) -> bool:
+        if appointment.status not in {AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED}:
+            return False
+        notice = timedelta(hours=self.settings.cancellation_notice_hours)
+        return appointment.starts_at - clock.now() >= notice
+
+    def cancel_by_patient(self, db: Session, appointment: Appointment, *, channel: str) -> Appointment:
+        """Self-service cancellation (booking link or WhatsApp), honouring the notice period."""
+        if appointment.status not in {AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED}:
+            raise DomainError("Este turno ya no está activo.", status_code=409)
+        if not self.can_cancel_online(appointment):
+            phone = f" al {self.settings.clinic_phone}" if self.settings.clinic_phone else ""
+            raise DomainError(
+                f"Faltan menos de {self.settings.cancellation_notice_hours} horas para el turno, así que no se puede "
+                f"cancelar online. Comunicate con el consultorio{phone}.",
+                status_code=409,
+            )
+        self.schedule_agent.apply_transition(
+            db,
+            appointment,
+            AppointmentStatus.CANCELLED,
+            followup_agent=self.followup_agent,
+        )
+        note = f"Cancelado por el paciente ({channel})."
+        appointment.notes = f"{appointment.notes}\n{note}" if appointment.notes else note
+        create_audit_log(
+            db,
+            action="appointment.cancelled_by_patient",
+            entity_name="appointment",
+            entity_id=str(appointment.id),
+            actor=f"patient:{channel}",
+            description="Appointment cancelled by the patient",
+        )
+        self.schedule_agent.commit(db)
+        return appointment
+
     def _with_checkout(self, db: Session, appointment: Appointment) -> BookingResult:
         try:
             payment = self.payment_service.start_checkout(db, appointment)
