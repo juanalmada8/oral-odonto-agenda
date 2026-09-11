@@ -38,7 +38,8 @@ def run(followup_agent: FollowUpAgent | None = None) -> dict:
 
 
 def main() -> None:
-    configure_logging(get_settings().debug)
+    settings = get_settings()
+    configure_logging(settings.debug, json_format=settings.log_format == "json", project_id=settings.google_cloud_project)
     summary = run()
     logger.info("Scheduled run finished: %s", summary)
     print(json.dumps(summary))

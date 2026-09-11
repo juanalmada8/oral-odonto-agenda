@@ -46,12 +46,14 @@ rate_limiter = RateLimiter()
 
 
 def client_ip(request: Request) -> str:
-    if get_settings().trust_proxy_headers:
+    settings = get_settings()
+    if settings.trust_proxy_headers:
         forwarded = request.headers.get("x-forwarded-for", "")
-        # The load balancer appends the address it saw; earlier entries can be forged by the client.
+        # Each trusted proxy appends the address it saw, so the client is N entries from the end;
+        # anything further left was sent by the client and can be forged.
         hops = [hop.strip() for hop in forwarded.split(",") if hop.strip()]
-        if hops:
-            return hops[-1]
+        if len(hops) >= settings.trusted_proxy_count:
+            return hops[-settings.trusted_proxy_count]
     return request.client.host if request.client else "unknown"
 
 

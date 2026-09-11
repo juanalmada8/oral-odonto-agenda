@@ -44,6 +44,31 @@ def _check_settings(settings: Settings) -> tuple[list[str], list[str]]:
     if not settings.email_from:
         warnings.append("EMAIL_FROM vacío: faltará remitente para notificaciones.")
 
+    def problem(message: str) -> None:
+        (errors if in_production else warnings).append(message)
+
+    if not settings.public_base_url.startswith("https://"):
+        problem("PUBLIC_BASE_URL debe ser https:// (links de emails y callbacks de Mercado Pago).")
+    if settings.deposit_default_amount > 0 and not settings.mercadopago_access_token:
+        problem("Hay seña por defecto pero falta MERCADOPAGO_ACCESS_TOKEN.")
+    if settings.mercadopago_access_token and not settings.mercadopago_webhook_secret:
+        warnings.append("Falta MERCADOPAGO_WEBHOOK_SECRET: las notificaciones de pago no se validan con firma.")
+    if settings.mercadopago_access_token and settings.mercadopago_access_token.startswith("TEST-") and in_production:
+        warnings.append("MERCADOPAGO_ACCESS_TOKEN es de prueba (TEST-): no se cobra dinero real.")
+    whatsapp_fields = {
+        "WHATSAPP_ACCESS_TOKEN": settings.whatsapp_access_token,
+        "WHATSAPP_PHONE_NUMBER_ID": settings.whatsapp_phone_number_id,
+        "WHATSAPP_APP_SECRET": settings.whatsapp_app_secret,
+        "WHATSAPP_VERIFY_TOKEN": settings.whatsapp_verify_token,
+    }
+    missing_whatsapp = [name for name, value in whatsapp_fields.items() if not value]
+    if len(missing_whatsapp) == len(whatsapp_fields):
+        warnings.append("WhatsApp sin configurar: los recordatorios salen solo por email.")
+    elif missing_whatsapp:
+        problem(f"WhatsApp configurado a medias, faltan: {', '.join(missing_whatsapp)}.")
+    if in_production and not settings.trust_proxy_headers:
+        warnings.append("TRUST_PROXY_HEADERS=false: detrás de Cloud Run el rate limit vería la IP del balanceador.")
+
     return errors, warnings
 
 
@@ -65,6 +90,16 @@ def _check_database(database_url: str) -> list[str]:
         engine.dispose()
 
     return errors
+
+
+def _redact(url: str) -> str:
+    """Hide the password when printing connection strings."""
+    scheme, _, rest = url.partition("://")
+    if "@" not in rest:
+        return url
+    credentials, _, host = rest.rpartition("@")
+    user = credentials.split(":", 1)[0]
+    return f"{scheme}://{user}:***@{host}"
 
 
 def _print_lines(title: str, lines: Sequence[str]) -> None:
@@ -89,7 +124,7 @@ def main() -> None:
     print("Chequeo de producción ORAL")
     print(f"APP_ENV={settings.app_env}")
     print(f"DEBUG={settings.debug}")
-    print(f"DATABASE_URL={settings.database_url}")
+    print(f"DATABASE_URL={_redact(settings.database_url)}")
 
     _print_lines("\nAdvertencias:", warnings)
     _print_lines("\nErrores:", errors)

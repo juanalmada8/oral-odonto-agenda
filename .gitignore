@@ -15,3 +15,10 @@ htmlcov/
 .coverage
 *.egg-info/
 coverage.xml
+
+# Terraform
+infra/terraform/.terraform/
+*.tfstate
+*.tfstate.*
+infra/terraform/terraform.tfvars
+crash.log

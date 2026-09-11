@@ -1,53 +1,63 @@
-# Backups PostgreSQL (diario + retención)
+# Backups y restauración
 
-## Objetivo recomendado para v1
+La base tiene datos de pacientes y de pagos: el backup no es opcional.
 
-- Backup diario automático.
-- Retención mínima: 14 días.
-- Al menos una restauración de prueba por mes.
+## En producción (Cloud SQL)
 
-## Opción A (recomendada): backup gestionado del proveedor
+Terraform deja configurado:
 
-Si usás Render/Railway/Supabase/Neon, activá backups automáticos desde el panel.
+- **Backup diario automático** a las 06:00 UTC (03:00 en Buenos Aires), con 14 copias de retención.
+- **Point-in-time recovery**: permite restaurar a cualquier momento de los últimos 7 días.
 
-Ventajas:
-
-- Cero mantenimiento operativo.
-- Restauración guiada.
-- Menor riesgo de errores manuales.
-
-## Opción B: script propio con `pg_dump`
-
-El repo incluye:
-
-- `ops/pg_backup.sh`
-
-Ejemplo manual:
+Verificar:
 
 ```bash
-DATABASE_URL='postgresql://user:pass@host:5432/dbname' \
-BACKUP_DIR='/var/backups/oral' \
-RETENTION_DAYS=14 \
-bash ops/pg_backup.sh
+gcloud sql backups list --instance=oral-pg
 ```
 
-## Programación diaria con cron
+### Restaurar
 
-Ejemplo: todos los días a las 03:00.
-
-```cron
-0 3 * * * DATABASE_URL='postgresql://user:pass@host:5432/dbname' BACKUP_DIR='/var/backups/oral' RETENTION_DAYS=14 /bin/bash /ruta/al/repo/ops/pg_backup.sh >> /var/log/oral_backup.log 2>&1
-```
-
-## Restauración (referencia)
+Sobre una **instancia nueva** (recomendado: no pisar la que está en uso):
 
 ```bash
-pg_restore --clean --if-exists --no-owner --dbname='postgresql://user:pass@host:5432/dbname' /ruta/backup/oral_YYYYMMDD_HHMMSS.dump
+# a partir de un backup
+gcloud sql backups restore BACKUP_ID --restore-instance=oral-pg-restore --backup-instance=oral-pg
+
+# a un momento exacto (PITR)
+gcloud sql instances clone oral-pg oral-pg-restore \
+  --point-in-time='2026-09-11T14:30:00Z'
 ```
 
-## Checklist de backup para salida a producción
+Después apuntá `DATABASE_URL` a la instancia restaurada (o exportá y reimportá los datos) y verificá
+la app antes de dar por cerrada la restauración.
 
-- backup diario activo
-- retención 14+ días
-- carpeta/volumen de backups fuera del contenedor principal
-- restauración de prueba validada
+### Copia fuera de Google (opcional pero sano)
+
+```bash
+gcloud sql export sql oral-pg gs://oral-turnos-backups/oral-$(date +%F).sql.gz \
+  --database=oral --offload
+```
+
+Programalo con Cloud Scheduler si querés retención propia, y activá *Object Versioning* en el bucket.
+
+## En desarrollo o en un servidor propio
+
+El repo incluye `ops/pg_backup.sh` (`pg_dump` + retención):
+
+```bash
+DATABASE_URL='postgresql://user:pass@host:5432/db' BACKUP_DIR='/var/backups/oral' RETENTION_DAYS=14 \
+  bash ops/pg_backup.sh
+```
+
+Restauración:
+
+```bash
+pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL" /var/backups/oral/oral_YYYYMMDD_HHMMSS.dump
+```
+
+## Checklist trimestral
+
+- [ ] Los backups de los últimos 14 días existen.
+- [ ] Se restauró una copia en una instancia de prueba y la app levantó contra ella.
+- [ ] La instancia productiva tiene `deletion_protection` activo.
+- [ ] Alguien más del equipo sabe ejecutar este procedimiento.

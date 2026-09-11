@@ -17,6 +17,14 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://postgres:postgres@db:5432/odonto_agenda"
     test_database_url: str = "sqlite+pysqlite:///:memory:"
+    # Per instance. Cloud SQL db-f1-micro allows ~25 connections: keep (pool+overflow) x instances below it.
+    db_pool_size: int = Field(default=5, ge=1, le=50)
+    db_max_overflow: int = Field(default=5, ge=0, le=50)
+
+    # "json" emits Cloud Logging structured lines; "text" is friendlier locally.
+    log_format: str = "text"
+    # Used to link log lines to Cloud Trace (set automatically on Cloud Run via GOOGLE_CLOUD_PROJECT).
+    google_cloud_project: str | None = None
 
     smtp_host: str | None = None
     smtp_port: int = 587
@@ -71,6 +79,8 @@ class Settings(BaseSettings):
 
     # Abuse protection. Behind Cloud Run / a load balancer the client IP arrives in X-Forwarded-For.
     trust_proxy_headers: bool = False
+    # Proxies that append to X-Forwarded-For: 1 on plain Cloud Run, 2 behind an external load balancer.
+    trusted_proxy_count: int = Field(default=1, ge=1, le=5)
     booking_rate_limit_per_hour: int = Field(default=10, ge=1)
     login_rate_limit_per_15_minutes: int = Field(default=10, ge=1)
 

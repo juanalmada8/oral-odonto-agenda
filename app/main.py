@@ -1,20 +1,30 @@
 from pathlib import Path
 from urllib.parse import quote
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
+from app import __version__
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
-from app.core.logging import configure_logging
+from app.core.logging import configure_logging, trace_context
 from app.db import models as _models  # noqa: F401  # Ensure all SQLAlchemy mappers are registered.
+from app.db import session as db_session
 from app.web import router as web_router
 
 
 settings = get_settings()
-configure_logging(settings.debug)
+configure_logging(
+    settings.debug,
+    json_format=settings.log_format == "json",
+    project_id=settings.google_cloud_project,
+)
+logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 
 
@@ -24,7 +34,7 @@ app = FastAPI(
         "API para gestion de turnos de un consultorio odontologico. "
         "La logica esta separada por agentes internos de recepcion, agenda y seguimiento."
     ),
-    version="0.1.0",
+    version=__version__,
     docs_url="/docs" if settings.docs_enabled else None,
     redoc_url="/redoc" if settings.docs_enabled else None,
     openapi_url="/openapi.json" if settings.docs_enabled else None,
@@ -33,6 +43,8 @@ app = FastAPI(
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
+    trace_header = request.headers.get("x-cloud-trace-context")
+    trace_context.set(trace_header.split("/", 1)[0] if trace_header else None)
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
@@ -61,7 +73,20 @@ def root():
 
 @app.get("/health", tags=["health"])
 def healthcheck() -> dict[str, str]:
+    """Liveness: the process answers."""
     return {"status": "healthy"}
+
+
+@app.get("/health/ready", tags=["health"])
+def readiness():
+    """Readiness/startup probe: the database is reachable."""
+    try:
+        with db_session.engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except Exception:
+        logger.exception("Readiness check failed")
+        return JSONResponse(status_code=503, content={"status": "unavailable"})
+    return {"status": "ready"}
 
 
 app.include_router(api_router, prefix=settings.api_prefix)

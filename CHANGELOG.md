@@ -8,10 +8,32 @@ y versionado semántico.
 ## Convención de orden
 
 - Este archivo se mantiene en **orden cronológico inverso**.
-- Los cambios más nuevos van **arriba**.
-- Agregá nuevas notas en la primera sección de cambios para que queden en las primeras líneas.
+- Los cambios nuevos se anotan en **`[Unreleased]`**, arriba de todo.
+- Al preparar un release (workflow *Preparar release*), `[Unreleased]` pasa a ser la versión nueva y
+  esas notas se publican como GitHub Release. Ver [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-09-11
+
+### Added — Infraestructura, CI/CD y operación
+- Infraestructura como código (`infra/terraform`): Cloud Run (web + jobs de migración y tareas),
+  Cloud SQL PostgreSQL con backups y point-in-time recovery, Secret Manager, Artifact Registry,
+  Cloud Scheduler cada 10 minutos, alerta de caída opcional y dominio propio opcional con balanceador.
+- Deploys desde GitHub Actions con Workload Identity (OIDC, sin claves), migraciones antes de publicar
+  la revisión nueva y verificación de `/health/ready`.
+- Releases por CI: workflow *Preparar release* (versión + CHANGELOG en un PR) y publicación con tag,
+  GitHub Release y deploy al mergear.
+- CI: lint, tests sobre SQLite y PostgreSQL, migraciones ida y vuelta, build de la imagen Docker con
+  prueba de humo y validación de Terraform. Dependabot y plantilla de PR.
+- Dockerfile productivo (multi-stage, usuario sin privilegios) y Docker Compose para desarrollo.
+- Logs estructurados JSON para Cloud Logging, `/health/ready` con chequeo de base y pool de conexiones
+  configurable.
+- Documentación nueva: [MERCADOPAGO.md](docs/MERCADOPAGO.md), [WHATSAPP.md](docs/WHATSAPP.md) y
+  deploy/operación/backups reescritos para GCP.
+
+### Removed
+- `render.yaml` y `.env.sqlite.example` (reemplazados por Terraform + GCP y por `.env.example`).
 
 ### Added — Panel: roles, disponibilidad recurrente y métricas
 - Rol **profesional**: cada odontólogo entra con su usuario, ve solo su agenda, carga su propia

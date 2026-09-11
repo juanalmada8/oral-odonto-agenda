@@ -1,0 +1,127 @@
+name: Deploy
+
+# Builds the image, runs the migrations as a Cloud Run Job, then rolls out the web service and the
+# scheduled job. Called by the Release workflow; can also be run by hand from the Actions tab.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to deploy (tag or branch)
+        type: string
+        required: true
+      environment:
+        type: string
+        default: production
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy (tag, branch or SHA)
+        default: main
+        required: true
+      environment:
+        type: choice
+        options: [production, staging]
+        default: production
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    # Protection rules (required reviewers) are configured on the GitHub environment.
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.PUBLIC_BASE_URL }}
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPOSITORY }}/app
+      SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+      MIGRATE_JOB: ${{ vars.CLOUD_RUN_MIGRATE_JOB }}
+      SCHEDULED_JOB: ${{ vars.CLOUD_RUN_SCHEDULED_JOB }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Check configuration
+        run: |
+          for name in GCP_PROJECT_ID GCP_REGION GCP_ARTIFACT_REPOSITORY GCP_WORKLOAD_IDENTITY_PROVIDER \
+                      GCP_DEPLOYER_SERVICE_ACCOUNT CLOUD_RUN_SERVICE CLOUD_RUN_MIGRATE_JOB CLOUD_RUN_SCHEDULED_JOB PUBLIC_BASE_URL; do
+            if [ -z "$(printenv "VAR_$name")" ]; then echo "::error::Missing repository/environment variable $name (see docs/DEPLOYMENT.md)"; exit 1; fi
+          done
+        env:
+          VAR_GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          VAR_GCP_REGION: ${{ vars.GCP_REGION }}
+          VAR_GCP_ARTIFACT_REPOSITORY: ${{ vars.GCP_ARTIFACT_REPOSITORY }}
+          VAR_GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          VAR_GCP_DEPLOYER_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+          VAR_CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+          VAR_CLOUD_RUN_MIGRATE_JOB: ${{ vars.CLOUD_RUN_MIGRATE_JOB }}
+          VAR_CLOUD_RUN_SCHEDULED_JOB: ${{ vars.CLOUD_RUN_SCHEDULED_JOB }}
+          VAR_PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+
+      - id: version
+        name: Image tags
+        run: |
+          echo "sha=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=$(python3 ops/release.py current)" >> "$GITHUB_OUTPUT"
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - uses: docker/setup-buildx-action@v3
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.version.outputs.sha }}
+            ${{ env.IMAGE }}:v${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run database migrations
+        run: |
+          IMAGE_REF="${IMAGE}@${{ steps.build.outputs.digest }}"
+          gcloud run jobs update "$MIGRATE_JOB" --image "$IMAGE_REF" --region "$REGION" --quiet
+          gcloud run jobs execute "$MIGRATE_JOB" --region "$REGION" --wait
+
+      - name: Deploy web service
+        run: |
+          IMAGE_REF="${IMAGE}@${{ steps.build.outputs.digest }}"
+          gcloud run deploy "$SERVICE" --image "$IMAGE_REF" --region "$REGION" --quiet \
+            --revision-suffix "${{ steps.version.outputs.sha }}-${{ github.run_attempt }}"
+          gcloud run jobs update "$SCHEDULED_JOB" --image "$IMAGE_REF" --region "$REGION" --quiet
+
+      - name: Smoke test
+        run: |
+          for attempt in $(seq 1 10); do
+            if curl -fsS "${{ vars.PUBLIC_BASE_URL }}/health/ready"; then exit 0; fi
+            sleep 6
+          done
+          echo "::error::The new revision did not become ready"
+          exit 1
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Deploy ${{ inputs.environment }}"
+            echo "- Ref: \`${{ inputs.ref }}\` (v${{ steps.version.outputs.version }}, ${{ steps.version.outputs.sha }})"
+            echo "- Image: \`${IMAGE}@${{ steps.build.outputs.digest }}\`"
+            echo "- URL: ${{ vars.PUBLIC_BASE_URL }}"
+            echo "- Rollback: \`gcloud run services update-traffic $SERVICE --region $REGION --to-revisions=PREVIOUS_REVISION=100\`"
+          } >> "$GITHUB_STEP_SUMMARY"
