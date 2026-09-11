@@ -11,6 +11,7 @@ from collections import deque
 from fastapi import Request
 
 from app.core.config import get_settings
+from app.core.exceptions import DomainError
 
 
 class RateLimiter:
@@ -52,3 +53,11 @@ def client_ip(request: Request) -> str:
         if hops:
             return hops[-1]
     return request.client.host if request.client else "unknown"
+
+
+def enforce_login_rate_limit(request: Request, username: str) -> None:
+    """Throttle password guessing per client IP and per account."""
+    limit = get_settings().login_rate_limit_per_15_minutes
+    keys = (f"login-ip:{client_ip(request)}", f"login-user:{username.strip().lower()}")
+    if not all(rate_limiter.allow(key, limit=limit, window_seconds=15 * 60) for key in keys):
+        raise DomainError("Demasiados intentos de ingreso. Esperá unos minutos y volvé a intentar.", status_code=429)

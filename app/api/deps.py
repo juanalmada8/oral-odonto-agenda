@@ -9,10 +9,15 @@ from app.core.enums import UserRole
 from app.core.exceptions import DomainError
 from app.db.session import get_db
 from app.integrations.email import EmailClient
+from app.integrations.fake_payments import FakePaymentGateway
+from app.integrations.mercadopago import MercadoPagoGateway
+from app.integrations.payments import PaymentGateway
 from app.models.user import User
 from app.services.ai_agent import AIAgent
 from app.services.auth_service import AuthService
+from app.services.booking_agent import BookingAgent
 from app.services.followup_agent import FollowUpAgent
+from app.services.payment_service import PaymentService
 from app.services.professional_service import ProfessionalService
 from app.services.reception_agent import ReceptionAgent
 from app.services.schedule_agent import ScheduleAgent
@@ -35,6 +40,38 @@ def get_schedule_agent() -> ScheduleAgent:
 def get_followup_agent() -> FollowUpAgent:
     settings = get_settings()
     return FollowUpAgent(settings=settings, email_client=EmailClient(settings))
+
+
+def get_payment_gateway() -> PaymentGateway | None:
+    settings = get_settings()
+    if settings.mercadopago_access_token:
+        return MercadoPagoGateway(settings)
+    if not settings.is_production:
+        return FakePaymentGateway()
+    return None
+
+
+def get_payment_service(
+    gateway: PaymentGateway | None = Depends(get_payment_gateway),
+    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+) -> PaymentService:
+    return PaymentService(get_settings(), gateway, schedule_agent, followup_agent)
+
+
+def get_booking_agent(
+    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    reception_agent: ReceptionAgent = Depends(get_reception_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    payment_service: PaymentService = Depends(get_payment_service),
+) -> BookingAgent:
+    return BookingAgent(
+        get_settings(),
+        schedule_agent=schedule_agent,
+        reception_agent=reception_agent,
+        followup_agent=followup_agent,
+        payment_service=payment_service,
+    )
 
 
 def get_ai_agent() -> AIAgent:

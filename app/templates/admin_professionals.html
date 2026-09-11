@@ -18,7 +18,14 @@
       <input name="specialty" placeholder="Especialidad" />
       <input name="email" type="email" placeholder="Email" />
       <input name="phone" placeholder="Teléfono" />
-      <input name="default_appointment_duration" type="number" min="10" max="240" value="30" />
+      <label class="field">
+        <span class="field-label">Duración por defecto (min)</span>
+        <input name="default_appointment_duration" type="number" min="10" max="240" value="30" />
+      </label>
+      <label class="field">
+        <span class="field-label">Seña online (ARS) <em>vacío = valor general{% if settings.deposit_default_amount %} ({{ settings.deposit_default_amount | money }}){% endif %}, 0 = sin seña</em></span>
+        <input name="deposit_amount" inputmode="decimal" placeholder="Ej: 10000" />
+      </label>
       <button type="submit">Guardar profesional</button>
     </form>
   </details>
@@ -41,6 +48,14 @@
         <li><span>Email</span><strong>{{ professional.email or "-" }}</strong></li>
         <li><span>Teléfono</span><strong>{{ professional.phone or "-" }}</strong></li>
         <li><span>Duración por defecto</span><strong>{{ professional.default_appointment_duration }} min</strong></li>
+        <li>
+          <span>Seña online</span>
+          <strong>
+            {% if professional.deposit_amount is none %}General ({{ settings.deposit_default_amount | money }})
+            {% elif professional.deposit_amount == 0 %}Sin seña
+            {% else %}{{ professional.deposit_amount | money }}{% endif %}
+          </strong>
+        </li>
         <li><span>Fechas habilitadas</span><strong>{{ windows_count[professional.id] }}</strong></li>
       </ul>
       <div class="card-footer-actions">

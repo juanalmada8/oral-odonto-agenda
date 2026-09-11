@@ -1,4 +1,5 @@
 import os
+from decimal import Decimal
 from functools import lru_cache
 
 from pydantic import Field, computed_field, field_validator, model_validator
@@ -29,10 +30,34 @@ class Settings(BaseSettings):
 
     reminder_hours_ahead: int = 24
 
+    # Clinic identity shown to patients (emails, WhatsApp, booking pages).
+    clinic_name: str = "ORAL odontología familiar"
+    clinic_address: str | None = None
+    clinic_phone: str | None = None
+    # Absolute URL where the site is reachable; used for payment callbacks and links in messages.
+    public_base_url: str = "http://localhost:8000"
+
     # Public booking rules.
     booking_min_lead_minutes: int = Field(default=120, ge=0)
     booking_max_days_ahead: int = Field(default=60, ge=1, le=365)
     booking_max_active_per_patient: int = Field(default=2, ge=1)
+    # Minutes a slot stays held while the patient pays the deposit.
+    booking_hold_minutes: int = Field(default=20, ge=5, le=120)
+    # Patients may cancel on their own (link / WhatsApp) up to this many hours before the visit.
+    cancellation_notice_hours: int = Field(default=24, ge=0)
+
+    # Deposit ("seña"). Professionals can override the amount; 0 disables deposits.
+    deposit_default_amount: Decimal = Field(default=Decimal("0"), ge=0, max_digits=12, decimal_places=2)
+    currency: str = "ARS"
+    deposit_policy: str = (
+        "La seña se descuenta del valor de la consulta. Si cancelás con al menos 24 horas de "
+        "anticipación podés reprogramar sin costo; con menos aviso, la seña no es reembolsable."
+    )
+
+    # Mercado Pago Checkout Pro. Without an access token (outside production) a local simulator is used.
+    mercadopago_access_token: str | None = None
+    mercadopago_webhook_secret: str | None = None
+    mercadopago_statement_descriptor: str = "ORAL ODONTOLOGIA"
 
     # Abuse protection. Behind Cloud Run / a load balancer the client IP arrives in X-Forwarded-For.
     trust_proxy_headers: bool = False
@@ -92,7 +117,16 @@ class Settings(BaseSettings):
             raise ValueError("SECRET_KEY must have at least 32 characters in production")
         if self.database_url.startswith("sqlite"):
             raise ValueError("DATABASE_URL must use PostgreSQL in production")
+        if not self.public_base_url.startswith("https://"):
+            raise ValueError("PUBLIC_BASE_URL must be an https:// URL in production")
+        if self.deposit_default_amount > 0 and not self.mercadopago_access_token:
+            raise ValueError("MERCADOPAGO_ACCESS_TOKEN is required when DEPOSIT_DEFAULT_AMOUNT > 0 in production")
         return self
+
+    @field_validator("public_base_url")
+    @classmethod
+    def strip_trailing_slash(cls, value: str) -> str:
+        return value.rstrip("/")
 
 
 @lru_cache

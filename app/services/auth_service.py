@@ -1,3 +1,4 @@
+from fastapi import Response
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -62,6 +63,16 @@ class AuthService:
             subject=str(user.id),
             secret_key=self.settings.secret_key,
             expires_minutes=self.settings.access_token_expire_minutes,
+        )
+
+    def set_session_cookie(self, response: Response, token: str) -> None:
+        response.set_cookie(
+            key="access_token",
+            value=f"Bearer {token}",
+            httponly=True,
+            samesite="lax",
+            secure=self.settings.is_production,
+            max_age=self.settings.access_token_expire_minutes * 60,
         )
 
     def get_current_user(self, db: Session, token: str) -> User:

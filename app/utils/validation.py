@@ -5,6 +5,7 @@ Validators raise ValueError with Spanish, patient-facing messages; pydantic surf
 
 import re
 import unicodedata
+from decimal import Decimal, InvalidOperation
 
 import phonenumbers
 
@@ -81,3 +82,23 @@ def names_match(stored: str, provided: str) -> bool:
     stored_words = set(fold_text(stored).split())
     provided_words = set(fold_text(provided).split())
     return bool(stored_words & provided_words)
+
+
+def parse_money(value: str | None) -> Decimal | None:
+    """Parse amounts typed Argentine-style ("10.000", "10000,50", "$ 8.500"). Blank means None."""
+    cleaned = re.sub(r"[\s$]", "", value or "")
+    if not cleaned:
+        return None
+    if "," in cleaned:
+        cleaned = cleaned.replace(".", "").replace(",", ".")
+    elif re.fullmatch(r"\d{1,3}(\.\d{3})+", cleaned):
+        cleaned = cleaned.replace(".", "")
+    try:
+        amount = Decimal(cleaned)
+    except InvalidOperation as exc:
+        raise ValueError("Ingresá un monto válido (ej: 10000).") from exc
+    if not amount.is_finite():
+        raise ValueError("Ingresá un monto válido (ej: 10000).")
+    if amount < 0:
+        raise ValueError("El monto no puede ser negativo.")
+    return amount.quantize(Decimal("0.01"))
