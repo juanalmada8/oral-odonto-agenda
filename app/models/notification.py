@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import NotificationChannel, NotificationStatus, NotificationType
@@ -10,6 +10,9 @@ from app.models.mixins import TimestampMixin
 
 
 class Notification(TimestampMixin, Base):
+    # The dispatcher polls "pending and due" rows.
+    __table_args__ = (Index("ix_notification_status_scheduled_for", "status", "scheduled_for"),)
+
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     appointment_id: Mapped[int | None] = mapped_column(ForeignKey("appointment.id", ondelete="SET NULL"), index=True)
     patient_id: Mapped[int | None] = mapped_column(ForeignKey("patient.id", ondelete="SET NULL"), index=True)
@@ -32,6 +35,13 @@ class Notification(TimestampMixin, Base):
         server_default=NotificationStatus.PENDING.value,
     )
     error_message: Mapped[str | None] = mapped_column(Text())
+    html_body: Mapped[str | None] = mapped_column(Text())
+    # Channel-specific data needed to send it again (e.g. WhatsApp template parameters).
+    payload: Mapped[dict | None] = mapped_column(JSON)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    # Id returned by the provider (WhatsApp wamid), used to match delivery status updates.
+    provider_message_id: Mapped[str | None] = mapped_column(String(128), index=True)
 
     appointment = relationship("Appointment", back_populates="notifications")
     patient = relationship("Patient", back_populates="notifications")

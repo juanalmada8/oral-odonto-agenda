@@ -3,11 +3,17 @@
 import logging
 from datetime import UTC, date, datetime
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_booking_agent, get_payment_service, get_professional_service, get_schedule_agent
+from app.api.deps import (
+    get_booking_agent,
+    get_followup_agent,
+    get_payment_service,
+    get_professional_service,
+    get_schedule_agent,
+)
 from app.core import clock
 from app.core.config import get_settings
 from app.core.enums import AppointmentStatus, PaymentStatus
@@ -20,9 +26,11 @@ from app.integrations.payments import PaymentGatewayError, PaymentInfo
 from app.models.appointment import Appointment
 from app.schemas.booking import PublicBookingRequest
 from app.services.booking_agent import BookingAgent
+from app.services.followup_agent import FollowUpAgent
 from app.services.payment_service import PaymentService, hold_seconds_left
 from app.services.professional_service import ProfessionalService
 from app.services.schedule_agent import ScheduleAgent
+from app.tasks.notifications import dispatch_due_notifications
 from app.web.common import active_professionals, format_long_date, format_short_date, redirect_with_message, templates
 
 logger = logging.getLogger(__name__)
@@ -139,11 +147,13 @@ def create_public_booking(
     observations: str = Form(""),
     accept_terms: str = Form(""),
     website: str = Form(""),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     professional_service: ProfessionalService = Depends(get_professional_service),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
     payment_service: PaymentService = Depends(get_payment_service),
     booking_agent: BookingAgent = Depends(get_booking_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
     form = {
         "dni": dni,
@@ -206,6 +216,7 @@ def create_public_booking(
         db.rollback()
         return render_error(user_facing_message(exc))
 
+    background_tasks.add_task(dispatch_due_notifications, followup_agent)
     status_url = f"/reservar/turno/{result.appointment.public_token}"
     if result.checkout_url:
         return RedirectResponse(result.checkout_url, status_code=303)
@@ -214,9 +225,11 @@ def create_public_booking(
     return RedirectResponse(status_url, status_code=303)
 
 
-def _booking_view(appointment: Appointment, payment_service: PaymentService) -> dict:
+def _booking_view(appointment: Appointment, payment_service: PaymentService, booking_agent: BookingAgent) -> dict:
     payment = appointment.latest_payment
     return {
+        "can_cancel": booking_agent.can_cancel_online(appointment),
+        "is_upcoming": appointment.status in {AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED},
         "appointment": appointment,
         "payment": payment,
         "seconds_left": hold_seconds_left(appointment),
@@ -236,9 +249,12 @@ def booking_status_page(
     request: Request,
     public_token: str,
     payment_id: str | None = None,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
     payment_service: PaymentService = Depends(get_payment_service),
+    booking_agent: BookingAgent = Depends(get_booking_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
     appointment = _get_public_appointment(db, schedule_agent, public_token)
     if appointment is None:
@@ -251,6 +267,7 @@ def booking_status_page(
         except (DomainError, PaymentGatewayError) as exc:
             db.rollback()
             logger.warning("Could not sync payment %s on return: %s", payment_id, exc)
+        background_tasks.add_task(dispatch_due_notifications, followup_agent)
         return RedirectResponse(f"/reservar/turno/{public_token}", status_code=303)
 
     payment_service.expire_unpaid(db)
@@ -259,7 +276,7 @@ def booking_status_page(
         request,
         "public_booking_status.html",
         {
-            **_booking_view(appointment, payment_service),
+            **_booking_view(appointment, payment_service, booking_agent),
             "message": request.query_params.get("message"),
             "error": request.query_params.get("error"),
         },
@@ -302,6 +319,28 @@ def retry_booking_payment(
     if result.checkout_url:
         return RedirectResponse(result.checkout_url, status_code=303)
     return redirect_with_message(status_url, error=result.checkout_error or "No pudimos generar el link de pago.")
+
+
+@router.post("/reservar/turno/{public_token}/cancelar")
+def cancel_booking_by_patient(
+    public_token: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    booking_agent: BookingAgent = Depends(get_booking_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+):
+    status_url = f"/reservar/turno/{public_token}"
+    appointment = _get_public_appointment(db, schedule_agent, public_token)
+    if appointment is None:
+        return RedirectResponse("/reservar", status_code=303)
+    try:
+        booking_agent.cancel_by_patient(db, appointment, channel="link")
+    except DomainError as exc:
+        db.rollback()
+        return redirect_with_message(status_url, error=exc.detail)
+    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    return redirect_with_message(status_url, message="Cancelamos tu turno. Te enviamos la confirmación por email.")
 
 
 @router.get("/reservar/turno/{public_token}/calendario.ics")
@@ -385,9 +424,11 @@ def payment_simulator_page(
 @router.post("/pagos/simulador/{reference}")
 def payment_simulator_submit(
     reference: str,
+    background_tasks: BackgroundTasks,
     decision: str = Form(...),
     db: Session = Depends(get_db),
     payment_service: PaymentService = Depends(get_payment_service),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
     if not _simulator_enabled(payment_service):
         return Response(status_code=404)
@@ -410,4 +451,5 @@ def payment_simulator_submit(
     except DomainError:
         db.rollback()
         return Response(status_code=404)
+    background_tasks.add_task(dispatch_due_notifications, followup_agent)
     return RedirectResponse(f"/reservar/turno/{token}", status_code=303)

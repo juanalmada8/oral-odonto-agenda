@@ -405,6 +405,9 @@ class ScheduleAgent:
             appointment.cancelled_at = now
             if followup_agent:
                 followup_agent.discard_pending_reminders(db, appointment)
+                # An abandoned unpaid hold was never a real booking for the patient: no email.
+                if current in (AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED):
+                    followup_agent.queue_cancellation(db, appointment)
         self.flush(db)
 
     # ------------------------------------------------------------ availability

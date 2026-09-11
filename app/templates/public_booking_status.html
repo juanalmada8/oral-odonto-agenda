@@ -101,6 +101,19 @@
             {% endif %}
           </div>
 
+          {% if is_upcoming %}
+          <div class="status-cancel">
+            {% if can_cancel %}
+            <form method="post" action="/reservar/turno/{{ appointment.public_token }}/cancelar" data-confirm="¿Seguro que querés cancelar el turno del {{ appointment.starts_at | long_date }} a las {{ appointment.starts_at.strftime('%H:%M') }} h?">
+              <button type="submit" class="ghost-button danger">Cancelar turno</button>
+            </form>
+            <p class="muted small">Podés cancelar online hasta {{ settings.cancellation_notice_hours }} horas antes del turno.</p>
+            {% else %}
+            <p class="muted small">Faltan menos de {{ settings.cancellation_notice_hours }} horas: para cancelar comunicate con el consultorio{% if settings.clinic_phone %} al {{ settings.clinic_phone }}{% endif %}.</p>
+            {% endif %}
+          </div>
+          {% endif %}
+
           <p class="muted small status-footnote">
             {{ settings.deposit_policy }}
             {% if settings.clinic_phone %}Consultas: {{ settings.clinic_phone }}.{% endif %}
@@ -108,6 +121,13 @@
         </section>
       </main>
     </div>
+    <script>
+      document.querySelectorAll("form[data-confirm]").forEach((form) => {
+        form.addEventListener("submit", (event) => {
+          if (!window.confirm(form.dataset.confirm)) event.preventDefault();
+        });
+      });
+    </script>
     {% if status == 'pending_payment' %}
     <script>
       (() => {

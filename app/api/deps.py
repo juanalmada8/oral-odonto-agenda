@@ -12,6 +12,7 @@ from app.integrations.email import EmailClient
 from app.integrations.fake_payments import FakePaymentGateway
 from app.integrations.mercadopago import MercadoPagoGateway
 from app.integrations.payments import PaymentGateway
+from app.integrations.whatsapp import WhatsAppClient
 from app.models.user import User
 from app.services.ai_agent import AIAgent
 from app.services.auth_service import AuthService
@@ -21,6 +22,7 @@ from app.services.payment_service import PaymentService
 from app.services.professional_service import ProfessionalService
 from app.services.reception_agent import ReceptionAgent
 from app.services.schedule_agent import ScheduleAgent
+from app.services.whatsapp_bot import WhatsAppBot
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
@@ -37,9 +39,19 @@ def get_schedule_agent() -> ScheduleAgent:
     return ScheduleAgent(get_settings())
 
 
-def get_followup_agent() -> FollowUpAgent:
-    settings = get_settings()
-    return FollowUpAgent(settings=settings, email_client=EmailClient(settings))
+def get_email_client() -> EmailClient:
+    return EmailClient(get_settings())
+
+
+def get_whatsapp_client() -> WhatsAppClient:
+    return WhatsAppClient(get_settings())
+
+
+def get_followup_agent(
+    email_client: EmailClient = Depends(get_email_client),
+    whatsapp_client: WhatsAppClient = Depends(get_whatsapp_client),
+) -> FollowUpAgent:
+    return FollowUpAgent(get_settings(), email_client, whatsapp_client)
 
 
 def get_payment_gateway() -> PaymentGateway | None:
@@ -71,6 +83,19 @@ def get_booking_agent(
         reception_agent=reception_agent,
         followup_agent=followup_agent,
         payment_service=payment_service,
+    )
+
+
+def get_whatsapp_bot(
+    whatsapp_client: WhatsAppClient = Depends(get_whatsapp_client),
+    booking_agent: BookingAgent = Depends(get_booking_agent),
+    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+) -> WhatsAppBot:
+    return WhatsAppBot(
+        get_settings(),
+        whatsapp_client=whatsapp_client,
+        booking_agent=booking_agent,
+        schedule_agent=schedule_agent,
     )
 
 

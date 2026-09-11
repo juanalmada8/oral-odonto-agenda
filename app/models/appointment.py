@@ -51,6 +51,8 @@ class Appointment(TimestampMixin, Base):
     # While the deposit is unpaid the slot is held until this moment, then released.
     hold_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    # The patient said "I'll be there" (WhatsApp reminder button).
+    attendance_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     created_by: Mapped[str] = mapped_column(String(80), nullable=False, default="system", server_default="system")
 

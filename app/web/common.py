@@ -1,7 +1,5 @@
 """Shared helpers for server-rendered pages: templates, filters, flash redirects."""
 
-from datetime import date, datetime
-from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -15,65 +13,11 @@ from app.core.enums import APPOINTMENT_STATUS_LABELS, PAYMENT_STATUS_LABELS, App
 from app.core.exceptions import DomainError
 from app.models.user import User
 from app.services.professional_service import ProfessionalService
+from app.utils.formatting import DAY_LABELS, format_long_date, format_money, format_short_date, mask_email
 from app.utils.validation import format_phone_for_display
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
-
-DAY_LABELS = {
-    0: "Lunes",
-    1: "Martes",
-    2: "Miércoles",
-    3: "Jueves",
-    4: "Viernes",
-    5: "Sábado",
-    6: "Domingo",
-}
-MONTH_LABELS = {
-    1: "enero",
-    2: "febrero",
-    3: "marzo",
-    4: "abril",
-    5: "mayo",
-    6: "junio",
-    7: "julio",
-    8: "agosto",
-    9: "septiembre",
-    10: "octubre",
-    11: "noviembre",
-    12: "diciembre",
-}
-
-
-def format_money(value: Decimal | int | float | None) -> str:
-    """Argentine format: $ 12.500 (cents only when present)."""
-    if value is None:
-        return ""
-    amount = Decimal(value).quantize(Decimal("0.01"))
-    integer, _, cents = f"{amount:,.2f}".partition(".")
-    integer = integer.replace(",", ".")
-    return f"$ {integer}" if cents == "00" else f"$ {integer},{cents}"
-
-
-def format_long_date(value: date | datetime | None) -> str:
-    """'martes 31 de marzo'."""
-    if value is None:
-        return ""
-    return f"{DAY_LABELS[value.weekday()].lower()} {value.day} de {MONTH_LABELS[value.month]}"
-
-
-def format_short_date(value: date | datetime | None) -> str:
-    """'Mar 31/03'."""
-    if value is None:
-        return ""
-    return f"{DAY_LABELS[value.weekday()][:3]} {value:%d/%m}"
-
-
-def mask_email(value: str | None) -> str:
-    if not value or "@" not in value:
-        return value or ""
-    local, domain = value.split("@", 1)
-    return f"{local[:1]}{'•' * max(1, min(len(local) - 1, 4))}@{domain}"
 
 
 def status_label(status: AppointmentStatus | PaymentStatus | str | None) -> str:
