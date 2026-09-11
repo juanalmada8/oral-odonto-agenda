@@ -1,85 +1,96 @@
 # Arquitectura
 
-## Visión general
+## Vista general
 
-El sistema está dividido en:
+```
+app/
+├── web/            páginas server-side: public.py (pacientes), admin.py (panel), webhooks.py
+├── api/            API REST /api/v1 (routes + dependencias)
+├── services/       reglas de negocio ("agentes")
+├── integrations/   proveedores externos: Mercado Pago, WhatsApp Cloud API, SMTP
+├── models/         tablas (SQLAlchemy 2)
+├── schemas/        validación de entrada/salida (Pydantic 2)
+├── core/           config, reloj, errores, rate limit, seguridad, logging
+├── tasks/          seed, chequeo de producción, tarea programada, despachador
+└── templates/      Jinja2: páginas + emails
+```
 
-- **Web pública** (`/reservar`): reserva autoservicio del paciente.
-- **Panel interno** (`/app/*`): operación diaria de recepción/admin.
-- **API REST** (`/api/v1/*`): acceso programático y base para integraciones.
+## Servicios
 
-## Capas
+| Servicio | Responsabilidad |
+| --- | --- |
+| `BookingAgent` | reserva pública: valida, bloquea el horario, crea el checkout y cancela por pedido del paciente |
+| `ScheduleAgent` | disponibilidad, alta de turnos, transiciones de estado y protección del calendario |
+| `PaymentService` | seña: checkout, aplicación idempotente de resultados, vencimientos y devoluciones a revisar |
+| `FollowUpAgent` | outbox de notificaciones (email + WhatsApp) con reintentos |
+| `WhatsAppBot` | respuestas del paciente por WhatsApp (confirmar asistencia, cancelar) |
+| `ReceptionAgent` | pacientes; identidad por DNI en la reserva pública |
+| `ProfessionalService`, `AuthService` | staff, usuarios, roles y sesiones |
+| `AnalyticsService` | métricas: ocupación, conversión de seña, ausentismo, ingresos |
 
-1. **Presentación**
-- `app/web.py` (rutas HTML)
-- `app/templates/*`
-- `app/static/*`
+## Estados del turno
 
-2. **API**
-- `app/api/routes/*`
-- `app/api/deps.py`
+```
+pending_payment ──paga──► confirmed ──► completed / no_show
+      │                      │
+      │ vence (20 min)       └──► cancelled
+      ▼
+   expired
+                 reserved (alta del consultorio) ──► confirmed / completed / no_show / cancelled
+```
 
-3. **Dominio / Servicios (agentes)**
-- `reception_agent`
-- `schedule_agent`
-- `followup_agent`
-- `professional_service`
-- `auth_service`
-- `ai_agent` (opcional)
+- **Ocupan agenda**: `pending_payment` (mientras el bloqueo no venció), `reserved`, `confirmed`,
+  `completed` y `no_show`.
+- Las transiciones válidas están en `ALLOWED_TRANSITIONS` (`app/services/schedule_agent.py`) y se
+  validan siempre, venga el pedido del panel, de la API o del bot.
 
-4. **Persistencia**
-- SQLAlchemy models en `app/models/*`
-- sesión DB en `app/db/session.py`
-- migraciones Alembic
+## Reglas de negocio
 
-## Agentes y responsabilidades
+- Paciente único por DNI. Desde la web pública **nunca** se sobrescribe la ficha existente: si el DNI
+  ya existe, el apellido tiene que coincidir y solo se completan los datos vacíos. Los datos de
+  contacto de esa reserva viven en el turno.
+- No se reservan horarios pasados. La reserva online exige anticipación mínima
+  (`BOOKING_MIN_LEAD_MINUTES`), no supera `BOOKING_MAX_DAYS_AHEAD` y el horario tiene que coincidir
+  exactamente con un turno publicado.
+- Un paciente no puede superponer turnos, ni tener dos con el mismo profesional el mismo día, ni más
+  de `BOOKING_MAX_ACTIVE_PER_PATIENT` turnos próximos.
+- Un paciente paga una seña por vez: al elegir otro horario, el bloqueo anterior se libera.
+- El paciente puede cancelar hasta `CANCELLATION_NOTICE_HOURS` antes, desde el link de su turno o
+  por WhatsApp.
 
-### Reception Agent
-- upsert y validación de pacientes por DNI.
-- creación/edición/baja lógica de pacientes.
+## Concurrencia y consistencia
 
-### Schedule Agent
-- agenda diaria/semanal.
-- disponibilidad por ventana puntual.
-- creación/reprogramación/cancelación/completado de turnos.
-- control de superposición.
+1. Cada reserva toma un **lock de la fila del profesional** (`SELECT ... FOR UPDATE`), de modo que
+   dos reservas del mismo profesional se serializan.
+2. PostgreSQL tiene además una **restricción de exclusión**: dos turnos activos del mismo profesional
+   no pueden superponerse, aunque el código fallara. La violación se traduce a un mensaje amable.
+3. Los pagos se aplican de forma **idempotente** y una notificación tardía no puede degradar un pago
+   aprobado.
+4. El envío de notificaciones toma cada fila con `FOR UPDATE SKIP LOCKED`: dos despachadores en
+   paralelo nunca mandan el mismo mensaje dos veces.
 
-### Followup Agent
-- cola de notificaciones.
-- confirmaciones inmediatas por email.
-- recordatorios de turnos confirmados.
-- despacho de pendientes con control de estado.
+## Tiempo
 
-### Auth Service
-- usuarios internos.
-- token JWT y control de roles.
+Los turnos se guardan como fecha y hora **local del consultorio** (`APP_TIMEZONE`). Todo el negocio
+usa `app.core.clock`, nunca el reloj del servidor (que en la nube está en UTC). Los tests congelan
+ese reloj.
 
-### AI Agent (opcional)
-- procesamiento de texto libre y asistencia no determinística.
-- desacoplado de la lógica clínica/operativa.
+## Datos
 
-## Modelo de datos (resumen)
+`user` · `patient` · `professional` · `availability_window` · `appointment` · `payment` ·
+`notification` · `audit_log` (+ `working_hours` y `holiday_block`, reservados para agenda recurrente
+persistente).
 
-- `users`
-- `patients`
-- `professionals`
-- `availability_windows`
-- `appointments`
-- `notifications`
-- `audit_logs`
+Decisiones:
 
-## Reglas de negocio principales
+- Los enums se guardan como **VARCHAR con su valor** (`confirmed`), no como enums nativos de
+  PostgreSQL: agregar un estado no requiere `ALTER TYPE` ni migraciones frágiles.
+- Los montos son `NUMERIC(12,2)`.
+- Los turnos tienen un **token público** impredecible para los links del paciente; nunca se expone el id.
+- Toda operación relevante deja registro en `audit_log`.
 
-- Paciente único por `DNI`.
-- Reserva pública prioritaria.
-- Administración manual como flujo secundario.
-- Recordatorios solo para turnos `CONFIRMED`.
-- Confirmaciones enviadas al momento de confirmar (no por batch).
+## Entrega
 
-## Decisiones técnicas
-
-- FastAPI + SQLAlchemy sync para simplicidad de MVP.
-- Alembic como única vía para cambios de esquema.
-- Servicios por responsabilidad para facilitar mantenimiento y tests.
-- UI server-side con Jinja2 para entrega rápida y robusta.
-
+- Una imagen Docker sirve para los tres roles: web, job de migraciones y job programado.
+- Cloud Run + Cloud SQL, con Cloud Scheduler disparando la tarea periódica cada 10 minutos.
+- Detalle en [DEPLOYMENT.md](DEPLOYMENT.md).

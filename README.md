@@ -1,236 +1,111 @@
 # ORAL · Odonto Agenda
 
-Aplicación full-stack para gestión de turnos odontológicos, con:
+Plataforma de turnos para consultorio odontológico:
 
-- web pública de reserva para pacientes (`/reservar`)
-- panel interno para administración y recepción (`/app`)
-- API REST documentada con FastAPI (`/docs`)
+- **Reserva online** (`/reservar`): el paciente elige profesional, día y horario, y **confirma pagando
+  una seña** por Mercado Pago. El horario queda bloqueado mientras paga y se libera solo si no paga.
+- **Recordatorios**: confirmación por email y recordatorio por **WhatsApp** con botones para confirmar
+  asistencia o cancelar.
+- **Panel interno** (`/app`): administración, recepción y cada odontólogo con su propio acceso.
+- **API REST** (`/api/v1`) documentada en `/docs`.
 
-El proyecto está pensado como MVP sólido y escalable, con módulos tipo “agentes” pero sin sobreingeniería.
+## Cómo funciona una reserva
+
+```
+Paciente elige horario
+        │
+        ▼
+Turno "seña pendiente"  ──20 min sin pagar──►  se libera el horario
+        │
+        │ paga la seña (Mercado Pago)
+        ▼
+Webhook firmado ──► se consulta el pago en la API ──► turno CONFIRMADO
+        │
+        ├─► email de confirmación (+ .ics para el calendario)
+        └─► recordatorio por WhatsApp 24 h antes: [Confirmo] [Cancelar]
+```
+
+Todo lo que toca la agenda pasa por las mismas validaciones: no se reservan horarios pasados, se
+respeta la anticipación mínima, el horario tiene que existir en la disponibilidad publicada, un
+paciente no puede tener dos turnos superpuestos y **dos reservas simultáneas del mismo horario nunca
+pueden confirmarse las dos** (bloqueo por profesional + restricción de exclusión en PostgreSQL).
 
 ## Stack
 
-- Python 3.12
-- FastAPI + Jinja2
-- SQLAlchemy + Alembic
-- PostgreSQL (o SQLite para desarrollo local rápido)
-- Docker Compose (DB + MailHog)
-- Pytest
+Python 3.12 · FastAPI · Jinja2 · SQLAlchemy 2 + Alembic · PostgreSQL · Pytest ·
+Docker · Terraform · GitHub Actions · Google Cloud Run + Cloud SQL.
 
-## Arquitectura resumida
+## Arranque rápido
 
-- `reception_agent`: alta/búsqueda/actualización de pacientes.
-- `schedule_agent`: disponibilidad, creación y cambios de estado de turnos.
-- `followup_agent`: cola y envío de notificaciones (confirmación/recordatorio).
-- `auth_service`: autenticación y roles (`admin`, `receptionist`).
-- `ai_agent`: extensión opcional para casos de IA no determinísticos.
-
-Más detalle en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Estructura del repositorio
-
-```text
-.
-├── app/
-│   ├── api/
-│   ├── core/
-│   ├── db/
-│   ├── integrations/
-│   ├── models/
-│   ├── schemas/
-│   ├── services/
-│   ├── static/
-│   ├── tasks/
-│   ├── templates/
-│   └── web.py
-├── alembic/
-├── tests/
-├── .env.example
-├── .env.sqlite.example
-├── docker-compose.yml
-├── Dockerfile
-├── pyproject.toml
-└── README.md
-```
-
-## Requisitos
-
-- Python 3.12+
-- `pip`
-- Docker + Docker Compose (recomendado para PostgreSQL/MailHog)
-
-## Quickstart (PostgreSQL + Docker)
-
-1. Crear entorno virtual:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-2. Instalar dependencias:
-
-```bash
-pip install -e ".[dev]"
-```
-
-3. Configurar variables:
+### Con Docker (recomendado)
 
 ```bash
 cp .env.example .env
+docker compose up --build            # app + PostgreSQL + MailHog
+docker compose run --rm app python -m app.tasks.seed_demo
 ```
 
-4. Levantar servicios:
+### Sin Docker (SQLite)
 
 ```bash
-docker compose up -d db mailhog
-```
-
-5. Migrar base:
-
-```bash
-alembic upgrade head
-```
-
-6. Seed demo:
-
-```bash
-python -m app.tasks.seed_demo
-```
-
-7. Levantar app:
-
-```bash
-uvicorn app.main:app --reload
-```
-
-## Quickstart rápido (SQLite local)
-
-Ideal para validar UI/flujo sin Docker:
-
-```bash
-cp .env.sqlite.example .env
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env                 # descomentá la línea de SQLite
 alembic upgrade head
 python -m app.tasks.seed_demo
 uvicorn app.main:app --reload
 ```
 
-## Accesos
+| Dónde | URL |
+| --- | --- |
+| Reserva online | http://localhost:8000/reservar |
+| Panel | http://localhost:8000/app/login |
+| API | http://localhost:8000/docs |
+| Emails de prueba (MailHog) | http://localhost:8025 |
 
-- Reserva pública: `http://localhost:8000/reservar`
-- Login interno: `http://localhost:8000/app/login`
-- Swagger API: `http://localhost:8000/docs`
-- MailHog UI: `http://localhost:8025`
+Usuarios demo: `admin`, `recepcion` y `laura` (odontóloga), todos con `demo12345`.
+Sin credenciales de Mercado Pago, el pago de la seña usa un **simulador local** con botones de
+aprobar y rechazar.
 
-Credenciales demo:
-
-- `admin / demo12345`
-- `recepcion / demo12345`
-
-## Variables de entorno
-
-Ver `.env.example`, `.env.sqlite.example` y `.env.production.example`.
-
-Claves principales:
-
-- `DATABASE_URL`
-- `SECRET_KEY`
-- `SMTP_*` (`HOST`, `PORT`, `USERNAME`, `PASSWORD`, `USE_TLS`)
-- `EMAIL_FROM`
-- `OPENAI_API_KEY` (opcional)
-- `REMINDER_HOURS_AHEAD`
-
-## Producción (PostgreSQL)
-
-Pasos mínimos:
+## Comandos
 
 ```bash
-cp .env.production.example .env
-alembic upgrade head
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+make test          # tests sobre SQLite
+TEST_DATABASE_URL=postgresql+psycopg://... make test-pg   # misma suite sobre PostgreSQL
+make lint          # ruff
+make migrate       # alembic upgrade head
+make seed          # datos demo
+make scheduled     # vencer señas impagas, preparar recordatorios y reintentar envíos
+make prod-check    # validar configuración de producción
+make tf-validate   # validar Terraform
 ```
 
-Notas:
+## Roles del panel
 
-- En `APP_ENV=production`, la app exige `SECRET_KEY` segura.
-- En `APP_ENV=production`, `DATABASE_URL` debe ser PostgreSQL (no SQLite).
-- La app no crea tablas automáticamente: siempre usar Alembic.
+| Rol | Puede |
+| --- | --- |
+| **Administración** | todo: turnos, pacientes, profesionales, disponibilidad, pagos, notificaciones, métricas y usuarios |
+| **Recepción** | agenda del día, turnos manuales y pacientes |
+| **Profesional** | su propia agenda y su disponibilidad; marcar turnos como atendidos o ausentes |
 
-Guía completa: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
-Checklist de variables: [docs/PROD_ENV_CHECKLIST.md](docs/PROD_ENV_CHECKLIST.md).
-Backups diarios: [docs/BACKUPS.md](docs/BACKUPS.md).
+## Documentación
 
-## Notificaciones por email (Gmail)
+| Documento | Contenido |
+| --- | --- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | módulos, modelo de datos y reglas de negocio |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | infraestructura en GCP, CI/CD y releases |
+| [docs/MERCADOPAGO.md](docs/MERCADOPAGO.md) | seña: configuración, pruebas y devoluciones |
+| [docs/WHATSAPP.md](docs/WHATSAPP.md) | bot de WhatsApp: app de Meta, plantilla y webhook |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | día a día del consultorio y resolución de problemas |
+| [docs/BACKUPS.md](docs/BACKUPS.md) | backups y restauración |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | flujo de trabajo y releases |
+| [CHANGELOG.md](CHANGELOG.md) | historial de cambios |
 
-Si usás Gmail SMTP:
+## Estado
 
-- `SMTP_HOST=smtp.gmail.com`
-- `SMTP_PORT=587`
-- `SMTP_USERNAME=tu_cuenta@gmail.com`
-- `SMTP_PASSWORD=<app-password de Google>`
-- `SMTP_USE_TLS=true`
-- `EMAIL_FROM=tu_cuenta@gmail.com`
+Incluye: reserva online con seña, agenda con disponibilidad por profesional (puntual o recurrente),
+estados de turno completos (incluye ausentes), notificaciones con reintentos, bot de WhatsApp,
+panel por roles, métricas con exportación a CSV, e infraestructura y deploys automatizados.
 
-Guía operativa completa en [docs/OPERATIONS.md](docs/OPERATIONS.md).
-
-## Comandos útiles
-
-```bash
-# migrar
-alembic upgrade head
-
-# seed demo
-python -m app.tasks.seed_demo
-
-# tests
-pytest
-
-# lint
-ruff check .
-
-# format (si querés aplicar formato ruff)
-ruff format .
-
-# chequeo preproducción (config + DB)
-python -m app.tasks.production_check
-
-# backup PostgreSQL (requiere pg_dump y DATABASE_URL)
-bash ops/pg_backup.sh
-```
-
-También podés usar `make` (ver `Makefile`).
-
-## API principal
-
-Base path: `/api/v1`
-
-- Auth: `/auth/*`
-- Pacientes: `/patients/*`
-- Profesionales: `/professionals/*`
-- Turnos: `/appointments/*`
-- Disponibilidad: `/availability/*`
-- Notificaciones: `/notifications/*`
-
-Swagger actualizado: `GET /docs`.
-
-## Calidad y contribución
-
-- Convenciones de trabajo: [CONTRIBUTING.md](CONTRIBUTING.md)
-- Historial de cambios: [CHANGELOG.md](CHANGELOG.md)
-
-## Estado actual del producto
-
-Incluye:
-
-- gestión de turnos y estados clínicos básicos
-- agenda por profesional con disponibilidad por fecha/hora
-- alta y edición de pacientes/profesionales
-- panel de notificaciones con previsualización de envíos
-- separación clara entre flujo público y flujo interno
-
-No incluye todavía (roadmap):
-
-- WhatsApp productivo
-- multiclínica / multisedes
-- reportes de negocio avanzados
+Roadmap: pagos del total de la consulta, multi-sede, historia clínica y reprogramación
+self-service desde el link del turno.

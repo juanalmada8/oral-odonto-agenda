@@ -1,0 +1,30 @@
+project_id = "oral-turnos"
+region     = "southamerica-east1"
+
+# Clinic data shown to patients.
+clinic_name    = "ORAL odontología familiar"
+clinic_address = "Av. ..., Belgrano, CABA"
+clinic_phone   = "11 ....-...."
+
+# Email delivery (the password lives in Secret Manager, not here).
+smtp_host     = "smtp.gmail.com"
+smtp_username = "turnos@tu-dominio.com.ar"
+email_from    = "turnos@tu-dominio.com.ar"
+
+# Keep 0 until MERCADOPAGO_ACCESS_TOKEN has a value; then set the deposit and add it to optional_secrets.
+deposit_default_amount = "0"
+
+# Secrets already loaded with `gcloud secrets versions add`.
+optional_secrets = [
+  # "MERCADOPAGO_ACCESS_TOKEN",
+  # "MERCADOPAGO_WEBHOOK_SECRET",
+  # "SMTP_PASSWORD",
+  # "WHATSAPP_ACCESS_TOKEN",
+  # "WHATSAPP_APP_SECRET",
+  # "WHATSAPP_VERIFY_TOKEN",
+]
+
+# whatsapp_phone_number_id = "123456789012345"
+# custom_domain            = "turnos.tu-dominio.com.ar"
+# alert_email              = "vos@tu-dominio.com.ar"
+# min_instances            = 1   # sin cold start (~USD 10/mes extra)

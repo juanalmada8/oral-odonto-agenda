@@ -1,3 +1,6 @@
+# Local development: PostgreSQL + MailHog (captures emails at http://localhost:8025) + the app.
+#   docker compose up --build        -> http://localhost:8000/reservar
+#   docker compose run --rm app python -m app.tasks.seed_demo
 services:
   db:
     image: postgres:16
@@ -9,6 +12,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d odonto_agenda"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   mailhog:
     image: mailhog/mailhog:latest
@@ -16,18 +24,36 @@ services:
       - "1025:1025"
       - "8025:8025"
 
-  api:
+  migrate:
     build: .
-    env_file:
-      - .env
+    environment: &app-env
+      APP_ENV: development
+      DEBUG: "true"
+      SECRET_KEY: local-development-secret-key-32-chars
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/odonto_agenda
+      PUBLIC_BASE_URL: http://localhost:8000
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      SMTP_USE_TLS: "false"
+      EMAIL_FROM: turnos@oral.local
+      DEPOSIT_DEFAULT_AMOUNT: "10000"
+    command: alembic upgrade head
     depends_on:
-      - db
-      - mailhog
+      db:
+        condition: service_healthy
+
+  app:
+    build: .
+    environment:
+      <<: *app-env
+      PORT: "8000"
     ports:
       - "8000:8000"
-    volumes:
-      - .:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mailhog:
+        condition: service_started
 
 volumes:
   postgres_data:
