@@ -15,7 +15,7 @@ class ProfessionalService:
     def get_professional(self, db: Session, professional_id: int) -> Professional:
         professional = db.get(Professional, professional_id)
         if not professional:
-            raise DomainError("Professional not found", status_code=404)
+            raise DomainError("No encontramos el profesional.", status_code=404)
         return professional
 
     def create_professional(self, db: Session, payload: ProfessionalCreate, actor: str = "admin") -> Professional:
@@ -118,4 +118,4 @@ class ProfessionalService:
         if exclude_id:
             query = query.where(Professional.id != exclude_id)
         if db.scalar(query):
-            raise DomainError("A professional already exists with the same email or phone", status_code=409)
+            raise DomainError("Ya existe un profesional con ese email o teléfono.", status_code=409)

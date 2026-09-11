@@ -26,7 +26,7 @@ class AuthService:
     def create_user(self, db: Session, payload: UserCreate, actor: str = "system") -> User:
         existing = db.scalar(select(User).where(or_(User.username == payload.username, User.email == payload.email)))
         if existing:
-            raise DomainError("A user already exists with the same username or email", status_code=409)
+            raise DomainError("Ya existe un usuario con ese nombre de usuario o email.", status_code=409)
         user = User(
             username=payload.username,
             full_name=payload.full_name,
@@ -52,9 +52,9 @@ class AuthService:
     def authenticate(self, db: Session, username: str, password: str) -> User:
         user = self.get_user_by_username(db, username)
         if not user or not verify_password(password, user.password_hash):
-            raise DomainError("Invalid credentials", status_code=401)
+            raise DomainError("Usuario o contraseña incorrectos.", status_code=401)
         if not user.is_active:
-            raise DomainError("User is inactive", status_code=403)
+            raise DomainError("El usuario está desactivado.", status_code=403)
         return user
 
     def create_token_for_user(self, user: User) -> str:
@@ -68,17 +68,17 @@ class AuthService:
         try:
             payload = decode_access_token(token, self.settings.secret_key)
         except Exception as exc:  # pragma: no cover - invalid tokens are tested via API behavior
-            raise DomainError("Invalid or expired token", status_code=401) from exc
+            raise DomainError("La sesión expiró. Ingresá de nuevo.", status_code=401) from exc
 
         subject = payload.get("sub")
         if not subject:
-            raise DomainError("Invalid token payload", status_code=401)
+            raise DomainError("Sesión inválida. Ingresá de nuevo.", status_code=401)
         user = self.get_user_by_id(db, int(subject))
         if not user or not user.is_active:
-            raise DomainError("User not available", status_code=401)
+            raise DomainError("Usuario no disponible.", status_code=401)
         return user
 
     def ensure_has_role(self, user: User, allowed_roles: tuple[UserRole, ...]) -> User:
         if user.role not in allowed_roles:
-            raise DomainError("You do not have permission for this action", status_code=403)
+            raise DomainError("No tenés permisos para esta acción.", status_code=403)
         return user

@@ -29,8 +29,7 @@ def get_professional_service() -> ProfessionalService:
 
 
 def get_schedule_agent() -> ScheduleAgent:
-    settings = get_settings()
-    return ScheduleAgent(timezone_name=settings.app_timezone)
+    return ScheduleAgent(get_settings())
 
 
 def get_followup_agent() -> FollowUpAgent:
@@ -54,7 +53,7 @@ def get_current_user(
 ) -> User:
     raw_token = header_token or cookie_token
     if not raw_token:
-        raise DomainError("Not authenticated", status_code=401)
+        raise DomainError("Tenés que iniciar sesión.", status_code=401)
     if raw_token.startswith("Bearer "):
         raw_token = raw_token.removeprefix("Bearer ").strip()
     return auth_service.get_current_user(db, raw_token)

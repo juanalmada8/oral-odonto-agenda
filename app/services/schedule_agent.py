@@ -1,14 +1,18 @@
 """Schedule agent: manages availability and protects the clinic calendar."""
 
-from datetime import date, datetime, timedelta
+from collections import defaultdict
+from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.enums import AppointmentStatus
+from app.core import clock
+from app.core.config import Settings
+from app.core.enums import BLOCKING_APPOINTMENT_STATUSES, AppointmentStatus
 from app.core.exceptions import DomainError
-from app.models.availability_window import AvailabilityWindow
 from app.models.appointment import Appointment
+from app.models.availability_window import AvailabilityWindow
 from app.models.professional import Professional
 from app.schemas.appointment import AppointmentCreate, AppointmentReschedule, AppointmentUpdate
 from app.schemas.availability import AvailabilitySlot, AvailabilityWindowCreate, AvailabilityWindowUpdate
@@ -18,9 +22,42 @@ from app.utils.audit import create_audit_log
 from app.utils.datetime import calculate_end, combine_date_time, date_range_end, date_range_start, ensure_local_naive
 
 
+SLOT_TAKEN_MESSAGE = "Ese horario ya no está disponible. Elegí otro, por favor."
+
+ALLOWED_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {
+    AppointmentStatus.PENDING_PAYMENT: {
+        AppointmentStatus.CONFIRMED,
+        AppointmentStatus.RESERVED,
+        AppointmentStatus.CANCELLED,
+        AppointmentStatus.EXPIRED,
+    },
+    AppointmentStatus.RESERVED: {
+        AppointmentStatus.CONFIRMED,
+        AppointmentStatus.CANCELLED,
+        AppointmentStatus.COMPLETED,
+        AppointmentStatus.NO_SHOW,
+    },
+    AppointmentStatus.CONFIRMED: {
+        AppointmentStatus.CANCELLED,
+        AppointmentStatus.COMPLETED,
+        AppointmentStatus.NO_SHOW,
+    },
+    AppointmentStatus.CANCELLED: {AppointmentStatus.RESERVED},
+    AppointmentStatus.EXPIRED: {AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED},
+    AppointmentStatus.COMPLETED: {AppointmentStatus.NO_SHOW},
+    AppointmentStatus.NO_SHOW: {AppointmentStatus.COMPLETED},
+}
+
+# Moving into these states takes the slot again, so the calendar must be re-validated.
+REACTIVATING_SOURCES = {AppointmentStatus.CANCELLED, AppointmentStatus.EXPIRED}
+
+
 class ScheduleAgent:
-    def __init__(self, *, timezone_name: str) -> None:
-        self.timezone_name = timezone_name
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        self.timezone_name = settings.app_timezone
+
+    # ------------------------------------------------------------------ queries
 
     def list_appointments(
         self,
@@ -53,8 +90,36 @@ class ScheduleAgent:
             .where(Appointment.id == appointment_id)
         )
         if not appointment:
-            raise DomainError("Appointment not found", status_code=404)
+            raise DomainError("No encontramos el turno.", status_code=404)
         return appointment
+
+    def get_appointment_by_token(self, db: Session, public_token: str) -> Appointment:
+        appointment = db.scalar(
+            select(Appointment)
+            .options(joinedload(Appointment.patient), joinedload(Appointment.professional))
+            .where(Appointment.public_token == public_token)
+        )
+        if not appointment:
+            raise DomainError("No encontramos el turno.", status_code=404)
+        return appointment
+
+    def get_daily_agenda(self, db: Session, *, day: date, professional_id: int | None = None) -> list[Appointment]:
+        return self.list_appointments(
+            db,
+            professional_id=professional_id,
+            date_from=date_range_start(day),
+            date_to=date_range_end(day),
+        )
+
+    def get_weekly_agenda(self, db: Session, *, week_start: date, professional_id: int | None = None) -> list[Appointment]:
+        return self.list_appointments(
+            db,
+            professional_id=professional_id,
+            date_from=date_range_start(week_start),
+            date_to=date_range_end(week_start + timedelta(days=6)),
+        )
+
+    # ------------------------------------------------------------- appointments
 
     def create_appointment(
         self,
@@ -65,41 +130,78 @@ class ScheduleAgent:
         followup_agent: FollowUpAgent,
         actor: str = "schedule_agent",
     ) -> Appointment:
-        professional = self._get_professional(db, payload.professional_id)
+        """Staff/API booking: no deposit, lands directly as reserved."""
+        professional = self.lock_professional(db, payload.professional_id)
         patient = reception_agent.resolve_patient(
             db,
             patient_id=payload.patient_id,
             patient_payload=payload.patient,
             actor=actor,
         )
-
         starts_at = ensure_local_naive(payload.starts_at, self.timezone_name)
         duration = payload.duration_minutes or professional.default_appointment_duration
-        ends_at = calculate_end(starts_at, duration)
+        appointment = self.insert_appointment(
+            db,
+            professional=professional,
+            patient_id=patient.id,
+            starts_at=starts_at,
+            duration_minutes=duration,
+            status=AppointmentStatus.RESERVED,
+            reason=payload.reason,
+            notes=payload.notes,
+            created_by=payload.created_by,
+            actor=actor,
+        )
+        followup_agent.queue_confirmation(db, appointment, actor=actor)
+        self.commit(db)
+        return self.get_appointment(db, appointment.id)
 
-        self._validate_slot(
+    def insert_appointment(
+        self,
+        db: Session,
+        *,
+        professional: Professional,
+        patient_id: int,
+        starts_at: datetime,
+        duration_minutes: int,
+        status: AppointmentStatus,
+        actor: str,
+        created_by: str,
+        reason: str | None = None,
+        notes: str | None = None,
+        contact_email: str | None = None,
+        contact_phone: str | None = None,
+        hold_expires_at: datetime | None = None,
+        public_rules: bool = False,
+    ) -> Appointment:
+        """Validate and add an appointment to the session. The caller must hold the professional lock."""
+        ends_at = calculate_end(starts_at, duration_minutes)
+        self.release_expired_holds(db, professional_id=professional.id)
+        self.validate_slot(
             db,
             professional=professional,
             starts_at=starts_at,
             ends_at=ends_at,
-            patient_id=patient.id,
+            patient_id=patient_id,
+            public_rules=public_rules,
         )
-
         appointment = Appointment(
-            patient_id=patient.id,
+            patient_id=patient_id,
             professional_id=professional.id,
             starts_at=starts_at,
             ends_at=ends_at,
-            duration_minutes=duration,
-            reason=payload.reason,
-            notes=payload.notes,
-            created_by=payload.created_by,
+            duration_minutes=duration_minutes,
+            status=status,
+            reason=reason,
+            notes=notes,
+            contact_email=contact_email,
+            contact_phone=contact_phone,
+            hold_expires_at=hold_expires_at,
+            confirmed_at=clock.now() if status == AppointmentStatus.CONFIRMED else None,
+            created_by=created_by,
         )
         db.add(appointment)
-        db.flush()
-        db.refresh(appointment)
-        appointment = self.get_appointment(db, appointment.id)
-        followup_agent.queue_confirmation(db, appointment, actor=actor)
+        self.flush(db)
         create_audit_log(
             db,
             action="appointment.created",
@@ -108,13 +210,14 @@ class ScheduleAgent:
             actor=actor,
             description="Appointment created",
             details={
-                "patient_id": appointment.patient_id,
-                "professional_id": appointment.professional_id,
-                "starts_at": appointment.starts_at.isoformat(),
+                "patient_id": patient_id,
+                "professional_id": professional.id,
+                "starts_at": starts_at.isoformat(),
+                "status": status.value,
             },
         )
-        db.commit()
-        return self.get_appointment(db, appointment.id)
+        db.refresh(appointment)
+        return appointment
 
     def update_appointment(
         self,
@@ -127,36 +230,37 @@ class ScheduleAgent:
     ) -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
         changes = payload.model_dump(exclude_unset=True)
+        new_status = changes.get("status")
+        if new_status == appointment.status:
+            new_status = None
 
         if "starts_at" in changes or "duration_minutes" in changes:
-            starts_at = ensure_local_naive(changes.get("starts_at", appointment.starts_at), self.timezone_name)
-            duration = changes.get("duration_minutes", appointment.duration_minutes)
+            starts_at = ensure_local_naive(changes.get("starts_at") or appointment.starts_at, self.timezone_name)
+            duration = changes.get("duration_minutes") or appointment.duration_minutes
             ends_at = calculate_end(starts_at, duration)
-            professional = self._get_professional(db, appointment.professional_id)
-            self._validate_slot(
-                db,
-                professional=professional,
-                starts_at=starts_at,
-                ends_at=ends_at,
-                patient_id=appointment.patient_id,
-                exclude_appointment_id=appointment.id,
-            )
-            appointment.starts_at = starts_at
-            appointment.ends_at = ends_at
-            appointment.duration_minutes = duration
-
-        if "status" in changes:
-            appointment.status = changes["status"]
-            if appointment.status == AppointmentStatus.CONFIRMED:
-                appointment.confirmed_at = datetime.now().replace(microsecond=0)
+            if (starts_at, ends_at) != (appointment.starts_at, appointment.ends_at):
+                professional = self.lock_professional(db, appointment.professional_id)
+                self.release_expired_holds(db, professional_id=professional.id)
+                self.validate_slot(
+                    db,
+                    professional=professional,
+                    starts_at=starts_at,
+                    ends_at=ends_at,
+                    patient_id=appointment.patient_id,
+                    exclude_appointment_id=appointment.id,
+                )
+                appointment.starts_at = starts_at
+                appointment.ends_at = ends_at
+                appointment.duration_minutes = duration
                 if followup_agent:
-                    followup_agent.queue_confirmation(db, appointment, actor=actor)
-            if appointment.status == AppointmentStatus.CANCELLED:
-                appointment.cancelled_at = datetime.now().replace(microsecond=0)
+                    followup_agent.discard_pending_reminders(db, appointment)
 
         for field in ("reason", "notes"):
             if field in changes:
                 setattr(appointment, field, changes[field])
+
+        if new_status:
+            self._apply_transition(db, appointment, new_status, followup_agent=followup_agent)
 
         create_audit_log(
             db,
@@ -165,9 +269,9 @@ class ScheduleAgent:
             entity_id=str(appointment.id),
             actor=actor,
             description="Appointment updated",
-            details=changes,
+            details={key: (value.isoformat() if isinstance(value, datetime) else value) for key, value in changes.items()},
         )
-        db.commit()
+        self.commit(db)
         return self.get_appointment(db, appointment.id)
 
     def reschedule_appointment(
@@ -176,109 +280,131 @@ class ScheduleAgent:
         appointment_id: int,
         payload: AppointmentReschedule,
         *,
+        followup_agent: FollowUpAgent | None = None,
         actor: str = "schedule_agent",
     ) -> Appointment:
         return self.update_appointment(
             db,
             appointment_id,
             AppointmentUpdate(starts_at=payload.starts_at, duration_minutes=payload.duration_minutes),
+            followup_agent=followup_agent,
             actor=actor,
         )
 
-    def cancel_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, actor: str = "schedule_agent") -> Appointment:
-        appointment = self.get_appointment(db, appointment_id)
-        if appointment.status == AppointmentStatus.CANCELLED:
-            raise DomainError("Appointment is already cancelled", status_code=409)
-        if appointment.status == AppointmentStatus.COMPLETED:
-            raise DomainError("Completed appointments cannot be cancelled from this action", status_code=409)
-        self._set_status(appointment, AppointmentStatus.CANCELLED)
-        if notes:
-            appointment.notes = notes
-        create_audit_log(
-            db,
-            action="appointment.cancelled",
-            entity_name="appointment",
-            entity_id=str(appointment.id),
-            actor=actor,
-            description="Appointment cancelled",
-        )
-        db.commit()
-        return self.get_appointment(db, appointment.id)
-
-    def confirm_appointment(
+    def change_status(
         self,
         db: Session,
         appointment_id: int,
+        new_status: AppointmentStatus,
         *,
         followup_agent: FollowUpAgent | None = None,
+        notes: str | None = None,
         actor: str = "schedule_agent",
     ) -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
-        if appointment.status == AppointmentStatus.CANCELLED:
-            raise DomainError("Cancelled appointments must be reactivated first", status_code=409)
-        if appointment.status == AppointmentStatus.COMPLETED:
-            raise DomainError("Completed appointments cannot be confirmed", status_code=409)
-        if appointment.status == AppointmentStatus.CONFIRMED:
-            raise DomainError("Appointment is already confirmed", status_code=409)
-        self._set_status(appointment, AppointmentStatus.CONFIRMED)
-        if followup_agent:
-            followup_agent.queue_confirmation(db, appointment, actor=actor)
-        create_audit_log(
-            db,
-            action="appointment.confirmed",
-            entity_name="appointment",
-            entity_id=str(appointment.id),
-            actor=actor,
-            description="Appointment confirmed",
-        )
-        db.commit()
-        return self.get_appointment(db, appointment.id)
-
-    def complete_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, actor: str = "schedule_agent") -> Appointment:
-        appointment = self.get_appointment(db, appointment_id)
-        if appointment.status == AppointmentStatus.CANCELLED:
-            raise DomainError("Cancelled appointments must be reactivated first", status_code=409)
-        if appointment.status == AppointmentStatus.COMPLETED:
-            raise DomainError("Appointment is already completed", status_code=409)
-        self._set_status(appointment, AppointmentStatus.COMPLETED)
+        if appointment.status == new_status:
+            raise DomainError("El turno ya está en ese estado.", status_code=409)
+        self._apply_transition(db, appointment, new_status, followup_agent=followup_agent)
         if notes:
             appointment.notes = notes
         create_audit_log(
             db,
-            action="appointment.completed",
+            action=f"appointment.{new_status.value}",
             entity_name="appointment",
             entity_id=str(appointment.id),
             actor=actor,
-            description="Appointment completed",
+            description=f"Appointment moved to {new_status.value}",
         )
-        db.commit()
+        self.commit(db)
         return self.get_appointment(db, appointment.id)
+
+    def confirm_appointment(self, db: Session, appointment_id: int, *, followup_agent: FollowUpAgent | None = None, actor: str = "schedule_agent") -> Appointment:
+        return self.change_status(db, appointment_id, AppointmentStatus.CONFIRMED, followup_agent=followup_agent, actor=actor)
+
+    def cancel_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, followup_agent: FollowUpAgent | None = None, actor: str = "schedule_agent") -> Appointment:
+        return self.change_status(db, appointment_id, AppointmentStatus.CANCELLED, followup_agent=followup_agent, notes=notes, actor=actor)
+
+    def complete_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, actor: str = "schedule_agent") -> Appointment:
+        return self.change_status(db, appointment_id, AppointmentStatus.COMPLETED, notes=notes, actor=actor)
+
+    def mark_no_show(self, db: Session, appointment_id: int, *, actor: str = "schedule_agent") -> Appointment:
+        return self.change_status(db, appointment_id, AppointmentStatus.NO_SHOW, actor=actor)
 
     def reserve_appointment(self, db: Session, appointment_id: int, *, actor: str = "schedule_agent") -> Appointment:
-        appointment = self.get_appointment(db, appointment_id)
-        if appointment.status != AppointmentStatus.CANCELLED:
-            raise DomainError("Only cancelled appointments can be reactivated", status_code=409)
-        self._set_status(appointment, AppointmentStatus.RESERVED)
-        create_audit_log(
-            db,
-            action="appointment.reserved",
-            entity_name="appointment",
-            entity_id=str(appointment.id),
-            actor=actor,
-            description="Appointment moved to reserved",
+        return self.change_status(db, appointment_id, AppointmentStatus.RESERVED, actor=actor)
+
+    def release_expired_holds(self, db: Session, *, professional_id: int | None = None) -> list[Appointment]:
+        """Mark unpaid holds whose deadline passed as expired so their slots become bookable."""
+        query = (
+            select(Appointment)
+            .where(Appointment.status == AppointmentStatus.PENDING_PAYMENT)
+            .where(Appointment.hold_expires_at.is_not(None))
+            .where(Appointment.hold_expires_at <= clock.now())
         )
-        db.commit()
-        return self.get_appointment(db, appointment.id)
+        if professional_id:
+            query = query.where(Appointment.professional_id == professional_id)
+        expired = list(db.scalars(query))
+        for appointment in expired:
+            appointment.status = AppointmentStatus.EXPIRED
+            create_audit_log(
+                db,
+                action="appointment.expired",
+                entity_name="appointment",
+                entity_id=str(appointment.id),
+                actor="schedule_agent",
+                description="Unpaid hold expired",
+            )
+        if expired:
+            db.flush()
+        return expired
 
-    def get_daily_agenda(self, db: Session, *, day: date, professional_id: int | None = None) -> list[Appointment]:
-        start = date_range_start(day)
-        end = date_range_end(day)
-        return self.list_appointments(db, professional_id=professional_id, date_from=start, date_to=end)
+    def _apply_transition(
+        self,
+        db: Session,
+        appointment: Appointment,
+        new_status: AppointmentStatus,
+        *,
+        followup_agent: FollowUpAgent | None = None,
+    ) -> None:
+        current = appointment.status
+        if new_status not in ALLOWED_TRANSITIONS.get(current, set()):
+            raise DomainError(
+                f"No se puede pasar un turno de «{current.value}» a «{new_status.value}».",
+                status_code=409,
+            )
+        if current in REACTIVATING_SOURCES:
+            professional = self.lock_professional(db, appointment.professional_id)
+            self.release_expired_holds(db, professional_id=professional.id)
+            if appointment.starts_at < clock.now():
+                raise DomainError("No se puede reactivar un turno que ya pasó.", status_code=409)
+            self._assert_slot_free(
+                db,
+                professional_id=professional.id,
+                patient_id=appointment.patient_id,
+                starts_at=appointment.starts_at,
+                ends_at=appointment.ends_at,
+                exclude_appointment_id=appointment.id,
+            )
 
-    def get_weekly_agenda(self, db: Session, *, week_start: date, professional_id: int | None = None) -> list[Appointment]:
-        start = date_range_start(week_start)
-        end = date_range_end(week_start + timedelta(days=6))
-        return self.list_appointments(db, professional_id=professional_id, date_from=start, date_to=end)
+        now = clock.now()
+        appointment.status = new_status
+        if new_status != AppointmentStatus.PENDING_PAYMENT:
+            appointment.hold_expires_at = None
+        if new_status == AppointmentStatus.RESERVED:
+            appointment.confirmed_at = None
+            appointment.cancelled_at = None
+        elif new_status == AppointmentStatus.CONFIRMED:
+            appointment.confirmed_at = now
+            appointment.cancelled_at = None
+            if followup_agent:
+                followup_agent.queue_confirmation(db, appointment)
+        elif new_status == AppointmentStatus.CANCELLED:
+            appointment.cancelled_at = now
+            if followup_agent:
+                followup_agent.discard_pending_reminders(db, appointment)
+        self.flush(db)
+
+    # ------------------------------------------------------------ availability
 
     def list_availability_windows(
         self,
@@ -306,6 +432,8 @@ class ScheduleAgent:
         actor: str = "admin",
     ) -> AvailabilityWindow:
         self._get_professional(db, payload.professional_id)
+        if payload.availability_date < clock.today():
+            raise DomainError("No se puede cargar disponibilidad en una fecha pasada.", status_code=422)
         self._validate_availability_window(
             db,
             professional_id=payload.professional_id,
@@ -336,9 +464,7 @@ class ScheduleAgent:
         *,
         actor: str = "admin",
     ) -> AvailabilityWindow:
-        availability_window = db.get(AvailabilityWindow, availability_window_id)
-        if not availability_window:
-            raise DomainError("Availability window not found", status_code=404)
+        availability_window = self.get_availability_window(db, availability_window_id)
         changes = payload.model_dump(exclude_unset=True)
         next_date = changes.get("availability_date", availability_window.availability_date)
         next_start = changes.get("start_time", availability_window.start_time)
@@ -351,6 +477,12 @@ class ScheduleAgent:
             end_time=next_end,
             exclude_window_id=availability_window.id,
         )
+        self._assert_window_keeps_appointments(
+            db,
+            availability_window,
+            new_start=combine_date_time(next_date, next_start),
+            new_end=combine_date_time(next_date, next_end),
+        )
         for field, value in changes.items():
             setattr(availability_window, field, value)
         create_audit_log(
@@ -360,16 +492,21 @@ class ScheduleAgent:
             entity_id=str(availability_window.id),
             actor=actor,
             description="Availability window updated",
-            details=changes,
+            details={key: str(value) for key, value in changes.items()},
         )
         db.commit()
         db.refresh(availability_window)
         return availability_window
 
-    def delete_availability_window(self, db: Session, availability_window_id: int, *, actor: str = "admin") -> None:
+    def get_availability_window(self, db: Session, availability_window_id: int) -> AvailabilityWindow:
         availability_window = db.get(AvailabilityWindow, availability_window_id)
         if not availability_window:
-            raise DomainError("Availability window not found", status_code=404)
+            raise DomainError("No encontramos esa disponibilidad.", status_code=404)
+        return availability_window
+
+    def delete_availability_window(self, db: Session, availability_window_id: int, *, actor: str = "admin") -> None:
+        availability_window = self.get_availability_window(db, availability_window_id)
+        self._assert_window_keeps_appointments(db, availability_window, new_start=None, new_end=None)
         create_audit_log(
             db,
             action="availability_window.deleted",
@@ -381,27 +518,69 @@ class ScheduleAgent:
         db.delete(availability_window)
         db.commit()
 
-    def get_daily_availability(self, db: Session, *, professional_id: int, day: date) -> list[AvailabilitySlot]:
+    def public_booking_bounds(self) -> tuple[datetime, date]:
+        """Earliest start and last date a patient may book online."""
+        now = clock.now()
+        earliest = now + timedelta(minutes=self.settings.booking_min_lead_minutes)
+        last_date = now.date() + timedelta(days=self.settings.booking_max_days_ahead)
+        return earliest, last_date
+
+    def compute_availability(
+        self,
+        db: Session,
+        *,
+        professional_id: int,
+        date_from: date,
+        date_to: date,
+        earliest_start: datetime | None = None,
+    ) -> dict[date, list[AvailabilitySlot]]:
+        """Free slots per day in [date_from, date_to], computed with two queries."""
         professional = self._get_professional(db, professional_id)
-        day_blocks = list(
-            db.scalars(
-                select(AvailabilityWindow)
-                .where(AvailabilityWindow.professional_id == professional.id)
-                .where(AvailabilityWindow.availability_date == day)
-                .order_by(AvailabilityWindow.start_time)
-            )
-        )
-        slots: list[AvailabilitySlot] = []
-        for block in day_blocks:
-            cursor = combine_date_time(day, block.start_time)
-            block_end = combine_date_time(day, block.end_time)
-            slot_duration = block.slot_duration_minutes or professional.default_appointment_duration
-            while cursor + timedelta(minutes=slot_duration) <= block_end:
-                slot_end = cursor + timedelta(minutes=slot_duration)
-                if not self._has_overlap(db, professional_id=professional.id, starts_at=cursor, ends_at=slot_end):
-                    slots.append(AvailabilitySlot(starts_at=cursor, ends_at=slot_end, available=True))
-                cursor = slot_end
-        return slots
+        earliest_start = earliest_start or clock.now()
+        windows = db.scalars(
+            select(AvailabilityWindow)
+            .where(AvailabilityWindow.professional_id == professional.id)
+            .where(AvailabilityWindow.availability_date >= date_from)
+            .where(AvailabilityWindow.availability_date <= date_to)
+            .order_by(AvailabilityWindow.availability_date, AvailabilityWindow.start_time)
+        ).all()
+        if not windows:
+            return {}
+        busy = db.execute(
+            select(Appointment.starts_at, Appointment.ends_at)
+            .where(Appointment.professional_id == professional.id)
+            .where(Appointment.starts_at < date_range_start(date_to + timedelta(days=1)))
+            .where(Appointment.ends_at > date_range_start(date_from))
+            .where(self._blocking_filter())
+        ).all()
+
+        availability: dict[date, list[AvailabilitySlot]] = defaultdict(list)
+        for window in windows:
+            for slot_start, slot_end in self._window_slots(window, professional):
+                if slot_start < earliest_start:
+                    continue
+                if any(busy_start < slot_end and busy_end > slot_start for busy_start, busy_end in busy):
+                    continue
+                availability[window.availability_date].append(
+                    AvailabilitySlot(starts_at=slot_start, ends_at=slot_end, available=True)
+                )
+        return dict(availability)
+
+    def get_daily_availability(
+        self,
+        db: Session,
+        *,
+        professional_id: int,
+        day: date,
+        earliest_start: datetime | None = None,
+    ) -> list[AvailabilitySlot]:
+        return self.compute_availability(
+            db,
+            professional_id=professional_id,
+            date_from=day,
+            date_to=day,
+            earliest_start=earliest_start,
+        ).get(day, [])
 
     def list_available_dates(
         self,
@@ -409,46 +588,44 @@ class ScheduleAgent:
         *,
         professional_id: int,
         date_from: date | None = None,
+        date_to: date | None = None,
+        earliest_start: datetime | None = None,
         limit: int = 12,
     ) -> list[tuple[date, int]]:
-        professional = self._get_professional(db, professional_id)
-        start_date = date_from or date.today()
-        candidate_dates = db.scalars(
-            select(AvailabilityWindow.availability_date)
-            .where(AvailabilityWindow.professional_id == professional.id)
-            .where(AvailabilityWindow.availability_date >= start_date)
-            .distinct()
-            .order_by(AvailabilityWindow.availability_date)
-        ).all()
-
-        available_dates: list[tuple[date, int]] = []
-        for candidate in candidate_dates:
-            slots = self.get_daily_availability(db, professional_id=professional.id, day=candidate)
-            if slots:
-                available_dates.append((candidate, len(slots)))
-            if len(available_dates) >= limit:
-                break
-        return available_dates
+        start_date = date_from or clock.today()
+        end_date = date_to or start_date + timedelta(days=self.settings.booking_max_days_ahead)
+        availability = self.compute_availability(
+            db,
+            professional_id=professional_id,
+            date_from=start_date,
+            date_to=end_date,
+            earliest_start=earliest_start,
+        )
+        return [(day, len(slots)) for day, slots in sorted(availability.items()) if slots][:limit]
 
     def get_weekly_availability(self, db: Session, *, professional_id: int, week_start: date) -> dict[date, list[AvailabilitySlot]]:
-        return {
-            week_start + timedelta(days=index): self.get_daily_availability(
-                db,
-                professional_id=professional_id,
-                day=week_start + timedelta(days=index),
-            )
-            for index in range(7)
-        }
+        availability = self.compute_availability(
+            db,
+            professional_id=professional_id,
+            date_from=week_start,
+            date_to=week_start + timedelta(days=6),
+        )
+        return {week_start + timedelta(days=index): availability.get(week_start + timedelta(days=index), []) for index in range(7)}
 
-    def _get_professional(self, db: Session, professional_id: int) -> Professional:
-        professional = db.get(Professional, professional_id)
+    # --------------------------------------------------------------- validation
+
+    def lock_professional(self, db: Session, professional_id: int) -> Professional:
+        """Serialize bookings per professional (SELECT ... FOR UPDATE on PostgreSQL)."""
+        professional = db.scalar(
+            select(Professional).where(Professional.id == professional_id).with_for_update()
+        )
         if not professional:
-            raise DomainError("Professional not found", status_code=404)
+            raise DomainError("No encontramos el profesional.", status_code=404)
         if not professional.is_active:
-            raise DomainError("Professional is inactive", status_code=409)
+            raise DomainError("El profesional no está tomando turnos en este momento.", status_code=409)
         return professional
 
-    def _validate_slot(
+    def validate_slot(
         self,
         db: Session,
         *,
@@ -457,19 +634,75 @@ class ScheduleAgent:
         ends_at: datetime,
         patient_id: int | None = None,
         exclude_appointment_id: int | None = None,
+        public_rules: bool = False,
     ) -> None:
         if starts_at >= ends_at:
-            raise DomainError("Appointment end time must be later than start time", status_code=422)
-        if not self._fits_availability_windows(db, professional_id=professional.id, starts_at=starts_at, ends_at=ends_at):
-            raise DomainError("The selected time is outside the professional availability for that date", status_code=409)
-        if self._has_overlap(
+            raise DomainError("El horario de fin debe ser posterior al de inicio.", status_code=422)
+        now = clock.now()
+        if starts_at < now:
+            raise DomainError("No se pueden reservar turnos en horarios que ya pasaron.", status_code=422)
+        if public_rules:
+            earliest, last_date = self.public_booking_bounds()
+            if starts_at < earliest:
+                raise DomainError(
+                    f"Los turnos online se reservan con al menos {self._format_lead_time()} de anticipación.",
+                    status_code=422,
+                )
+            if starts_at.date() > last_date:
+                raise DomainError(
+                    f"Solo se pueden reservar turnos online hasta {self.settings.booking_max_days_ahead} días hacia adelante.",
+                    status_code=422,
+                )
+            if not self._is_published_slot(db, professional=professional, starts_at=starts_at, ends_at=ends_at):
+                raise DomainError(SLOT_TAKEN_MESSAGE, status_code=409)
+        elif not self._fits_availability_windows(db, professional_id=professional.id, starts_at=starts_at, ends_at=ends_at):
+            raise DomainError("El horario está fuera de la disponibilidad del profesional para esa fecha.", status_code=409)
+        self._assert_slot_free(
             db,
             professional_id=professional.id,
+            patient_id=patient_id,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            exclude_appointment_id=exclude_appointment_id,
+        )
+
+    def flush(self, db: Session) -> None:
+        """Flush, translating the PostgreSQL overlap constraint into a friendly domain error."""
+        try:
+            db.flush()
+        except IntegrityError as exc:
+            db.rollback()
+            if "no_overlap" in str(exc.orig):
+                raise DomainError(SLOT_TAKEN_MESSAGE, status_code=409) from exc
+            raise
+
+    def commit(self, db: Session) -> None:
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            if "no_overlap" in str(exc.orig):
+                raise DomainError(SLOT_TAKEN_MESSAGE, status_code=409) from exc
+            raise
+
+    def _assert_slot_free(
+        self,
+        db: Session,
+        *,
+        professional_id: int,
+        patient_id: int | None,
+        starts_at: datetime,
+        ends_at: datetime,
+        exclude_appointment_id: int | None = None,
+    ) -> None:
+        if self._has_overlap(
+            db,
+            professional_id=professional_id,
             starts_at=starts_at,
             ends_at=ends_at,
             exclude_appointment_id=exclude_appointment_id,
         ):
-            raise DomainError("The selected time overlaps an existing appointment", status_code=409)
+            raise DomainError(SLOT_TAKEN_MESSAGE, status_code=409)
         if patient_id and self._has_patient_overlap(
             db,
             patient_id=patient_id,
@@ -477,16 +710,40 @@ class ScheduleAgent:
             ends_at=ends_at,
             exclude_appointment_id=exclude_appointment_id,
         ):
-            raise DomainError("The patient already has another appointment in that time range", status_code=409)
+            raise DomainError("El paciente ya tiene otro turno en ese horario.", status_code=409)
+
+    def _blocking_filter(self):
+        return and_(
+            Appointment.status.in_(BLOCKING_APPOINTMENT_STATUSES),
+            or_(
+                Appointment.status != AppointmentStatus.PENDING_PAYMENT,
+                Appointment.hold_expires_at.is_(None),
+                Appointment.hold_expires_at > clock.now(),
+            ),
+        )
+
+    def _window_slots(self, window: AvailabilityWindow, professional: Professional):
+        cursor = combine_date_time(window.availability_date, window.start_time)
+        window_end = combine_date_time(window.availability_date, window.end_time)
+        step = timedelta(minutes=window.slot_duration_minutes or professional.default_appointment_duration)
+        while cursor + step <= window_end:
+            yield cursor, cursor + step
+            cursor += step
+
+    def _is_published_slot(self, db: Session, *, professional: Professional, starts_at: datetime, ends_at: datetime) -> bool:
+        windows = db.scalars(
+            select(AvailabilityWindow)
+            .where(AvailabilityWindow.professional_id == professional.id)
+            .where(AvailabilityWindow.availability_date == starts_at.date())
+        ).all()
+        return any((starts_at, ends_at) in set(self._window_slots(window, professional)) for window in windows)
 
     def _fits_availability_windows(self, db: Session, *, professional_id: int, starts_at: datetime, ends_at: datetime) -> bool:
-        blocks = list(
-            db.scalars(
-                select(AvailabilityWindow)
-                .where(AvailabilityWindow.professional_id == professional_id)
-                .where(AvailabilityWindow.availability_date == starts_at.date())
-            )
-        )
+        blocks = db.scalars(
+            select(AvailabilityWindow)
+            .where(AvailabilityWindow.professional_id == professional_id)
+            .where(AvailabilityWindow.availability_date == starts_at.date())
+        ).all()
         for block in blocks:
             block_start = combine_date_time(starts_at.date(), block.start_time)
             block_end = combine_date_time(starts_at.date(), block.end_time)
@@ -500,12 +757,12 @@ class ScheduleAgent:
         *,
         professional_id: int,
         availability_date: date,
-        start_time,
-        end_time,
+        start_time: time,
+        end_time: time,
         exclude_window_id: int | None = None,
     ) -> None:
         if end_time <= start_time:
-            raise DomainError("Availability end time must be later than start time", status_code=422)
+            raise DomainError("La hora de fin debe ser posterior a la de inicio.", status_code=422)
         query = (
             select(AvailabilityWindow)
             .where(AvailabilityWindow.professional_id == professional_id)
@@ -516,7 +773,41 @@ class ScheduleAgent:
         if exclude_window_id:
             query = query.where(AvailabilityWindow.id != exclude_window_id)
         if db.scalar(query):
-            raise DomainError("The professional already has another overlapping availability window on that date", status_code=409)
+            raise DomainError(
+                "El profesional ya tiene otra disponibilidad que se superpone en esa fecha.",
+                status_code=409,
+            )
+
+    def _assert_window_keeps_appointments(
+        self,
+        db: Session,
+        window: AvailabilityWindow,
+        *,
+        new_start: datetime | None,
+        new_end: datetime | None,
+    ) -> None:
+        """Refuse to remove or shrink a window that still has upcoming appointments inside it."""
+        window_start = combine_date_time(window.availability_date, window.start_time)
+        window_end = combine_date_time(window.availability_date, window.end_time)
+        booked = db.scalars(
+            select(Appointment)
+            .where(Appointment.professional_id == window.professional_id)
+            .where(Appointment.starts_at >= window_start)
+            .where(Appointment.ends_at <= window_end)
+            .where(Appointment.starts_at >= clock.now())
+            .where(self._blocking_filter())
+        ).all()
+        stranded = [
+            appointment
+            for appointment in booked
+            if new_start is None or appointment.starts_at < new_start or appointment.ends_at > new_end
+        ]
+        if stranded:
+            raise DomainError(
+                f"Hay {len(stranded)} turno(s) activos dentro de esa disponibilidad. "
+                "Cancelalos o reprogramalos antes de modificarla.",
+                status_code=409,
+            )
 
     def _has_overlap(
         self,
@@ -528,15 +819,15 @@ class ScheduleAgent:
         exclude_appointment_id: int | None = None,
     ) -> bool:
         query = (
-            select(Appointment)
+            select(Appointment.id)
             .where(Appointment.professional_id == professional_id)
-            .where(Appointment.status != AppointmentStatus.CANCELLED)
+            .where(self._blocking_filter())
             .where(Appointment.starts_at < ends_at)
             .where(Appointment.ends_at > starts_at)
         )
         if exclude_appointment_id:
             query = query.where(Appointment.id != exclude_appointment_id)
-        return db.scalar(query) is not None
+        return db.scalar(query.limit(1)) is not None
 
     def _has_patient_overlap(
         self,
@@ -548,29 +839,27 @@ class ScheduleAgent:
         exclude_appointment_id: int | None = None,
     ) -> bool:
         query = (
-            select(Appointment)
+            select(Appointment.id)
             .where(Appointment.patient_id == patient_id)
-            .where(Appointment.status != AppointmentStatus.CANCELLED)
+            .where(self._blocking_filter())
             .where(Appointment.starts_at < ends_at)
             .where(Appointment.ends_at > starts_at)
         )
         if exclude_appointment_id:
             query = query.where(Appointment.id != exclude_appointment_id)
-        return db.scalar(query) is not None
+        return db.scalar(query.limit(1)) is not None
 
-    def _set_status(self, appointment: Appointment, status: AppointmentStatus) -> None:
-        now = datetime.now().replace(microsecond=0)
-        appointment.status = status
-        if status == AppointmentStatus.RESERVED:
-            appointment.confirmed_at = None
-            appointment.cancelled_at = None
-            return
-        if status == AppointmentStatus.CONFIRMED:
-            appointment.confirmed_at = now
-            appointment.cancelled_at = None
-            return
-        if status == AppointmentStatus.CANCELLED:
-            appointment.cancelled_at = now
-            return
-        if status == AppointmentStatus.COMPLETED:
-            appointment.cancelled_at = None
+    def _get_professional(self, db: Session, professional_id: int) -> Professional:
+        professional = db.get(Professional, professional_id)
+        if not professional:
+            raise DomainError("No encontramos el profesional.", status_code=404)
+        if not professional.is_active:
+            raise DomainError("El profesional no está tomando turnos en este momento.", status_code=409)
+        return professional
+
+    def _format_lead_time(self) -> str:
+        minutes = self.settings.booking_min_lead_minutes
+        if minutes % 60 == 0:
+            hours = minutes // 60
+            return f"{hours} hora{'s' if hours != 1 else ''}"
+        return f"{minutes} minutos"

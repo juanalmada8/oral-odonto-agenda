@@ -8,8 +8,10 @@ from app.core.exceptions import DomainError
 from app.models.appointment import Appointment
 from app.models.notification import Notification
 from app.models.patient import Patient
+from app.schemas.booking import PublicBookingRequest
 from app.schemas.patient import PatientCreate, PatientUpdate, PatientUpsert
 from app.utils.audit import create_audit_log
+from app.utils.validation import names_match
 
 
 class ReceptionAgent:
@@ -19,7 +21,7 @@ class ReceptionAgent:
     def get_patient(self, db: Session, patient_id: int) -> Patient:
         patient = db.get(Patient, patient_id)
         if not patient:
-            raise DomainError("Patient not found", status_code=404)
+            raise DomainError("No encontramos el paciente.", status_code=404)
         return patient
 
     def create_patient(self, db: Session, payload: PatientCreate, actor: str = "reception_agent") -> Patient:
@@ -129,11 +131,11 @@ class ReceptionAgent:
         if patient_id is not None:
             patient = self.get_patient(db, patient_id)
             if not patient.is_active:
-                raise DomainError("Patient is inactive", status_code=409)
+                raise DomainError("El paciente está inactivo.", status_code=409)
             return patient
 
         if patient_payload is None:
-            raise DomainError("Patient information is required", status_code=422)
+            raise DomainError("Faltan los datos del paciente.", status_code=422)
 
         patient = self._find_existing(db, dni=patient_payload.dni)
         if patient:
@@ -168,6 +170,65 @@ class ReceptionAgent:
         )
         return patient
 
+    def resolve_patient_for_public_booking(self, db: Session, request: PublicBookingRequest) -> Patient:
+        """Find or create the patient behind a public booking without trusting the form.
+
+        Anyone can type any DNI on the public site, so an existing record is only matched when the
+        last name agrees, and its stored data is never overwritten (only empty fields are filled).
+        Contact data for the booking itself lives on the appointment.
+        """
+        patient = self._find_existing(db, dni=request.dni)
+        if patient is None:
+            patient = Patient(
+                dni=request.dni,
+                first_name=request.first_name,
+                last_name=request.last_name,
+                email=request.email,
+                phone=request.phone,
+                observations=request.observations,
+            )
+            db.add(patient)
+            db.flush()
+            create_audit_log(
+                db,
+                action="patient.created_from_booking",
+                entity_name="patient",
+                entity_id=str(patient.id),
+                actor="public_booking",
+                description="Patient created during public booking",
+            )
+            return patient
+
+        if not patient.is_active:
+            raise DomainError(
+                "No podemos tomar reservas online para ese DNI. Comunicate con el consultorio.",
+                status_code=409,
+            )
+        if not names_match(patient.last_name, request.last_name):
+            raise DomainError(
+                "Los datos no coinciden con los registrados para ese DNI. "
+                "Revisá el apellido o comunicate con el consultorio.",
+                status_code=409,
+            )
+        filled = {}
+        for field in ("email", "phone", "observations"):
+            value = getattr(request, field)
+            if value and not getattr(patient, field):
+                setattr(patient, field, value)
+                filled[field] = value
+        if filled:
+            create_audit_log(
+                db,
+                action="patient.completed_from_booking",
+                entity_name="patient",
+                entity_id=str(patient.id),
+                actor="public_booking",
+                description="Empty patient fields filled during public booking",
+                details=filled,
+            )
+            db.flush()
+        return patient
+
     def _find_existing(self, db: Session, *, dni: str) -> Patient | None:
         return db.scalar(select(Patient).where(Patient.dni == dni))
 
@@ -183,4 +244,4 @@ class ReceptionAgent:
             query = query.where(Patient.id != exclude_id)
         existing = db.scalar(query)
         if existing:
-            raise DomainError("A patient already exists with the same DNI", status_code=409)
+            raise DomainError("Ya existe un paciente con ese DNI.", status_code=409)
