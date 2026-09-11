@@ -20,6 +20,15 @@
       placeholder="Duración por defecto"
       required
     />
+    <label class="field">
+      <span class="field-label">Seña online (ARS) <em>vacío = valor general{% if settings.deposit_default_amount %} ({{ settings.deposit_default_amount | money }}){% endif %}, 0 = sin seña</em></span>
+      <input
+        name="deposit_amount"
+        inputmode="decimal"
+        value="{{ '' if professional.deposit_amount is none else professional.deposit_amount | int }}"
+        placeholder="Ej: 10000"
+      />
+    </label>
     <label class="checkbox-row">
       <input type="checkbox" name="is_active" value="true" {% if professional.is_active %}checked{% endif %} />
       Profesional activo

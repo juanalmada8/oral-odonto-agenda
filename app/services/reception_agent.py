@@ -3,11 +3,12 @@
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
-from app.core.enums import AppointmentStatus
+from app.core.enums import UPCOMING_APPOINTMENT_STATUSES
 from app.core.exceptions import DomainError
 from app.models.appointment import Appointment
 from app.models.notification import Notification
 from app.models.patient import Patient
+from app.models.payment import Payment
 from app.schemas.booking import PublicBookingRequest
 from app.schemas.patient import PatientCreate, PatientUpdate, PatientUpsert
 from app.utils.audit import create_audit_log
@@ -85,16 +86,21 @@ class ReceptionAgent:
         has_active_appointments = db.scalar(
             select(Appointment.id)
             .where(Appointment.patient_id == patient.id)
-            .where(Appointment.status.in_([AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED]))
+            .where(Appointment.status.in_(UPCOMING_APPOINTMENT_STATUSES))
             .limit(1)
         )
         if has_active_appointments:
             raise DomainError(
-                "No se puede borrar el paciente porque tiene turnos activos (reservados o confirmados).",
+                "No se puede borrar el paciente porque tiene turnos activos (reservados, confirmados o esperando seña).",
                 status_code=409,
             )
 
         appointment_ids = list(db.scalars(select(Appointment.id).where(Appointment.patient_id == patient.id)))
+        if appointment_ids and db.scalar(select(Payment.id).where(Payment.appointment_id.in_(appointment_ids)).limit(1)):
+            raise DomainError(
+                "No se puede borrar el paciente porque tiene pagos registrados. Podés desactivarlo.",
+                status_code=409,
+            )
         if appointment_ids:
             db.execute(
                 update(Notification)

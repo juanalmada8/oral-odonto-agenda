@@ -22,4 +22,5 @@ def configure_logging(debug: bool = False) -> None:
             "root": {"handlers": ["console"], "level": level},
         }
     )
-    logging.getLogger("sqlalchemy.engine").setLevel("WARNING")
+    for noisy in ("sqlalchemy.engine", "python_multipart", "httpcore", "asyncio"):
+        logging.getLogger(noisy).setLevel("WARNING")

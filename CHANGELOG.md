@@ -13,6 +13,20 @@ y versionado semántico.
 
 ## [Unreleased]
 
+### Added — Reserva con seña (Mercado Pago)
+- La reserva online bloquea el horario (`pending_payment`) y envía al paciente a pagar la seña con
+  Checkout Pro; el turno se confirma solo cuando Mercado Pago aprueba el pago (webhook firmado con HMAC
+  + consulta a la API, nunca se confía en la notificación). Si la seña no se paga a tiempo
+  (`BOOKING_HOLD_MINUTES`, 20 por defecto) el horario se libera.
+- Seña configurable por profesional (vacío = `DEPOSIT_DEFAULT_AMOUNT`, 0 = sin seña).
+- Página del turno (`/reservar/turno/<token>`) con estado del pago, cuenta regresiva, reintento de pago,
+  archivo `.ics` para el calendario y sincronización inmediata al volver de Mercado Pago.
+- Pagos aprobados tarde para un horario ya ocupado quedan marcados para devolución (`/api/v1/payments/requires-refund`).
+- Simulador de checkout local (`/pagos/simulador/...`) cuando no hay credenciales de Mercado Pago (nunca en producción).
+- Nueva página de reserva: pasos, grilla de horarios, resumen con seña, política de cancelación,
+  honeypot anti-bots, límite de intentos por IP y conservación de los datos cargados ante errores.
+- Límite de intentos de login por IP y usuario; cookie `secure` y cabeceras de seguridad en producción.
+
 ### Fixed
 - PostgreSQL: la migración inicial fallaba ("type already exists") y los enums se guardaban por nombre
   (`ADMIN`) en columnas que esperaban el valor (`admin`), así que ninguna inserción funcionaba.

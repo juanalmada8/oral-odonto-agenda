@@ -1,0 +1,137 @@
+{% set brand_logo = request.url_for('static', path='brand/oral-logo-blue-cropped.png') %}
+{% set status = appointment.status.value %}
+{% set professional_name = appointment.professional.first_name ~ ' ' ~ appointment.professional.last_name %}
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>ORAL | Tu turno</title>
+    <link rel="icon" type="image/png" href="{{ brand_logo }}" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="public-body">
+    <div class="public-shell status-shell">
+      <div class="public-topbar">
+        <a class="topbar-brand" href="/reservar">
+          <img class="brand-logo brand-logo-wide brand-logo-topbar" src="{{ brand_logo }}" alt="ORAL odontología familiar" />
+        </a>
+      </div>
+
+      <main class="status-layout">
+        <section class="panel status-card status-card--{{ status }}" data-status="{{ status }}" data-token="{{ appointment.public_token }}">
+          {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+          {% if message %}<div class="alert alert-success" role="status">{{ message }}</div>{% endif %}
+
+          {% if status == 'pending_payment' %}
+            <div class="status-icon" aria-hidden="true">⏱</div>
+            <span class="eyebrow">Paso final</span>
+            <h1>Pagá la seña para confirmar</h1>
+            {% if seconds_left > 0 %}
+            <p class="status-lead">
+              Te guardamos el horario por
+              <strong class="countdown" data-seconds-left="{{ seconds_left }}">{{ (seconds_left // 60) }}:{{ '%02d' % (seconds_left % 60) }}</strong>
+              minutos. Si no se acredita la seña, se libera para otra persona.
+            </p>
+            {% else %}
+            <p class="status-lead">Estamos verificando el pago…</p>
+            {% endif %}
+            {% if payment_rejected %}
+            <div class="alert alert-error">El pago fue rechazado. Probá con otra tarjeta o medio de pago.</div>
+            {% endif %}
+          {% elif status == 'confirmed' %}
+            <div class="status-icon" aria-hidden="true">✓</div>
+            <span class="eyebrow">Turno confirmado</span>
+            <h1>¡Te esperamos, {{ appointment.patient.first_name }}!</h1>
+            <p class="status-lead">
+              {% if payment and payment.status.value == 'approved' %}Recibimos tu seña. {% endif %}Te enviamos la confirmación a
+              <strong>{{ appointment.notification_email | mask_email }}</strong> y te vamos a recordar el turno por WhatsApp.
+            </p>
+          {% elif status == 'reserved' %}
+            <div class="status-icon" aria-hidden="true">✓</div>
+            <span class="eyebrow">Turno reservado</span>
+            <h1>Tu turno quedó reservado</h1>
+            <p class="status-lead">Te enviamos los detalles a <strong>{{ appointment.notification_email | mask_email }}</strong>.</p>
+          {% elif status == 'expired' %}
+            <div class="status-icon" aria-hidden="true">!</div>
+            <span class="eyebrow">Reserva vencida</span>
+            <h1>El horario se liberó</h1>
+            {% if requires_refund %}
+            <p class="status-lead">Recibimos tu pago después de que venciera la reserva y el horario ya no está disponible. El consultorio se va a comunicar con vos para reprogramar o devolverte la seña.</p>
+            {% else %}
+            <p class="status-lead">No se acreditó la seña a tiempo. Podés reservar otro horario cuando quieras.</p>
+            {% endif %}
+          {% elif status == 'cancelled' %}
+            <div class="status-icon" aria-hidden="true">✕</div>
+            <span class="eyebrow">Turno cancelado</span>
+            <h1>Este turno fue cancelado</h1>
+            {% if requires_refund %}
+            <p class="status-lead">El consultorio se va a comunicar con vos por la seña abonada.</p>
+            {% else %}
+            <p class="status-lead">Si fue un error, reservá un nuevo horario o comunicate con el consultorio.</p>
+            {% endif %}
+          {% else %}
+            <div class="status-icon" aria-hidden="true">✓</div>
+            <span class="eyebrow">Turno</span>
+            <h1>{{ appointment.status | status_label }}</h1>
+          {% endif %}
+
+          <dl class="status-details">
+            <div><dt>Profesional</dt><dd>{{ professional_name }}</dd></div>
+            <div><dt>Día</dt><dd>{{ appointment.starts_at | long_date | capitalize }}</dd></div>
+            <div><dt>Horario</dt><dd>{{ appointment.starts_at.strftime('%H:%M') }} a {{ appointment.ends_at.strftime('%H:%M') }} h</dd></div>
+            {% if appointment.deposit_amount %}
+            <div><dt>Seña</dt><dd>{{ appointment.deposit_amount | money }}{% if payment %} · {{ payment.status | status_label }}{% endif %}</dd></div>
+            {% endif %}
+            {% if settings.clinic_address %}<div><dt>Dirección</dt><dd>{{ settings.clinic_address }}</dd></div>{% endif %}
+          </dl>
+
+          <div class="status-actions">
+            {% if can_pay %}
+            <form method="post" action="/reservar/turno/{{ appointment.public_token }}/pagar">
+              <button type="submit">{{ 'Reintentar el pago' if payment_rejected else 'Pagar seña con Mercado Pago' }}</button>
+            </form>
+            {% endif %}
+            {% if can_add_to_calendar %}
+            <a class="cta-link" href="/reservar/turno/{{ appointment.public_token }}/calendario.ics">Agregar al calendario</a>
+            {% endif %}
+            {% if status in ['expired', 'cancelled'] %}
+            <a class="cta-link" href="/reservar?professional_id={{ appointment.professional_id }}#booking-flow">Reservar otro horario</a>
+            {% endif %}
+          </div>
+
+          <p class="muted small status-footnote">
+            {{ settings.deposit_policy }}
+            {% if settings.clinic_phone %}Consultas: {{ settings.clinic_phone }}.{% endif %}
+          </p>
+        </section>
+      </main>
+    </div>
+    {% if status == 'pending_payment' %}
+    <script>
+      (() => {
+        const card = document.querySelector(".status-card");
+        const countdown = document.querySelector("[data-seconds-left]");
+        let secondsLeft = countdown ? Number(countdown.dataset.secondsLeft) : 0;
+        if (countdown) {
+          const tick = () => {
+            secondsLeft = Math.max(0, secondsLeft - 1);
+            countdown.textContent = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
+            if (secondsLeft === 0) window.location.reload();
+          };
+          setInterval(tick, 1000);
+        }
+        // The payment may be confirmed by the provider a few seconds after returning here.
+        const poll = async () => {
+          try {
+            const response = await fetch(`/reservar/turno/${card.dataset.token}/estado`, { headers: { Accept: "application/json" } });
+            if (response.ok && (await response.json()).status !== card.dataset.status) window.location.reload();
+          } catch (error) {}
+        };
+        setInterval(poll, 5000);
+      })();
+    </script>
+    {% endif %}
+  </body>
+</html>

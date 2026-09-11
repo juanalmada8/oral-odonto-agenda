@@ -1,10 +1,11 @@
+"""Internal panel (/app): staff and professionals operate the agenda."""
+
 from collections import defaultdict
 from datetime import date, datetime
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -19,244 +20,30 @@ from app.core import clock
 from app.core.enums import AppointmentStatus, NotificationStatus, NotificationType, UserRole
 from app.core.errors import user_facing_message
 from app.core.exceptions import DomainError
+from app.core.rate_limit import enforce_login_rate_limit
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
 from app.schemas.availability import AvailabilityWindowCreate
-from app.schemas.patient import PatientCreate, PatientUpdate, PatientUpsert
+from app.schemas.patient import PatientCreate, PatientUpdate
 from app.schemas.professional import ProfessionalCreate, ProfessionalUpdate
 from app.services.auth_service import AuthService
 from app.services.followup_agent import FollowUpAgent
 from app.services.professional_service import ProfessionalService
 from app.services.reception_agent import ReceptionAgent
 from app.services.schedule_agent import ScheduleAgent
+from app.utils.validation import parse_money
+from app.web.common import (
+    active_professionals,
+    ensure_admin,
+    filter_patients_collection,
+    redirect_with_message,
+    render_admin,
+    serialize_status_counts,
+    templates,
+)
 
-
-templates = Jinja2Templates(directory="app/templates")
 router = APIRouter(include_in_schema=False)
-
-DAY_LABELS = {
-    0: "Lunes",
-    1: "Martes",
-    2: "Miercoles",
-    3: "Jueves",
-    4: "Viernes",
-    5: "Sabado",
-    6: "Domingo",
-}
-
-
-def redirect_with_message(
-    path: str,
-    *,
-    message: str | None = None,
-    error: str | None = None,
-    fragment: str | None = None,
-) -> RedirectResponse:
-    params: dict[str, str] = {}
-    if message:
-        params["message"] = message
-    if error:
-        params["error"] = error
-    separator = "&" if "?" in path else "?"
-    target = f"{path}{separator}{urlencode(params)}" if params else path
-    if fragment:
-        target = f"{target}#{fragment}"
-    return RedirectResponse(url=target, status_code=303)
-
-
-def render_admin(
-    request: Request,
-    *,
-    template_name: str,
-    current_user: User,
-    page_title: str,
-    page_subtitle: str,
-    active_page: str,
-    **context,
-):
-    return templates.TemplateResponse(
-        request,
-        template_name,
-        {
-            "current_user": current_user,
-            "page_title": page_title,
-            "page_subtitle": page_subtitle,
-            "active_page": active_page,
-            "message": request.query_params.get("message"),
-            "error": request.query_params.get("error"),
-            "day_labels": DAY_LABELS,
-            **context,
-        },
-    )
-
-
-def ensure_admin(current_user: User) -> None:
-    if current_user.role != UserRole.ADMIN:
-        raise DomainError("Solo admin puede acceder a esta sección", status_code=403)
-
-
-def active_professionals(db: Session, professional_service: ProfessionalService):
-    return [professional for professional in professional_service.list_professionals(db) if professional.is_active]
-
-
-def serialize_status_counts(appointments: list) -> dict[str, int]:
-    counts = {status.value: 0 for status in AppointmentStatus}
-    for appointment in appointments:
-        counts[appointment.status.value] += 1
-    return counts
-
-
-def filter_patients_collection(patients: list, query: str | None):
-    if not query:
-        return patients
-    normalized = query.strip().lower()
-    return [
-        patient
-        for patient in patients
-        if normalized in patient.first_name.lower()
-        or normalized in patient.last_name.lower()
-        or normalized in patient.dni.lower()
-    ]
-
-
-@router.get("/reservar", response_class=HTMLResponse)
-def public_booking_page(
-    request: Request,
-    selected_date: date | None = None,
-    professional_id: str | None = None,
-    booking_id: int | None = None,
-    db: Session = Depends(get_db),
-    professional_service: ProfessionalService = Depends(get_professional_service),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-):
-    professionals = active_professionals(db, professional_service)
-    agenda_date: date | None = selected_date
-    selected_professional = None
-    available_slots = []
-    available_dates: list[dict[str, str | int]] = []
-    booking_summary: dict[str, str] | None = None
-
-    professional_id_value = int(professional_id) if professional_id else None
-
-    if professionals and professional_id_value is not None:
-        selected_professional = next(
-            (professional for professional in professionals if professional.id == professional_id_value),
-            None,
-        )
-        if selected_professional:
-            earliest_start, last_date = schedule_agent.public_booking_bounds()
-            available_dates_raw = schedule_agent.list_available_dates(
-                db,
-                professional_id=selected_professional.id,
-                date_from=earliest_start.date(),
-                date_to=last_date,
-                earliest_start=earliest_start,
-            )
-            available_dates = [
-                {
-                    "value": available_day.isoformat(),
-                    "label": available_day.strftime("%d/%m/%Y"),
-                    "slots": slot_count,
-                }
-                for available_day, slot_count in available_dates_raw
-            ]
-            available_date_values = {item["value"] for item in available_dates}
-            if available_dates and (agenda_date is None or agenda_date.isoformat() not in available_date_values):
-                agenda_date = date.fromisoformat(available_dates[0]["value"])
-            if agenda_date:
-                available_slots = schedule_agent.get_daily_availability(
-                    db,
-                    professional_id=selected_professional.id,
-                    day=agenda_date,
-                    earliest_start=earliest_start,
-                )
-
-    if booking_id:
-        try:
-            booked = schedule_agent.get_appointment(db, booking_id)
-            if selected_professional and booked.professional_id == selected_professional.id:
-                booking_summary = {
-                    "professional": f"{booked.professional.first_name} {booked.professional.last_name}",
-                    "date": booked.starts_at.strftime("%d/%m/%Y"),
-                    "time": booked.starts_at.strftime("%H:%M"),
-                    "status": booked.status.value,
-                }
-        except DomainError:
-            booking_summary = None
-
-    return templates.TemplateResponse(
-        request,
-        "public_booking.html",
-        {
-            "professionals": professionals,
-            "selected_professional": selected_professional,
-            "selected_date": agenda_date.isoformat() if agenda_date else "",
-            "selected_date_label": agenda_date.strftime("%d/%m/%Y") if agenda_date else "",
-            "available_dates": available_dates,
-            "available_slots": available_slots,
-            "booking_summary": booking_summary,
-            "message": request.query_params.get("message"),
-            "error": request.query_params.get("error"),
-        },
-    )
-
-
-@router.post("/reservar")
-def create_public_booking(
-    professional_id: int = Form(...),
-    starts_at: str = Form(...),
-    dni: str = Form(...),
-    first_name: str = Form(...),
-    last_name: str = Form(...),
-    email: str = Form(""),
-    phone: str = Form(""),
-    observations: str = Form(""),
-    reason: str = Form(""),
-    notes: str = Form(""),
-    db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
-):
-    selected_dt = datetime.fromisoformat(starts_at)
-    redirect_base = f"/reservar?professional_id={professional_id}&selected_date={selected_dt.date().isoformat()}"
-
-    try:
-        appointment = schedule_agent.create_appointment(
-            db,
-            AppointmentCreate(
-                professional_id=professional_id,
-                patient=PatientUpsert(
-                    dni=dni,
-                    first_name=first_name,
-                    last_name=last_name,
-                    email=email or None,
-                    phone=phone or None,
-                    observations=observations or None,
-                ),
-                starts_at=selected_dt,
-                reason=reason or "Reserva online",
-                notes=notes or "Generado desde reserva publica",
-                created_by="public_booking",
-            ),
-            reception_agent=reception_agent,
-            followup_agent=followup_agent,
-            actor="public_booking",
-        )
-        success_path = (
-            f"/reservar?professional_id={professional_id}"
-            f"&selected_date={selected_dt.date().isoformat()}"
-            f"&booking_id={appointment.id}"
-        )
-        return redirect_with_message(
-            success_path,
-            message="Tu turno fue reservado. Si cargaste email, te vamos a enviar la confirmacion.",
-            fragment="booking-flow",
-        )
-    except Exception as exc:
-        db.rollback()
-        return redirect_with_message(redirect_base, error=user_facing_message(exc), fragment="booking-flow")
 
 
 @router.get("/app/login", response_class=HTMLResponse)
@@ -272,22 +59,17 @@ def login_page(request: Request):
 
 @router.post("/app/login")
 def login_submit(
+    request: Request,
     username: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service),
 ):
     try:
+        enforce_login_rate_limit(request, username)
         user = auth_service.authenticate(db, username, password)
-        token = auth_service.create_token_for_user(user)
         response = RedirectResponse(url="/app", status_code=303)
-        response.set_cookie(
-            key="access_token",
-            value=f"Bearer {token}",
-            httponly=True,
-            samesite="lax",
-            max_age=auth_service.settings.access_token_expire_minutes * 60,
-        )
+        auth_service.set_session_cookie(response, auth_service.create_token_for_user(user))
         return response
     except DomainError as exc:
         return redirect_with_message("/app/login", error=exc.detail)
@@ -759,6 +541,7 @@ def create_professional_from_admin(
     email: str = Form(""),
     phone: str = Form(""),
     default_appointment_duration: int = Form(30),
+    deposit_amount: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     professional_service: ProfessionalService = Depends(get_professional_service),
@@ -774,6 +557,7 @@ def create_professional_from_admin(
                 email=email or None,
                 phone=phone or None,
                 default_appointment_duration=default_appointment_duration,
+                deposit_amount=parse_money(deposit_amount),
             ),
             actor=current_user.username,
         )
@@ -813,6 +597,7 @@ def edit_professional_submit(
     email: str = Form(""),
     phone: str = Form(""),
     default_appointment_duration: int = Form(30),
+    deposit_amount: str = Form(""),
     is_active: bool = Form(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -830,6 +615,7 @@ def edit_professional_submit(
                 email=email or None,
                 phone=phone or None,
                 default_appointment_duration=default_appointment_duration,
+                deposit_amount=parse_money(deposit_amount),
                 is_active=is_active,
             ),
             actor=current_user.username,

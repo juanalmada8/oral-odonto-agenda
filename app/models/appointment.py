@@ -1,7 +1,8 @@
 import secrets
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import AppointmentStatus
@@ -45,6 +46,8 @@ class Appointment(TimestampMixin, Base):
     # so notifications for the appointment go here first.
     contact_email: Mapped[str | None] = mapped_column(String(255))
     contact_phone: Mapped[str | None] = mapped_column(String(40))
+    # Deposit required when the appointment was booked (snapshot; the professional's amount may change).
+    deposit_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     # While the deposit is unpaid the slot is held until this moment, then released.
     hold_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
@@ -54,6 +57,11 @@ class Appointment(TimestampMixin, Base):
     patient = relationship("Patient", back_populates="appointments")
     professional = relationship("Professional", back_populates="appointments")
     notifications = relationship("Notification", back_populates="appointment")
+    payments = relationship("Payment", back_populates="appointment", order_by="Payment.id")
+
+    @property
+    def latest_payment(self):
+        return self.payments[-1] if self.payments else None
 
     @property
     def notification_email(self) -> str | None:

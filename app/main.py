@@ -31,6 +31,20 @@ app = FastAPI(
 )
 
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if settings.is_production:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    if request.url.path.startswith(("/app", "/reservar/turno", "/pagos")):
+        response.headers.setdefault("Cache-Control", "no-store")
+    return response
+
+
 @app.exception_handler(DomainError)
 async def domain_error_handler(request: Request, exc: DomainError):
     if request.url.path.startswith("/app") and exc.status_code == 401:

@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core import clock
 from app.core.config import Settings
-from app.core.enums import BLOCKING_APPOINTMENT_STATUSES, AppointmentStatus
+from app.core.enums import BLOCKING_APPOINTMENT_STATUSES, UPCOMING_APPOINTMENT_STATUSES, AppointmentStatus
 from app.core.exceptions import DomainError
 from app.models.appointment import Appointment
 from app.models.availability_window import AvailabilityWindow
@@ -172,6 +173,7 @@ class ScheduleAgent:
         contact_email: str | None = None,
         contact_phone: str | None = None,
         hold_expires_at: datetime | None = None,
+        deposit_amount: Decimal | None = None,
         public_rules: bool = False,
     ) -> Appointment:
         """Validate and add an appointment to the session. The caller must hold the professional lock."""
@@ -197,6 +199,7 @@ class ScheduleAgent:
             contact_email=contact_email,
             contact_phone=contact_phone,
             hold_expires_at=hold_expires_at,
+            deposit_amount=deposit_amount,
             confirmed_at=clock.now() if status == AppointmentStatus.CONFIRMED else None,
             created_by=created_by,
         )
@@ -260,7 +263,7 @@ class ScheduleAgent:
                 setattr(appointment, field, changes[field])
 
         if new_status:
-            self._apply_transition(db, appointment, new_status, followup_agent=followup_agent)
+            self.apply_transition(db, appointment, new_status, followup_agent=followup_agent)
 
         create_audit_log(
             db,
@@ -304,7 +307,7 @@ class ScheduleAgent:
         appointment = self.get_appointment(db, appointment_id)
         if appointment.status == new_status:
             raise DomainError("El turno ya está en ese estado.", status_code=409)
-        self._apply_transition(db, appointment, new_status, followup_agent=followup_agent)
+        self.apply_transition(db, appointment, new_status, followup_agent=followup_agent)
         if notes:
             appointment.notes = notes
         create_audit_log(
@@ -358,7 +361,7 @@ class ScheduleAgent:
             db.flush()
         return expired
 
-    def _apply_transition(
+    def apply_transition(
         self,
         db: Session,
         appointment: Appointment,
@@ -611,6 +614,32 @@ class ScheduleAgent:
             date_to=week_start + timedelta(days=6),
         )
         return {week_start + timedelta(days=index): availability.get(week_start + timedelta(days=index), []) for index in range(7)}
+
+    def published_slot_duration(self, db: Session, *, professional: Professional, starts_at: datetime) -> int | None:
+        """Duration of the published slot starting exactly at `starts_at`, if there is one."""
+        windows = db.scalars(
+            select(AvailabilityWindow)
+            .where(AvailabilityWindow.professional_id == professional.id)
+            .where(AvailabilityWindow.availability_date == starts_at.date())
+        ).all()
+        for window in windows:
+            for slot_start, slot_end in self._window_slots(window, professional):
+                if slot_start == starts_at:
+                    return int((slot_end - slot_start).total_seconds() // 60)
+        return None
+
+    def upcoming_for_patient(self, db: Session, patient_id: int) -> list[Appointment]:
+        """Appointments the patient is still expected to attend (live holds included)."""
+        return list(
+            db.scalars(
+                select(Appointment)
+                .where(Appointment.patient_id == patient_id)
+                .where(Appointment.status.in_(UPCOMING_APPOINTMENT_STATUSES))
+                .where(self._blocking_filter())
+                .where(Appointment.starts_at >= clock.now())
+                .order_by(Appointment.starts_at)
+            )
+        )
 
     # --------------------------------------------------------------- validation
 

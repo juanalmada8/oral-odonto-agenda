@@ -1,0 +1,32 @@
+{% set brand_logo = request.url_for('static', path='brand/oral-logo-blue-cropped.png') %}
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Simulador de pago</title>
+    <link rel="icon" type="image/png" href="{{ brand_logo }}" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="public-body">
+    <div class="public-shell status-shell">
+      <main class="status-layout">
+        <section class="panel status-card">
+          <div class="alert alert-error">Entorno de prueba: no se cobra dinero. Configurá MERCADOPAGO_ACCESS_TOKEN para usar Mercado Pago.</div>
+          <span class="eyebrow">Simulador de checkout</span>
+          <h1>Seña {{ payment.amount | money }}</h1>
+          <dl class="status-details">
+            <div><dt>Referencia</dt><dd>{{ payment.reference }}</dd></div>
+            <div><dt>Turno</dt><dd>{{ payment.appointment.starts_at | long_date | capitalize }} · {{ payment.appointment.starts_at.strftime('%H:%M') }} h</dd></div>
+            <div><dt>Estado</dt><dd>{{ payment.status | status_label }}</dd></div>
+          </dl>
+          <div class="status-actions">
+            <form method="post"><input type="hidden" name="decision" value="approve" /><button type="submit">Aprobar pago</button></form>
+            <form method="post"><input type="hidden" name="decision" value="reject" /><button type="submit" class="secondary">Rechazar pago</button></form>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

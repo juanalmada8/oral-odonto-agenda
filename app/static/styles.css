@@ -1474,6 +1474,442 @@ button:disabled {
   line-height: 1.55;
 }
 
+/* ---------------------------------------------------------------- status badges (v2 states) */
+
+.status-pending_payment {
+  background: rgba(15, 93, 131, 0.1);
+  color: var(--brand-ocean);
+}
+
+.status-no_show,
+.status-expired {
+  background: rgba(102, 113, 122, 0.12);
+  color: var(--muted);
+}
+
+.status-completed {
+  background: rgba(15, 93, 131, 0.12);
+  color: var(--brand-ocean-deep);
+}
+
+/* ---------------------------------------------------------------- booking flow v2 */
+
+.booking-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.booking-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--surface-border);
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.booking-steps li span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  font-size: 0.8rem;
+}
+
+.booking-steps li.current {
+  color: var(--brand-coral);
+  border-color: rgba(255, 91, 58, 0.22);
+}
+
+.booking-steps li.current span {
+  background: var(--brand-coral);
+  color: white;
+}
+
+.booking-steps li.done {
+  color: var(--brand-ocean);
+}
+
+.booking-steps li.done span {
+  background: rgba(15, 93, 131, 0.12);
+}
+
+.step-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.step-number {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  background: rgba(255, 91, 58, 0.1);
+  color: var(--brand-coral);
+  font-size: 0.95rem;
+}
+
+.step-context {
+  color: var(--brand-ocean);
+  font-weight: 700;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.field-label em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.date-strip-label {
+  margin-top: 22px;
+}
+
+.date-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.date-chip {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 93, 131, 0.14);
+  background: rgba(15, 93, 131, 0.05);
+  color: var(--brand-ocean);
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.date-chip strong {
+  font-size: 0.95rem;
+}
+
+.date-chip span {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.date-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 93, 131, 0.32);
+}
+
+.date-chip.active {
+  background: rgba(255, 91, 58, 0.1);
+  border-color: rgba(255, 91, 58, 0.36);
+  color: var(--brand-coral);
+}
+
+.deposit-card {
+  display: grid;
+  gap: 6px;
+  margin-top: 24px;
+  padding: 18px 20px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(15, 93, 131, 0.08), rgba(255, 255, 255, 0.9));
+  border: 1px solid rgba(15, 93, 131, 0.12);
+}
+
+.deposit-card__label {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-ocean);
+}
+
+.deposit-card__amount {
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.deposit-card p {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.hp-field {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.booking-fieldset {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin: 0 0 26px;
+  padding: 0 0 26px;
+  border: none;
+  border-bottom: 1px solid rgba(15, 35, 51, 0.08);
+}
+
+.booking-fieldset:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.booking-fieldset:disabled {
+  opacity: 0.55;
+}
+
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+}
+
+.slot-chip {
+  position: relative;
+  cursor: pointer;
+}
+
+.slot-chip input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+}
+
+.slot-chip span {
+  display: grid;
+  place-items: center;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 35, 51, 0.12);
+  background: white;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.slot-chip:hover span {
+  border-color: rgba(15, 93, 131, 0.4);
+  transform: translateY(-1px);
+}
+
+.slot-chip input:focus-visible + span {
+  box-shadow: 0 0 0 4px rgba(15, 93, 131, 0.14);
+}
+
+.slot-chip input:checked + span {
+  background: var(--brand-coral);
+  border-color: var(--brand-coral);
+  color: white;
+  box-shadow: 0 10px 20px rgba(255, 91, 58, 0.2);
+}
+
+.booking-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.booking-summary div {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface-alt);
+  border: 1px solid rgba(15, 35, 51, 0.06);
+}
+
+.booking-summary span {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.terms-row {
+  align-items: flex-start;
+  font-weight: 600;
+}
+
+.terms-row input {
+  margin-top: 3px;
+  flex: 0 0 auto;
+}
+
+.inline-link {
+  color: var(--brand-ocean);
+  text-decoration: underline;
+}
+
+.policy-box {
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--surface-alt);
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.policy-box summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.policy-box p {
+  margin-bottom: 12px;
+}
+
+.booking-submit {
+  min-height: 56px;
+  font-size: 1.05rem;
+}
+
+.secure-note {
+  margin: 0;
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- booking status */
+
+.status-shell {
+  max-width: 860px;
+}
+
+.status-layout {
+  display: grid;
+}
+
+.status-card {
+  display: grid;
+  gap: 8px;
+}
+
+.status-card h1 {
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.status-icon {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  margin-bottom: 8px;
+  border-radius: 20px;
+  font-size: 1.6rem;
+  font-weight: 900;
+  background: rgba(15, 93, 131, 0.1);
+  color: var(--brand-ocean);
+}
+
+.status-card--confirmed .status-icon,
+.status-card--reserved .status-icon {
+  background: rgba(31, 122, 79, 0.12);
+  color: var(--success);
+}
+
+.status-card--expired .status-icon,
+.status-card--cancelled .status-icon {
+  background: rgba(191, 75, 75, 0.1);
+  color: var(--danger);
+}
+
+.status-lead {
+  font-size: 1.08rem;
+  color: var(--text);
+}
+
+.countdown {
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-coral);
+}
+
+.status-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+
+.status-details div {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface-alt);
+  border: 1px solid rgba(15, 35, 51, 0.06);
+}
+
+.status-details dt {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.status-details dd {
+  margin: 0;
+  font-weight: 800;
+}
+
+.status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.status-actions form,
+.status-actions button {
+  width: auto;
+}
+
+.status-actions button {
+  padding-inline: 24px;
+}
+
+.status-footnote {
+  margin: 14px 0 0;
+}
+
 @media (max-width: 1280px) {
   .admin-shell {
     grid-template-columns: 1fr;
@@ -1596,6 +2032,34 @@ button:disabled {
 
   .two-cols {
     grid-template-columns: 1fr;
+  }
+
+  .booking-steps {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .date-strip {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scroll-snap-type: x mandatory;
+  }
+
+  .date-chip {
+    flex: 0 0 116px;
+    scroll-snap-align: start;
+  }
+
+  .slot-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .status-actions,
+  .status-actions form,
+  .status-actions button,
+  .status-actions .cta-link {
+    width: 100%;
   }
 
   .data-table th,
