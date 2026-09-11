@@ -107,9 +107,11 @@ jobs:
           gcloud run jobs update "$SCHEDULED_JOB" --image "$IMAGE_REF" --region "$REGION" --quiet
 
       - name: Smoke test
+        env:
+          DEPLOY_URL: ${{ vars.PUBLIC_BASE_URL }}
         run: |
           for attempt in $(seq 1 10); do
-            if curl -fsS "${{ vars.PUBLIC_BASE_URL }}/health/ready"; then exit 0; fi
+            if curl -fsS "${DEPLOY_URL}/health/ready"; then exit 0; fi
             sleep 6
           done
           echo "::error::The new revision did not become ready"
@@ -117,11 +119,15 @@ jobs:
 
       - name: Summary
         if: always()
+        env:
+          DEPLOY_REF: ${{ inputs.ref }}
+          DEPLOY_DIGEST: ${{ steps.build.outputs.digest }}
+          DEPLOY_URL: ${{ vars.PUBLIC_BASE_URL }}
         run: |
           {
             echo "### Deploy ${{ inputs.environment }}"
-            echo "- Ref: \`${{ inputs.ref }}\` (v${{ steps.version.outputs.version }}, ${{ steps.version.outputs.sha }})"
-            echo "- Image: \`${IMAGE}@${{ steps.build.outputs.digest }}\`"
-            echo "- URL: ${{ vars.PUBLIC_BASE_URL }}"
+            echo "- Ref: \`${DEPLOY_REF}\` (v${{ steps.version.outputs.version }}, ${{ steps.version.outputs.sha }})"
+            echo "- Image: \`${IMAGE}@${DEPLOY_DIGEST}\`"
+            echo "- URL: ${DEPLOY_URL}"
             echo "- Rollback: \`gcloud run services update-traffic $SERVICE --region $REGION --to-revisions=PREVIOUS_REVISION=100\`"
           } >> "$GITHUB_STEP_SUMMARY"

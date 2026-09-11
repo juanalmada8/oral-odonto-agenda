@@ -29,6 +29,12 @@ def _ratio(numerator: float, denominator: float) -> float | None:
     return round(numerator / denominator, 4) if denominator else None
 
 
+def _csv_safe(value: object) -> str:
+    """Neutralize spreadsheet formulas: "motivo" is typed by patients on the public site."""
+    text = str(value if value is not None else "").replace("\n", " ").replace("\r", " ")
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t") else text
+
+
 @dataclass
 class ProfessionalStats:
     professional_id: int
@@ -240,7 +246,8 @@ class AnalyticsService:
         for appointment in db.scalars(query).unique():
             payment = appointment.latest_payment
             writer.writerow(
-                [
+                _csv_safe(field)
+                for field in (
                     appointment.starts_at.strftime("%Y-%m-%d"),
                     appointment.starts_at.strftime("%H:%M"),
                     appointment.duration_minutes,
@@ -252,7 +259,7 @@ class AnalyticsService:
                     str(appointment.deposit_amount or "").replace(".", ","),
                     payment.status.value if payment else "",
                     "si" if appointment.attendance_confirmed_at else "",
-                    (appointment.reason or "").replace("\n", " "),
-                ]
+                    appointment.reason,
+                )
             )
         return "\ufeff" + buffer.getvalue()
