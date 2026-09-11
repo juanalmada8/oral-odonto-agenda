@@ -13,7 +13,23 @@ y versionado semántico.
 
 ## [Unreleased]
 
+### Fixed
+- PostgreSQL: la migración inicial fallaba ("type already exists") y los enums se guardaban por nombre
+  (`ADMIN`) en columnas que esperaban el valor (`admin`), así que ninguna inserción funcionaba.
+  Los enums pasan a VARCHAR con su valor (migración `20260911_04`, que también corrige datos SQLite).
+- `DATABASE_URL` con `postgres://`/`postgresql://` (Render, Cloud SQL) ahora usa psycopg 3.
+- Zona horaria: "hoy", "ahora" y los recordatorios usan `APP_TIMEZONE` en vez del reloj del servidor (UTC en la nube).
+- Ya no se muestran ni aceptan horarios pasados; la reserva online respeta anticipación mínima y máximo de días.
+- `seed_demo` buscaba tablas en plural y no registraba todos los modelos.
+- Los tests leían el `.env` local y enviaban emails reales por SMTP.
+- El formulario público ya no sobrescribe datos de un paciente existente por conocer su DNI.
+- Los errores inesperados ya no se muestran crudos en pantalla.
+
 ### Added
+- Restricción de exclusión en PostgreSQL + bloqueo por profesional: dos reservas simultáneas del mismo horario no pueden confirmarse ambas.
+- Estados de turno `pending_payment`, `no_show` y `expired`, con transiciones validadas.
+- Validaciones de DNI, nombres y celular (normalizado a formato WhatsApp `+549...`).
+- Suite de tests ejecutable también sobre PostgreSQL (`TEST_DATABASE_URL`), con chequeo de desvío modelos↔migraciones.
 - Documentación profesional base: `CONTRIBUTING.md`, `docs/ARCHITECTURE.md`, `docs/OPERATIONS.md`.
 - Nueva guía de despliegue productivo: `docs/DEPLOYMENT.md`.
 - Checklist de variables de producción: `docs/PROD_ENV_CHECKLIST.md`.

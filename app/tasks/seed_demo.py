@@ -1,7 +1,8 @@
-from datetime import date, datetime, timedelta, time
+from datetime import datetime, timedelta, time
 
 from sqlalchemy import inspect, select
 
+from app.core import clock
 from app.core.config import get_settings
 from app.core.enums import UserRole
 from app.db.session import SessionLocal
@@ -21,14 +22,15 @@ from app.schemas.appointment import AppointmentCreate
 
 
 def _ensure_schema_ready(db) -> None:
+    # Table names come from the model class names (singular), see app/db/base.py.
     required_tables = [
-        "users",
-        "patients",
-        "professionals",
-        "availability_windows",
-        "appointments",
-        "notifications",
-        "audit_logs",
+        "user",
+        "patient",
+        "professional",
+        "availability_window",
+        "appointment",
+        "notification",
+        "audit_log",
     ]
     inspector = inspect(db.get_bind())
     missing = [table for table in required_tables if not inspector.has_table(table)]
@@ -46,7 +48,7 @@ def main() -> None:
     auth_service = AuthService(settings)
     reception_agent = ReceptionAgent()
     professional_service = ProfessionalService()
-    schedule_agent = ScheduleAgent(timezone_name=settings.app_timezone)
+    schedule_agent = ScheduleAgent(settings)
     followup_agent = FollowUpAgent(settings=settings, email_client=EmailClient(settings))
 
     try:
@@ -100,7 +102,7 @@ def main() -> None:
             )
             professionals = professional_service.list_professionals(db)
 
-        target_day = date.today() + timedelta(days=1)
+        target_day = clock.today() + timedelta(days=1)
         while target_day.weekday() > 4:
             target_day += timedelta(days=1)
         second_day = target_day + timedelta(days=2)

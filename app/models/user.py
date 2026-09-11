@@ -1,8 +1,9 @@
-from sqlalchemy import Boolean, Enum, String
+from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.enums import UserRole
 from app.db.base import Base
+from app.db.types import enum_column
 from app.models.mixins import TimestampMixin
 
 
@@ -13,7 +14,7 @@ class User(TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role"),
+        enum_column(UserRole),
         nullable=False,
         default=UserRole.RECEPTIONIST,
         server_default=UserRole.RECEPTIONIST.value,

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import clock
 from app.core.config import Settings
 from app.core.enums import AppointmentStatus, NotificationChannel, NotificationStatus, NotificationType
 from app.integrations.email import EmailClient
@@ -22,9 +23,10 @@ class FollowUpAgent:
         return list(db.scalars(select(Notification).order_by(Notification.scheduled_for.desc())))
 
     def queue_confirmation(self, db: Session, appointment: Appointment, actor: str = "followup_agent") -> Notification | None:
-        if not appointment.patient.email:
+        recipient = appointment.notification_email
+        if not recipient:
             return None
-        now = datetime.now().replace(microsecond=0)
+        now = clock.now()
         existing_confirmation = db.scalar(
             select(Notification)
             .where(Notification.appointment_id == appointment.id)
@@ -42,7 +44,7 @@ class FollowUpAgent:
         if existing_confirmation:
             if existing_confirmation.status == NotificationStatus.SENT:
                 return existing_confirmation
-            existing_confirmation.recipient = appointment.patient.email
+            existing_confirmation.recipient = recipient
             existing_confirmation.subject = subject
             existing_confirmation.body = body
             existing_confirmation.scheduled_for = now
@@ -56,7 +58,7 @@ class FollowUpAgent:
             db,
             appointment=appointment,
             type_=NotificationType.CONFIRMATION,
-            recipient=appointment.patient.email,
+            recipient=recipient,
             subject=subject,
             body=body,
             scheduled_for=now,
@@ -73,7 +75,7 @@ class FollowUpAgent:
         actor: str = "followup_agent",
     ) -> int:
         hours = hours_ahead or self.settings.reminder_hours_ahead
-        now = datetime.now().replace(microsecond=0)
+        now = clock.now()
         deadline = now + timedelta(hours=hours)
         appointments = db.scalars(
             select(Appointment)
@@ -84,7 +86,7 @@ class FollowUpAgent:
 
         created = 0
         for appointment in appointments:
-            if not appointment.patient.email:
+            if not appointment.notification_email:
                 continue
             existing = db.scalar(
                 select(Notification)
@@ -98,7 +100,7 @@ class FollowUpAgent:
                 db,
                 appointment=appointment,
                 type_=NotificationType.REMINDER,
-                recipient=appointment.patient.email,
+                recipient=appointment.notification_email,
                 subject="Recordatorio de turno odontologico",
                 body=(
                     f"Hola {appointment.patient.first_name}, te recordamos tu turno el "
@@ -114,7 +116,7 @@ class FollowUpAgent:
         return created
 
     def send_pending_notifications(self, db: Session, *, limit: int = 20, actor: str = "followup_agent") -> dict[str, int]:
-        now = datetime.now().replace(microsecond=0)
+        now = clock.now()
         pending = list(
             db.scalars(
                 select(Notification)
@@ -174,6 +176,19 @@ class FollowUpAgent:
         )
         db.commit()
         return result
+
+    def discard_pending_reminders(self, db: Session, appointment: Appointment) -> int:
+        """Skip reminders queued for an appointment that was cancelled or moved."""
+        pending = db.scalars(
+            select(Notification)
+            .where(Notification.appointment_id == appointment.id)
+            .where(Notification.type == NotificationType.REMINDER)
+            .where(Notification.status == NotificationStatus.PENDING)
+        ).all()
+        for notification in pending:
+            notification.status = NotificationStatus.SKIPPED
+            notification.error_message = "El turno cambió o fue cancelado"
+        return len(pending)
 
     def create_notification(self, db: Session, notification: Notification, actor: str = "followup_agent") -> Notification:
         db.add(notification)

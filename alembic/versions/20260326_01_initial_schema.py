@@ -18,13 +18,8 @@ user_role = sa.Enum("admin", "receptionist", name="user_role")
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    appointment_status.create(bind, checkfirst=True)
-    notification_channel.create(bind, checkfirst=True)
-    notification_status.create(bind, checkfirst=True)
-    notification_type.create(bind, checkfirst=True)
-    user_role.create(bind, checkfirst=True)
-
+    # Each enum type is created by the create_table call of the only table using it. Creating them
+    # explicitly beforehand made PostgreSQL fail with "type already exists".
     op.create_table(
         "patient",
         sa.Column("id", sa.Integer(), primary_key=True),

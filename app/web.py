@@ -15,7 +15,9 @@ from app.api.deps import (
     get_reception_agent,
     get_schedule_agent,
 )
+from app.core import clock
 from app.core.enums import AppointmentStatus, NotificationStatus, NotificationType, UserRole
+from app.core.errors import user_facing_message
 from app.core.exceptions import DomainError
 from app.db.session import get_db
 from app.models.user import User
@@ -143,10 +145,13 @@ def public_booking_page(
             None,
         )
         if selected_professional:
+            earliest_start, last_date = schedule_agent.public_booking_bounds()
             available_dates_raw = schedule_agent.list_available_dates(
                 db,
                 professional_id=selected_professional.id,
-                date_from=date.today(),
+                date_from=earliest_start.date(),
+                date_to=last_date,
+                earliest_start=earliest_start,
             )
             available_dates = [
                 {
@@ -164,6 +169,7 @@ def public_booking_page(
                     db,
                     professional_id=selected_professional.id,
                     day=agenda_date,
+                    earliest_start=earliest_start,
                 )
 
     if booking_id:
@@ -249,7 +255,8 @@ def create_public_booking(
             fragment="booking-flow",
         )
     except Exception as exc:
-        return redirect_with_message(redirect_base, error=str(exc), fragment="booking-flow")
+        db.rollback()
+        return redirect_with_message(redirect_base, error=user_facing_message(exc), fragment="booking-flow")
 
 
 @router.get("/app/login", response_class=HTMLResponse)
@@ -304,7 +311,7 @@ def dashboard(
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
-    agenda_date = selected_date or date.today()
+    agenda_date = selected_date or clock.today()
     professional_id_value = int(professional_id) if professional_id else None
     professionals = active_professionals(db, professional_service)
     appointments = schedule_agent.get_daily_agenda(db, day=agenda_date, professional_id=professional_id_value)
@@ -360,7 +367,7 @@ def appointments_page(
     reception_agent: ReceptionAgent = Depends(get_reception_agent),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
 ):
-    agenda_date = selected_date or date.today()
+    agenda_date = selected_date or clock.today()
     professional_id_value = int(professional_id) if professional_id else None
     normalized_patient_query = (patient_query or "").strip()
     professionals = active_professionals(db, professional_service)
@@ -399,7 +406,7 @@ def appointments_page(
         available_dates_raw = schedule_agent.list_available_dates(
             db,
             professional_id=professional.id,
-            date_from=date.today(),
+            date_from=clock.today(),
         )
         manual_available_dates[str(professional.id)] = [
             {
@@ -474,7 +481,8 @@ def create_manual_appointment(
             message="Turno manual creado",
         )
     except Exception as exc:
-        return redirect_with_message("/app/appointments", error=str(exc))
+        db.rollback()
+        return redirect_with_message("/app/appointments", error=user_facing_message(exc))
 
 
 @router.post("/app/appointments/{appointment_id}/status")
@@ -490,7 +498,7 @@ def update_appointment_status(
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
-    redirect_params = {"selected_date": selected_date or date.today().isoformat()}
+    redirect_params = {"selected_date": selected_date or clock.today().isoformat()}
     if professional_id:
         redirect_params["professional_id"] = professional_id
     if status_filter:
@@ -510,10 +518,17 @@ def update_appointment_status(
             )
         elif action == "complete":
             appointment = schedule_agent.complete_appointment(db, appointment_id, actor=current_user.username)
+        elif action == "no_show":
+            appointment = schedule_agent.mark_no_show(db, appointment_id, actor=current_user.username)
         elif action == "cancel":
-            appointment = schedule_agent.cancel_appointment(db, appointment_id, actor=current_user.username)
+            appointment = schedule_agent.cancel_appointment(
+                db,
+                appointment_id,
+                followup_agent=followup_agent,
+                actor=current_user.username,
+            )
         else:
-            raise DomainError("Unsupported appointment action", status_code=400)
+            raise DomainError("Acción de turno no soportada.", status_code=400)
         redirect_params["selected_date"] = selected_date or appointment.starts_at.date().isoformat()
         if professional_id:
             redirect_params["professional_id"] = professional_id
@@ -527,7 +542,8 @@ def update_appointment_status(
             message="Estado de turno actualizado",
         )
     except Exception as exc:
-        return redirect_with_message(f"/app/appointments?{urlencode(redirect_params)}", error=str(exc))
+        db.rollback()
+        return redirect_with_message(f"/app/appointments?{urlencode(redirect_params)}", error=user_facing_message(exc))
 
 
 @router.get("/app/appointments/{appointment_id}/edit", response_class=HTMLResponse)
@@ -583,7 +599,8 @@ def edit_appointment_submit(
             message="Turno actualizado",
         )
     except Exception as exc:
-        return redirect_with_message(f"/app/appointments/{appointment_id}/edit", error=str(exc))
+        db.rollback()
+        return redirect_with_message(f"/app/appointments/{appointment_id}/edit", error=user_facing_message(exc))
 
 
 @router.get("/app/patients", response_class=HTMLResponse)
@@ -634,7 +651,8 @@ def create_patient_from_admin(
         )
         return redirect_with_message("/app/patients", message="Paciente creado manualmente")
     except Exception as exc:
-        return redirect_with_message("/app/patients", error=str(exc))
+        db.rollback()
+        return redirect_with_message("/app/patients", error=user_facing_message(exc))
 
 
 @router.post("/app/patients/{patient_id}/delete")
@@ -648,7 +666,8 @@ def delete_patient_from_admin(
         reception_agent.delete_patient(db, patient_id, actor=current_user.username)
         return redirect_with_message("/app/patients", message="Paciente eliminado")
     except Exception as exc:
-        return redirect_with_message("/app/patients", error=str(exc))
+        db.rollback()
+        return redirect_with_message("/app/patients", error=user_facing_message(exc))
 
 
 @router.get("/app/patients/{patient_id}/edit", response_class=HTMLResponse)
@@ -702,7 +721,8 @@ def edit_patient_submit(
         )
         return redirect_with_message("/app/patients", message="Paciente actualizado")
     except Exception as exc:
-        return redirect_with_message(f"/app/patients/{patient_id}/edit", error=str(exc))
+        db.rollback()
+        return redirect_with_message(f"/app/patients/{patient_id}/edit", error=user_facing_message(exc))
 
 
 @router.get("/app/professionals", response_class=HTMLResponse)
@@ -715,7 +735,7 @@ def professionals_page(
 ):
     ensure_admin(current_user)
     professionals = professional_service.list_professionals(db)
-    availability_windows = schedule_agent.list_availability_windows(db, date_from=date.today())
+    availability_windows = schedule_agent.list_availability_windows(db, date_from=clock.today())
     windows_count = defaultdict(int)
     for row in availability_windows:
         windows_count[row.professional_id] += 1
@@ -759,7 +779,8 @@ def create_professional_from_admin(
         )
         return redirect_with_message("/app/professionals", message="Profesional creado")
     except Exception as exc:
-        return redirect_with_message("/app/professionals", error=str(exc))
+        db.rollback()
+        return redirect_with_message("/app/professionals", error=user_facing_message(exc))
 
 
 @router.get("/app/professionals/{professional_id}/edit", response_class=HTMLResponse)
@@ -815,7 +836,8 @@ def edit_professional_submit(
         )
         return redirect_with_message("/app/professionals", message="Profesional actualizado")
     except Exception as exc:
-        return redirect_with_message(f"/app/professionals/{professional_id}/edit", error=str(exc))
+        db.rollback()
+        return redirect_with_message(f"/app/professionals/{professional_id}/edit", error=user_facing_message(exc))
 
 
 @router.post("/app/professionals/{professional_id}/delete")
@@ -830,7 +852,8 @@ def delete_professional_from_admin(
         professional_service.delete_professional(db, professional_id, actor=current_user.username)
         return redirect_with_message("/app/professionals", message="Profesional eliminado")
     except Exception as exc:
-        return redirect_with_message("/app/professionals", error=str(exc))
+        db.rollback()
+        return redirect_with_message("/app/professionals", error=user_facing_message(exc))
 
 
 @router.get("/app/settings", response_class=HTMLResponse)
@@ -843,7 +866,7 @@ def settings_page(
 ):
     ensure_admin(current_user)
     professionals = active_professionals(db, professional_service)
-    availability_windows = schedule_agent.list_availability_windows(db, date_from=date.today())
+    availability_windows = schedule_agent.list_availability_windows(db, date_from=clock.today())
     grouped_windows = defaultdict(list)
     for row in availability_windows:
         grouped_windows[row.professional_id].append(row)
@@ -867,7 +890,7 @@ def notifications_page(
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
     ensure_admin(current_user)
-    now = datetime.now().replace(microsecond=0)
+    now = clock.now()
     notifications = followup_agent.list_notifications(db)
     pending_reminders = [
         item
@@ -930,7 +953,8 @@ def create_availability_window_from_admin(
         )
         return redirect_with_message("/app/settings", message="Disponibilidad guardada")
     except Exception as exc:
-        return redirect_with_message("/app/settings", error=str(exc))
+        db.rollback()
+        return redirect_with_message("/app/settings", error=user_facing_message(exc))
 
 
 @router.post("/app/settings/availability-windows/{availability_window_id}/delete")
@@ -945,7 +969,8 @@ def delete_availability_window_from_admin(
         schedule_agent.delete_availability_window(db, availability_window_id, actor=current_user.username)
         return redirect_with_message("/app/settings", message="Disponibilidad eliminada")
     except Exception as exc:
-        return redirect_with_message("/app/settings", error=str(exc))
+        db.rollback()
+        return redirect_with_message("/app/settings", error=user_facing_message(exc))
 
 
 @router.post("/app/notifications/prepare")

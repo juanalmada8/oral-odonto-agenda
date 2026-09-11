@@ -26,14 +26,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    inspector = sa.inspect(bind)
-    patient_columns = {column["name"] for column in inspector.get_columns("patient")}
-    patient_indexes = {index["name"] for index in inspector.get_indexes("patient")}
-
-    if "ix_patient_dni" in patient_indexes:
-        op.drop_index(op.f("ix_patient_dni"), table_name="patient")
-
-    if "dni" in patient_columns:
-        with op.batch_alter_table("patient") as batch_op:
-            batch_op.drop_column("dni")
+    # `dni` and its index belong to the initial schema (20260326_01); this revision only backfilled
+    # databases created before that. Dropping them here broke the downgrade of the initial revision.
+    pass
