@@ -16,7 +16,13 @@ from app.models.appointment import Appointment
 from app.models.availability_window import AvailabilityWindow
 from app.models.professional import Professional
 from app.schemas.appointment import AppointmentCreate, AppointmentReschedule, AppointmentUpdate
-from app.schemas.availability import AvailabilitySlot, AvailabilityWindowCreate, AvailabilityWindowUpdate
+from app.schemas.availability import (
+    AvailabilityBulkResult,
+    AvailabilitySlot,
+    AvailabilityWindowCreate,
+    AvailabilityWindowUpdate,
+    RecurringAvailabilityCreate,
+)
 from app.services.followup_agent import FollowUpAgent
 from app.services.reception_agent import ReceptionAgent
 from app.utils.audit import create_audit_log
@@ -503,6 +509,94 @@ class ScheduleAgent:
         db.commit()
         db.refresh(availability_window)
         return availability_window
+
+    def create_recurring_windows(
+        self,
+        db: Session,
+        payload: RecurringAvailabilityCreate,
+        *,
+        actor: str = "admin",
+    ) -> AvailabilityBulkResult:
+        """Create the same block on every selected weekday; dates that clash or already passed are skipped."""
+        self._get_professional(db, payload.professional_id)
+        today = clock.today()
+        created, skipped = 0, []
+        day = payload.date_from
+        while day <= payload.date_to:
+            if day.weekday() in payload.weekdays:
+                clashes = db.scalar(
+                    select(AvailabilityWindow.id)
+                    .where(AvailabilityWindow.professional_id == payload.professional_id)
+                    .where(AvailabilityWindow.availability_date == day)
+                    .where(AvailabilityWindow.start_time < payload.end_time)
+                    .where(AvailabilityWindow.end_time > payload.start_time)
+                    .limit(1)
+                )
+                if day < today or clashes:
+                    skipped.append(day)
+                else:
+                    db.add(
+                        AvailabilityWindow(
+                            professional_id=payload.professional_id,
+                            availability_date=day,
+                            start_time=payload.start_time,
+                            end_time=payload.end_time,
+                            slot_duration_minutes=payload.slot_duration_minutes,
+                            notes=payload.notes,
+                        )
+                    )
+                    created += 1
+            day += timedelta(days=1)
+        create_audit_log(
+            db,
+            action="availability_window.bulk_created",
+            entity_name="professional",
+            entity_id=str(payload.professional_id),
+            actor=actor,
+            description="Recurring availability created",
+            details={"created": created, "skipped": [item.isoformat() for item in skipped]},
+        )
+        db.commit()
+        return AvailabilityBulkResult(created=created, skipped_dates=skipped)
+
+    def clear_windows(
+        self,
+        db: Session,
+        *,
+        professional_id: int,
+        date_from: date,
+        date_to: date,
+        actor: str = "admin",
+    ) -> AvailabilityBulkResult:
+        """Block days (vacations): remove windows in the range, keeping those with active appointments."""
+        if date_to < date_from:
+            raise DomainError("La fecha final tiene que ser igual o posterior a la inicial.", status_code=422)
+        windows = db.scalars(
+            select(AvailabilityWindow)
+            .where(AvailabilityWindow.professional_id == professional_id)
+            .where(AvailabilityWindow.availability_date >= max(date_from, clock.today()))
+            .where(AvailabilityWindow.availability_date <= date_to)
+        ).all()
+        removed, kept = 0, []
+        for window in windows:
+            try:
+                self._assert_window_keeps_appointments(db, window, new_start=None, new_end=None)
+            except DomainError:
+                kept.append(window.availability_date)
+                continue
+            db.delete(window)
+            removed += 1
+        create_audit_log(
+            db,
+            action="availability_window.bulk_deleted",
+            entity_name="professional",
+            entity_id=str(professional_id),
+            actor=actor,
+            description="Availability cleared for a date range",
+            details={"removed": removed, "kept": [item.isoformat() for item in kept]},
+        )
+        db.commit()
+        return AvailabilityBulkResult(removed=removed, skipped_dates=sorted(set(kept)))
 
     def get_availability_window(self, db: Session, availability_window_id: int) -> AvailabilityWindow:
         availability_window = db.get(AvailabilityWindow, availability_window_id)

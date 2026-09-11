@@ -1494,6 +1494,28 @@ button:disabled {
 
 /* ---------------------------------------------------------------- booking flow v2 */
 
+/* Grid children default to min-width:auto and would grow to fit wide content (date strip, tables)
+   instead of letting that content scroll inside its own container. */
+.admin-shell > *,
+.metrics-grid > *,
+.booking-layout > *,
+.content-grid > *,
+.availability-tools > *,
+.cards-grid > * {
+  min-width: 0;
+}
+
+.booking-layout {
+  align-items: start;
+}
+
+@media (min-width: 1281px) {
+  .booking-sidebar {
+    position: sticky;
+    top: 20px;
+  }
+}
+
 .booking-steps {
   display: flex;
   flex-wrap: wrap;
@@ -1924,6 +1946,251 @@ button:disabled {
   margin: 14px 0 0;
 }
 
+/* ---------------------------------------------------------------- admin v2 */
+
+.alert-warning {
+  background: rgba(184, 123, 34, 0.1);
+  color: #8a5a12;
+  border-color: rgba(184, 123, 34, 0.18);
+}
+
+.metric-value-sm {
+  font-size: 1.7rem;
+}
+
+.metric-foot {
+  display: block;
+  margin-top: 10px;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.attendance-ok {
+  margin-top: 4px;
+  color: var(--success);
+  font-weight: 700;
+}
+
+.pay-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  background: rgba(102, 113, 122, 0.1);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.pay-ok {
+  background: rgba(31, 122, 79, 0.12);
+  color: var(--success);
+}
+
+.pay-waiting {
+  background: rgba(15, 93, 131, 0.1);
+  color: var(--brand-ocean);
+}
+
+.notif-sent,
+.pay-status-approved {
+  background: rgba(31, 122, 79, 0.12);
+  color: var(--success);
+}
+
+.notif-pending,
+.pay-status-pending,
+.pay-status-in_process {
+  background: rgba(15, 93, 131, 0.1);
+  color: var(--brand-ocean);
+}
+
+.notif-failed,
+.pay-status-rejected {
+  background: rgba(191, 75, 75, 0.12);
+  color: var(--danger);
+}
+
+.notif-skipped,
+.pay-status-expired,
+.pay-status-cancelled,
+.pay-status-refunded {
+  background: rgba(102, 113, 122, 0.12);
+  color: var(--muted);
+}
+
+.row-highlight td {
+  background: rgba(184, 123, 34, 0.06);
+}
+
+.refund-flag {
+  margin-top: 4px;
+  color: #8a5a12;
+  font-weight: 800;
+}
+
+.empty-row {
+  padding: 28px 14px !important;
+  text-align: center;
+  color: var(--muted);
+}
+
+.table-caption {
+  margin: 0 0 10px;
+}
+
+.day-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.day-nav .ghost-button {
+  display: inline-flex;
+  align-items: center;
+}
+
+.toolbar-form .field {
+  gap: 4px;
+}
+
+.row-actions .ghost-button.compact {
+  white-space: nowrap;
+}
+
+.availability-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 28px;
+  margin-bottom: 28px;
+}
+
+.availability-list {
+  align-items: start;
+}
+
+.weekday-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.weekday-picker legend {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.weekday-chip {
+  position: relative;
+  cursor: pointer;
+}
+
+.weekday-chip input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+}
+
+.weekday-chip span {
+  display: grid;
+  place-items: center;
+  min-width: 56px;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 35, 51, 0.12);
+  background: white;
+  font-weight: 800;
+}
+
+.weekday-chip input:checked + span {
+  background: var(--brand-ocean);
+  border-color: var(--brand-ocean);
+  color: white;
+}
+
+.weekday-chip input:focus-visible + span {
+  box-shadow: 0 0 0 4px rgba(15, 93, 131, 0.14);
+}
+
+.metrics-filter {
+  margin-bottom: 28px;
+  padding: 22px 26px;
+}
+
+.metrics-filter .toolbar-form {
+  align-items: end;
+}
+
+.metrics-filter .ghost-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 50px;
+  padding-inline: 18px;
+}
+
+.day-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 160px;
+  padding: 12px 0 0;
+}
+
+.day-bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  min-width: 4px;
+}
+
+.day-bar span {
+  display: block;
+  width: 100%;
+  min-height: 2px;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, var(--brand-coral), rgba(255, 91, 58, 0.55));
+}
+
+.day-bars-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.occupancy-bar {
+  width: 120px;
+  height: 8px;
+  margin-bottom: 4px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+
+.occupancy-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand-ocean), var(--brand-coral));
+}
+
+.patient-layout {
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  align-items: start;
+}
+
+a.section-pill:hover {
+  background: rgba(255, 91, 58, 0.14);
+}
+
 @media (max-width: 1280px) {
   .admin-shell {
     grid-template-columns: 1fr;
@@ -2046,6 +2313,42 @@ button:disabled {
 
   .two-cols {
     grid-template-columns: 1fr;
+  }
+
+  .hero-visual::before {
+    width: 96px;
+    height: 96px;
+    right: -40px;
+    top: -40px;
+  }
+
+  .hero-visual-copy {
+    padding-right: 28px;
+  }
+
+  .sidebar-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  .sidebar-nav .nav-link {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
+  .brand-badge-sidebar {
+    min-height: 88px;
+  }
+
+  .availability-tools,
+  .patient-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics-filter {
+    padding: 18px;
   }
 
   .booking-steps {

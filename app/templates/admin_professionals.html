@@ -4,20 +4,24 @@
 <section class="surface">
   <div class="surface-head">
     <div>
-      <div class="eyebrow">Estructura médica</div>
+      <div class="eyebrow">Staff clínico</div>
       <h2>Profesionales</h2>
     </div>
-    <span class="section-pill">Altas y mantenimiento ocasional</span>
+    <a class="section-pill" href="/app/availability">Cargar disponibilidad →</a>
   </div>
 
   <details class="foldout">
     <summary>Alta de profesional</summary>
     <form method="post" action="/app/professionals" class="form-grid">
-      <input name="first_name" placeholder="Nombre" required />
-      <input name="last_name" placeholder="Apellido" required />
-      <input name="specialty" placeholder="Especialidad" />
-      <input name="email" type="email" placeholder="Email" />
-      <input name="phone" placeholder="Teléfono" />
+      <div class="two-cols">
+        <input name="first_name" placeholder="Nombre" required aria-label="Nombre" />
+        <input name="last_name" placeholder="Apellido" required aria-label="Apellido" />
+      </div>
+      <input name="specialty" placeholder="Especialidad" aria-label="Especialidad" />
+      <div class="two-cols">
+        <input name="email" type="email" placeholder="Email" aria-label="Email" />
+        <input name="phone" placeholder="Teléfono" aria-label="Teléfono" />
+      </div>
       <label class="field">
         <span class="field-label">Duración por defecto (min)</span>
         <input name="default_appointment_duration" type="number" min="10" max="240" value="30" />
@@ -40,7 +44,7 @@
         </div>
         <div class="card-actions-top">
           <span class="status-badge {% if professional.is_active %}status-confirmed{% else %}status-cancelled{% endif %}">
-            {% if professional.is_active %}activo{% else %}inactivo{% endif %}
+            {% if professional.is_active %}Activo{% else %}Inactivo{% endif %}
           </span>
         </div>
       </div>
@@ -56,7 +60,11 @@
             {% else %}{{ professional.deposit_amount | money }}{% endif %}
           </strong>
         </li>
-        <li><span>Fechas habilitadas</span><strong>{{ windows_count[professional.id] }}</strong></li>
+        <li><span>Días con disponibilidad</span><strong>{{ windows_count[professional.id] }}</strong></li>
+        <li>
+          <span>Acceso al panel</span>
+          <strong>{% if logins.get(professional.id) %}{{ logins[professional.id].username }}{% else %}<a class="inline-link" href="/app/users">Crear usuario</a>{% endif %}</strong>
+        </li>
       </ul>
       <div class="card-footer-actions">
         <a class="quick-link compact" href="/app/professionals/{{ professional.id }}/edit">Editar</a>

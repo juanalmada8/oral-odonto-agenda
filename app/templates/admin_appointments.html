@@ -1,15 +1,22 @@
 {% extends "base_admin.html" %}
+{% from "_macros.html" import status_badge, payment_badge, appointment_actions %}
 
 {% block content %}
 <section class="surface">
   <div class="surface-head">
     <div>
-      <div class="eyebrow">Agenda administrativa</div>
-      <h2>Buscar y operar turnos</h2>
+      <div class="eyebrow">Agenda</div>
+      <h2>Turnos del {{ agenda_date[8:10] }}/{{ agenda_date[5:7] }}</h2>
+      <div class="day-nav">
+        <a class="ghost-button compact" href="/app/appointments?selected_date={{ previous_date }}{% if selected_professional_id and not is_professional %}&professional_id={{ selected_professional_id }}{% endif %}">← Día anterior</a>
+        <a class="ghost-button compact" href="/app/appointments{% if selected_professional_id and not is_professional %}?professional_id={{ selected_professional_id }}{% endif %}">Hoy</a>
+        <a class="ghost-button compact" href="/app/appointments?selected_date={{ next_date }}{% if selected_professional_id and not is_professional %}&professional_id={{ selected_professional_id }}{% endif %}">Día siguiente →</a>
+      </div>
     </div>
     <form method="get" action="/app/appointments" class="toolbar-form">
-      <input type="date" name="selected_date" value="{{ agenda_date }}" />
-      <select name="professional_id">
+      <input type="date" name="selected_date" value="{{ agenda_date }}" aria-label="Fecha" />
+      {% if not is_professional %}
+      <select name="professional_id" aria-label="Profesional">
         <option value="">Todos los profesionales</option>
         {% for professional in professionals %}
         <option value="{{ professional.id }}" {% if selected_professional_id == professional.id %}selected{% endif %}>
@@ -17,103 +24,114 @@
         </option>
         {% endfor %}
       </select>
-      <select name="status_filter">
+      {% endif %}
+      <select name="status_filter" aria-label="Estado">
         <option value="">Todos los estados</option>
         {% for status in status_options %}
-        <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>
+        <option value="{{ status.value }}" {% if selected_status == status.value %}selected{% endif %}>{{ status | status_label }} ({{ stats[status.value] }})</option>
         {% endfor %}
       </select>
+      <input type="search" name="patient_query" value="{{ patient_query }}" placeholder="Paciente, DNI o motivo" aria-label="Buscar" />
       <button type="submit">Filtrar</button>
     </form>
   </div>
 
+  {% if not is_professional %}
   <details class="foldout">
-    <summary>Crear turno manual</summary>
+    <summary>Crear turno manual (teléfono / mostrador)</summary>
     <form method="post" action="/app/appointments" class="form-grid" id="manual-appointment-form">
-      <select name="patient_id" required>
-        <option value="">Paciente</option>
-        {% for patient in patients %}
-        <option value="{{ patient.id }}">{{ patient.last_name }}, {{ patient.first_name }} · DNI {{ patient.dni }}</option>
-        {% endfor %}
-      </select>
-      <select name="professional_id" id="manual-professional" required>
-        <option value="">Profesional</option>
-        {% for professional in professionals %}
-        <option value="{{ professional.id }}">{{ professional.first_name }} {{ professional.last_name }}</option>
-        {% endfor %}
-      </select>
-      <select name="manual_date" id="manual-date" disabled required>
-        <option value="">Elegí primero un profesional</option>
-      </select>
-      <select name="starts_at" id="manual-starts-at" disabled required>
-        <option value="">Elegí fecha para ver horarios</option>
-      </select>
-      <input name="duration_minutes" type="hidden" value="30" />
-      <input name="reason" placeholder="Motivo" />
-      <textarea name="notes" placeholder="Notas"></textarea>
-      <p class="muted small" id="manual-slot-hint">Seleccioná profesional y fecha para habilitar horarios reales.</p>
+      <label class="field">
+        <span class="field-label">Paciente</span>
+        <select name="patient_id" required>
+          <option value="">Elegí un paciente</option>
+          {% for patient in patients if patient.is_active %}
+          <option value="{{ patient.id }}">{{ patient.last_name }}, {{ patient.first_name }} · DNI {{ patient.dni }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <p class="muted small">¿Paciente nuevo? Cargalo primero en <a class="inline-link" href="/app/patients">Pacientes</a>.</p>
+      <div class="two-cols">
+        <label class="field">
+          <span class="field-label">Profesional</span>
+          <select name="professional_id" id="manual-professional" required>
+            <option value="">Elegí un profesional</option>
+            {% for professional in professionals %}
+            <option value="{{ professional.id }}">{{ professional.first_name }} {{ professional.last_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Día</span>
+          <select name="manual_date" id="manual-date" disabled required>
+            <option value="">Elegí primero un profesional</option>
+          </select>
+        </label>
+      </div>
+      <label class="field">
+        <span class="field-label">Horario</span>
+        <select name="starts_at" id="manual-starts-at" disabled required>
+          <option value="">Elegí un día para ver horarios</option>
+        </select>
+      </label>
+      <input name="duration_minutes" type="hidden" id="manual-duration" value="30" />
+      <label class="field">
+        <span class="field-label">Motivo</span>
+        <input name="reason" placeholder="Control, limpieza, urgencia…" />
+      </label>
+      <label class="field">
+        <span class="field-label">Notas internas</span>
+        <textarea name="notes" placeholder="Opcional"></textarea>
+      </label>
+      <p class="muted small" id="manual-slot-hint">Los turnos manuales no piden seña y se confirman por email al paciente.</p>
       <button type="submit" id="manual-submit" disabled>Guardar turno</button>
     </form>
   </details>
+  {% endif %}
 
+  <p class="muted small table-caption">Mostrando {{ stats.shown }} de {{ stats.total }} turno(s).</p>
   <div class="table-wrap">
     <table class="data-table">
       <thead>
         <tr>
           <th>Hora</th>
           <th>Paciente</th>
-          <th>Profesional</th>
+          {% if not is_professional %}<th>Profesional</th>{% endif %}
           <th>Estado</th>
+          <th>Seña</th>
           <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
         {% for appointment in appointments %}
         <tr>
-          <td>{{ appointment.starts_at.strftime("%H:%M") }}</td>
+          <td><strong>{{ appointment.starts_at.strftime("%H:%M") }}</strong><div class="muted small">{{ appointment.duration_minutes }} min</div></td>
           <td>
             <strong>{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}</strong>
             <div class="muted small">DNI {{ appointment.patient.dni }}</div>
+            {% if appointment.notification_phone or appointment.notification_email %}
+            <div class="muted small">{{ appointment.notification_phone | phone }}{% if appointment.notification_phone and appointment.notification_email %} · {% endif %}{{ appointment.notification_email or '' }}</div>
+            {% endif %}
+            {% if appointment.reason %}<div class="small">{{ appointment.reason }}</div>{% endif %}
           </td>
-          <td>{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>
-          <td><span class="status-badge status-{{ appointment.status.value }}">{{ appointment.status.value }}</span></td>
+          {% if not is_professional %}<td>{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>{% endif %}
+          <td>
+            {{ status_badge(appointment.status) }}
+            {% if appointment.attendance_confirmed_at %}<div class="muted small attendance-ok">✓ Confirmó por WhatsApp</div>{% endif %}
+            <div class="muted small">{{ 'Online' if appointment.created_by == 'public_booking' else 'Consultorio' }}</div>
+          </td>
+          <td>{{ payment_badge(appointment) }}</td>
           <td>
             <div class="row-actions">
+              {% if not is_professional %}
               <a class="quick-link compact" href="/app/appointments/{{ appointment.id }}/edit">Editar</a>
-              {% if appointment.status.value == "cancelled" %}
-              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
-                <input type="hidden" name="action" value="reserve" />
-                <button class="ghost-button" type="submit">Reactivar</button>
-              </form>
-              {% elif appointment.status.value == "reserved" %}
-              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
-                <input type="hidden" name="action" value="confirm" />
-                <button class="ghost-button" type="submit">Confirmar</button>
-              </form>
-              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
-                <input type="hidden" name="action" value="complete" />
-                <button class="ghost-button" type="submit">Completar</button>
-              </form>
-              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
-                <input type="hidden" name="action" value="cancel" />
-                <button class="ghost-button danger" type="submit">Cancelar</button>
-              </form>
-              {% elif appointment.status.value == "confirmed" %}
-              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
-                <input type="hidden" name="action" value="complete" />
-                <button class="ghost-button" type="submit">Completar</button>
-              </form>
-              <form method="post" action="/app/appointments/{{ appointment.id }}/status">
-                <input type="hidden" name="action" value="cancel" />
-                <button class="ghost-button danger" type="submit">Cancelar</button>
-              </form>
               {% endif %}
+              {{ appointment_actions(appointment, actions_for(appointment), '/app/appointments?' ~ filters_querystring) }}
             </div>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="5">No hay turnos para los filtros seleccionados.</td>
+          <td colspan="6" class="empty-row">No hay turnos para los filtros seleccionados.</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -121,120 +139,75 @@
   </div>
 </section>
 
+{% if not is_professional %}
 <script>
   document.addEventListener("DOMContentLoaded", () => {
     const manualAvailableDates = {{ manual_available_dates | tojson }};
     const professionalSelect = document.getElementById("manual-professional");
     const dateSelect = document.getElementById("manual-date");
     const slotSelect = document.getElementById("manual-starts-at");
+    const durationInput = document.getElementById("manual-duration");
     const submitButton = document.getElementById("manual-submit");
     const hint = document.getElementById("manual-slot-hint");
-
     if (!professionalSelect || !dateSelect || !slotSelect || !submitButton || !hint) return;
 
-    const resetSlots = (message) => {
-      slotSelect.innerHTML = "";
-      const option = document.createElement("option");
-      option.value = "";
-      option.textContent = message;
-      slotSelect.appendChild(option);
-      slotSelect.disabled = true;
+    const fill = (select, options, placeholder) => {
+      select.innerHTML = "";
+      const first = document.createElement("option");
+      first.value = "";
+      first.textContent = placeholder;
+      select.appendChild(first);
+      options.forEach(({ value, label, data }) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        Object.entries(data || {}).forEach(([key, val]) => (option.dataset[key] = val));
+        select.appendChild(option);
+      });
+      select.disabled = options.length === 0;
+    };
+    const hhmm = (iso) => iso.slice(11, 16);
+
+    const loadSlots = async () => {
+      fill(slotSelect, [], "Buscando horarios…");
       submitButton.disabled = true;
-    };
-
-    const resetDates = (message) => {
-      dateSelect.innerHTML = "";
-      const option = document.createElement("option");
-      option.value = "";
-      option.textContent = message;
-      dateSelect.appendChild(option);
-      dateSelect.disabled = true;
-      resetSlots("Elegí fecha para ver horarios");
-    };
-
-    const formatHour = (isoValue) => {
-      const parsed = new Date(isoValue);
-      if (Number.isNaN(parsed.getTime())) return "";
-      return parsed.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
-    };
-
-    const loadSlots = async (professionalId, selectedDate) => {
-      resetSlots("Buscando horarios...");
-      hint.textContent = "Consultando horarios habilitados para ese profesional...";
       try {
-        const response = await fetch(
-          `/api/v1/availability?professional_id=${encodeURIComponent(professionalId)}&date=${encodeURIComponent(selectedDate)}`
+        const params = new URLSearchParams({ professional_id: professionalSelect.value, date: dateSelect.value });
+        const response = await fetch(`/api/v1/availability/?${params}`, { headers: { Accept: "application/json" } });
+        if (!response.ok) throw new Error("slots");
+        const slots = (await response.json()).slots || [];
+        fill(
+          slotSelect,
+          slots.map((slot) => ({
+            value: slot.starts_at,
+            label: `${hhmm(slot.starts_at)} a ${hhmm(slot.ends_at)}`,
+            data: { minutes: (new Date(slot.ends_at) - new Date(slot.starts_at)) / 60000 },
+          })),
+          slots.length ? "Elegí un horario" : "Sin horarios libres ese día"
         );
-        if (!response.ok) throw new Error("manual-slots-fetch-failed");
-        const payload = await response.json();
-        const slots = payload.slots || [];
-        if (!slots.length) {
-          resetSlots("Sin horarios para esa fecha");
-          hint.textContent = "No hay horarios disponibles para esa fecha. Elegí otra.";
-          return;
-        }
-
-        slotSelect.innerHTML = "";
-        const defaultOption = document.createElement("option");
-        defaultOption.value = "";
-        defaultOption.textContent = "Elegí horario";
-        slotSelect.appendChild(defaultOption);
-
-        slots.forEach((slot) => {
-          const option = document.createElement("option");
-          option.value = slot.starts_at;
-          option.textContent = `${formatHour(slot.starts_at)} a ${formatHour(slot.ends_at)}`;
-          slotSelect.appendChild(option);
-        });
-
-        slotSelect.disabled = false;
-        hint.textContent = "Seleccioná un horario disponible y guardá el turno.";
       } catch (error) {
-        resetSlots("No se pudieron cargar horarios");
-        hint.textContent = "No pudimos cargar horarios ahora. Reintentá.";
+        fill(slotSelect, [], "No se pudieron cargar los horarios");
+        hint.textContent = "No pudimos cargar horarios. Reintentá en unos segundos.";
       }
     };
 
     professionalSelect.addEventListener("change", () => {
-      const professionalId = professionalSelect.value;
-      if (!professionalId) {
-        resetDates("Elegí primero un profesional");
-        hint.textContent = "Seleccioná profesional y fecha para habilitar horarios reales.";
-        return;
-      }
-
-      const availableDates = manualAvailableDates[String(professionalId)] || [];
-      if (!availableDates.length) {
-        resetDates("Este profesional no tiene fechas habilitadas");
-        hint.textContent = "Este profesional no tiene disponibilidad cargada por ahora.";
-        return;
-      }
-
-      dateSelect.innerHTML = "";
-      availableDates.forEach((item, index) => {
-        const option = document.createElement("option");
-        option.value = item.value;
-        option.textContent = `${item.label} · ${item.slots} horarios`;
-        if (index === 0) option.selected = true;
-        dateSelect.appendChild(option);
-      });
-      dateSelect.disabled = false;
-      void loadSlots(professionalId, dateSelect.value);
+      const dates = manualAvailableDates[professionalSelect.value] || [];
+      fill(
+        dateSelect,
+        dates.map((item) => ({ value: item.value, label: `${item.label} · ${item.slots} libres` })),
+        dates.length ? "Elegí un día" : "Sin días con horarios libres"
+      );
+      fill(slotSelect, [], "Elegí un día para ver horarios");
+      submitButton.disabled = true;
     });
-
-    dateSelect.addEventListener("change", () => {
-      const professionalId = professionalSelect.value;
-      const selectedDate = dateSelect.value;
-      if (!professionalId || !selectedDate) {
-        resetSlots("Elegí fecha para ver horarios");
-        return;
-      }
-      void loadSlots(professionalId, selectedDate);
-    });
-
+    dateSelect.addEventListener("change", () => dateSelect.value && loadSlots());
     slotSelect.addEventListener("change", () => {
+      const selected = slotSelect.selectedOptions[0];
+      if (selected?.dataset.minutes && durationInput) durationInput.value = selected.dataset.minutes;
       submitButton.disabled = !slotSelect.value;
     });
   });
 </script>
+{% endif %}
 {% endblock %}

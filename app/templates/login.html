@@ -18,10 +18,10 @@
             </div>
             <div>
               <div class="eyebrow">Ingreso interno</div>
-              <h2>Recepción y administración clínica en un solo lugar.</h2>
+              <h2>Agenda, señas y recordatorios en un solo lugar.</h2>
             </div>
             <p>
-              Panel para operar el día con más claridad, menos ruido y la estética de la identidad ORAL.
+              Cada profesional ve su agenda y carga su disponibilidad; recepción opera el día.
             </p>
             <div class="brand-accent">Buenos Aires</div>
           </div>
@@ -30,18 +30,18 @@
         <section class="login-card">
           <div class="eyebrow">Equipo ORAL</div>
           <h1>Entrar al panel</h1>
-          <p class="muted">Este acceso es solo para recepción y administración.</p>
+          <p class="muted">Acceso para administración, recepción y profesionales de ORAL.</p>
           {% if error %}
           <div class="alert alert-error">{{ error }}</div>
           {% endif %}
           <form method="post" action="/app/login" class="stack">
-            <label>
-              Usuario
-              <input type="text" name="username" placeholder="admin" required />
+            <label class="field">
+              <span class="field-label">Usuario</span>
+              <input type="text" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required />
             </label>
-            <label>
-              Password
-              <input type="password" name="password" placeholder="demo12345" required />
+            <label class="field">
+              <span class="field-label">Contraseña</span>
+              <input type="password" name="password" autocomplete="current-password" required />
             </label>
             <button type="submit">Entrar</button>
           </form>

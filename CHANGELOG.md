@@ -13,6 +13,20 @@ y versionado semántico.
 
 ## [Unreleased]
 
+### Added — Panel: roles, disponibilidad recurrente y métricas
+- Rol **profesional**: cada odontólogo entra con su usuario, ve solo su agenda, carga su propia
+  disponibilidad y marca sus turnos como atendidos/ausentes.
+- Disponibilidad recurrente (días de la semana + rango de fechas) y bloqueo de días por vacaciones que
+  respeta los turnos ya tomados.
+- Gestión de usuarios (alta, rol, vínculo con profesional, activación, cambio de contraseña) con
+  protección para no quedarse sin administradores.
+- Páginas nuevas: Pagos (señas a devolver), Métricas (ocupación, conversión de seña, ausentismo,
+  cancelaciones, ingresos por profesional, turnos por día) y exportación CSV para Excel.
+- Agenda con estados en español, seña y confirmación de asistencia por turno; acciones según rol y
+  transición válida; ficha del paciente con historial.
+- Correcciones responsive (desbordes horizontales en celulares) verificadas con navegador headless
+  en 360/390/768/1024/1440 px.
+
 ### Added — Notificaciones y bot de WhatsApp
 - Outbox de notificaciones con reintentos (backoff exponencial, `NOTIFICATION_MAX_ATTEMPTS`) y envío en
   segundo plano apenas termina la operación; filas bloqueadas con `SKIP LOCKED` para no duplicar envíos.

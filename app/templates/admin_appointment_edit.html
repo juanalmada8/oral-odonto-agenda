@@ -1,22 +1,48 @@
 {% extends "base_admin.html" %}
+{% from "_macros.html" import status_badge, payment_badge %}
 
 {% block content %}
 <section class="surface narrow-surface">
-  <div class="eyebrow">Edición manual</div>
+  <div class="eyebrow">Turno #{{ appointment.id }}</div>
   <h2>{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}</h2>
-  <p class="muted">Profesional: {{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</p>
+  <p class="muted">
+    {{ appointment.professional.first_name }} {{ appointment.professional.last_name }} ·
+    {{ appointment.starts_at | long_date }} {{ appointment.starts_at.strftime('%H:%M') }} h ·
+    {{ status_badge(appointment.status) }} {{ payment_badge(appointment) }}
+  </p>
 
   <form method="post" action="/app/appointments/{{ appointment.id }}/edit" class="form-grid">
-    <input name="starts_at" type="datetime-local" value="{{ appointment.starts_at.strftime('%Y-%m-%dT%H:%M') }}" required />
-    <input name="duration_minutes" type="number" min="10" max="240" value="{{ appointment.duration_minutes }}" />
-    <select name="status" required>
-      {% for status in status_options %}
-      <option value="{{ status }}" {% if appointment.status.value == status %}selected{% endif %}>{{ status }}</option>
-      {% endfor %}
-    </select>
-    <input name="reason" value="{{ appointment.reason or '' }}" placeholder="Motivo" />
-    <textarea name="notes" placeholder="Notas">{{ appointment.notes or '' }}</textarea>
-    <button type="submit">Guardar cambios</button>
+    <div class="two-cols">
+      <label class="field">
+        <span class="field-label">Fecha y hora</span>
+        <input name="starts_at" type="datetime-local" step="300" value="{{ appointment.starts_at.strftime('%Y-%m-%dT%H:%M') }}" required />
+      </label>
+      <label class="field">
+        <span class="field-label">Duración (min)</span>
+        <input name="duration_minutes" type="number" min="10" max="240" value="{{ appointment.duration_minutes }}" />
+      </label>
+    </div>
+    <label class="field">
+      <span class="field-label">Estado</span>
+      <select name="status" required>
+        {% for status in status_options %}
+        <option value="{{ status.value }}" {% if appointment.status == status %}selected{% endif %}>{{ status | status_label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">
+      <span class="field-label">Motivo</span>
+      <input name="reason" value="{{ appointment.reason or '' }}" />
+    </label>
+    <label class="field">
+      <span class="field-label">Notas internas</span>
+      <textarea name="notes">{{ appointment.notes or '' }}</textarea>
+    </label>
+    <p class="muted small">Si cambiás el horario se validan disponibilidad y superposiciones, y se reprograman los recordatorios.</p>
+    <div class="button-row">
+      <button type="submit">Guardar cambios</button>
+      <a class="ghost-button" href="/app/appointments?selected_date={{ appointment.starts_at.date().isoformat() }}">Volver</a>
+    </div>
   </form>
 </section>
 {% endblock %}

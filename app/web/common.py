@@ -9,7 +9,14 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.enums import APPOINTMENT_STATUS_LABELS, PAYMENT_STATUS_LABELS, AppointmentStatus, PaymentStatus, UserRole
+from app.core.enums import (
+    APPOINTMENT_STATUS_LABELS,
+    PAYMENT_STATUS_LABELS,
+    ROLE_LABELS,
+    AppointmentStatus,
+    PaymentStatus,
+    UserRole,
+)
 from app.core.exceptions import DomainError
 from app.models.user import User
 from app.services.professional_service import ProfessionalService
@@ -34,6 +41,8 @@ templates.env.filters["short_date"] = format_short_date
 templates.env.filters["mask_email"] = mask_email
 templates.env.filters["status_label"] = status_label
 templates.env.filters["phone"] = format_phone_for_display
+templates.env.filters["role_label"] = lambda role: ROLE_LABELS.get(role, str(role))
+templates.env.filters["percent"] = lambda value: "—" if value is None else f"{value * 100:.0f}%"
 templates.env.globals["settings"] = get_settings()
 
 

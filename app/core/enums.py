@@ -84,3 +84,10 @@ class UserRole(str, Enum):
     ADMIN = "admin"
     RECEPTIONIST = "receptionist"
     PROFESSIONAL = "professional"
+
+
+ROLE_LABELS = {
+    UserRole.ADMIN: "Administración",
+    UserRole.RECEPTIONIST: "Recepción",
+    UserRole.PROFESSIONAL: "Profesional",
+}

@@ -1,0 +1,105 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<section class="surface">
+  <div class="surface-head">
+    <div>
+      <div class="eyebrow">Equipo</div>
+      <h2>Accesos al panel</h2>
+      <p class="muted">Cada odontólogo puede tener su usuario para ver su agenda y cargar su disponibilidad.</p>
+    </div>
+  </div>
+
+  <details class="foldout" {% if not users %}open{% endif %}>
+    <summary>Crear usuario</summary>
+    <form method="post" action="/app/users" class="form-grid" autocomplete="off">
+      <div class="two-cols">
+        <label class="field"><span class="field-label">Nombre completo</span><input name="full_name" required maxlength="120" /></label>
+        <label class="field"><span class="field-label">Email</span><input name="email" type="email" required /></label>
+      </div>
+      <div class="two-cols">
+        <label class="field"><span class="field-label">Usuario</span><input name="username" required minlength="3" maxlength="80" pattern="[a-zA-Z0-9._\-]+" placeholder="ej: laura.gomez" /></label>
+        <label class="field"><span class="field-label">Contraseña inicial</span><input name="password" type="password" required minlength="8" autocomplete="new-password" /></label>
+      </div>
+      <div class="two-cols">
+        <label class="field">
+          <span class="field-label">Rol</span>
+          <select name="role" required data-role-select>
+            {% for role in roles %}
+            <option value="{{ role.value }}" {% if role.value == 'receptionist' %}selected{% endif %}>{{ role_labels[role] }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field" data-professional-field>
+          <span class="field-label">Profesional <em>(solo rol Profesional)</em></span>
+          <select name="professional_id">
+            <option value="">—</option>
+            {% for professional in unlinked_professionals %}
+            <option value="{{ professional.id }}">{{ professional.first_name }} {{ professional.last_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <button type="submit">Crear usuario</button>
+    </form>
+  </details>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Usuario</th><th>Rol y acceso</th><th>Contraseña</th></tr></thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td>
+            <strong>{{ user.full_name }}</strong>
+            <div class="muted small">{{ user.username }} · {{ user.email }}</div>
+            {% if user.professional_id and professionals_by_id.get(user.professional_id) %}
+            {% set linked = professionals_by_id[user.professional_id] %}
+            <div class="small">Agenda de {{ linked.first_name }} {{ linked.last_name }}</div>
+            {% endif %}
+          </td>
+          <td>
+            <form method="post" action="/app/users/{{ user.id }}" class="inline-form">
+              <select name="role" aria-label="Rol">
+                {% for role in roles %}
+                <option value="{{ role.value }}" {% if user.role == role %}selected{% endif %}>{{ role_labels[role] }}</option>
+                {% endfor %}
+              </select>
+              <select name="professional_id" aria-label="Profesional vinculado">
+                <option value="">Sin profesional</option>
+                {% for professional in professionals %}
+                <option value="{{ professional.id }}" {% if user.professional_id == professional.id %}selected{% endif %}>{{ professional.first_name }} {{ professional.last_name }}</option>
+                {% endfor %}
+              </select>
+              <label class="checkbox-row"><input type="checkbox" name="is_active" value="true" {% if user.is_active %}checked{% endif %} {% if user.id == current_user.id %}disabled{% endif %} /> Activo</label>
+              {% if user.id == current_user.id %}<input type="hidden" name="is_active" value="true" />{% endif %}
+              <button type="submit" class="ghost-button compact">Guardar</button>
+            </form>
+          </td>
+          <td>
+            <form method="post" action="/app/users/{{ user.id }}/password" class="inline-form">
+              <input type="password" name="password" minlength="8" placeholder="Nueva contraseña" autocomplete="new-password" required aria-label="Nueva contraseña" />
+              <button type="submit" class="ghost-button compact">Cambiar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<script>
+  (() => {
+    const roleSelect = document.querySelector("[data-role-select]");
+    const professionalField = document.querySelector("[data-professional-field]");
+    if (!roleSelect || !professionalField) return;
+    const sync = () => {
+      const isProfessional = roleSelect.value === "professional";
+      professionalField.hidden = !isProfessional;
+      professionalField.querySelector("select").required = isProfessional;
+    };
+    roleSelect.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+{% endblock %}
