@@ -646,7 +646,7 @@ button:disabled {
   justify-content: space-between;
   gap: 34px;
   align-items: center;
-  min-height: calc(100vh - 140px);
+  min-height: min(560px, calc(100vh - 200px));
   margin-bottom: 18px;
   padding: 12px 0 28px;
 }
@@ -665,6 +665,66 @@ button:disabled {
 .hero-copy p {
   font-size: 1.18rem;
   max-width: 520px;
+}
+
+.hero-lead {
+  font-size: clamp(1.14rem, 1.5vw, 1.32rem);
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: #2b3a46;
+  max-width: 540px;
+}
+
+.hero-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 54px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 35, 51, 0.14);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--brand-ocean);
+  font-weight: 800;
+}
+
+.hero-secondary:hover {
+  border-color: rgba(15, 93, 131, 0.4);
+}
+
+/* Datos concretos del consultorio, en vez de frases de marketing. */
+.hero-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, max-content));
+  gap: 18px 34px;
+  margin: 34px 0 0;
+}
+
+.hero-facts div {
+  display: grid;
+  gap: 4px;
+}
+
+.hero-facts dt {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hero-facts dd {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.hero-facts a {
+  text-decoration: underline;
+  text-decoration-color: rgba(15, 93, 131, 0.35);
+  text-underline-offset: 3px;
 }
 
 .hero-actions {
@@ -690,8 +750,8 @@ button:disabled {
 
 .hero-visual {
   position: relative;
-  flex: 1;
-  min-height: 300px;
+  flex: 0 1 440px;
+  min-height: 240px;
   padding: 34px;
   border-radius: var(--radius-xl);
   background: linear-gradient(135deg, var(--brand-ocean), var(--brand-ocean-deep));
@@ -700,8 +760,7 @@ button:disabled {
   box-shadow: var(--shadow-soft);
 }
 
-.hero-visual::before,
-.hero-visual::after {
+.hero-visual::before {
   content: "";
   position: absolute;
   border-radius: 34px;
@@ -715,21 +774,39 @@ button:disabled {
   top: -34px;
 }
 
-.hero-visual::after {
-  width: 140px;
-  height: 140px;
-  background: rgba(184, 210, 232, 0.36);
-  left: -18px;
-  bottom: -28px;
-}
-
 .hero-visual-inner {
   position: relative;
   z-index: 1;
   display: grid;
   gap: 18px;
-  align-content: space-between;
+  align-content: center;
   min-height: 100%;
+}
+
+.hero-brand {
+  display: block;
+  width: min(100%, 210px);
+  height: auto;
+}
+
+.hero-place {
+  display: grid;
+  gap: 2px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.hero-place a,
+.hero-place strong {
+  font-size: 1.45rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: white;
+}
+
+.hero-place a {
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.4);
+  text-underline-offset: 4px;
 }
 
 .hero-kicker {
@@ -2313,6 +2390,22 @@ a.section-pill:hover {
 
   .two-cols {
     grid-template-columns: 1fr;
+  }
+
+  .hero-visual {
+    /* In column direction the flex-basis would become the height. */
+    flex: 0 0 auto;
+    min-height: 0;
+    padding: 24px;
+  }
+
+  .hero-brand {
+    width: min(60%, 150px);
+  }
+
+  .hero-place a,
+  .hero-place strong {
+    font-size: 1.2rem;
   }
 
   .hero-visual::before {

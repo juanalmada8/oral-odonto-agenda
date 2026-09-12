@@ -1,4 +1,4 @@
-{% set brand_logo = request.url_for('static', path='brand/oral-logo-blue-cropped.png') %}
+{% set brand_logo = asset_url('brand/oral-logo-blue-cropped.png') %}
 <!DOCTYPE html>
 <html lang="es">
   <head>
@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ page_title }} | ORAL</title>
     <link rel="icon" type="image/png" href="{{ brand_logo }}" />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="{{ asset_url('styles.css') }}" />
     <style>
       #confirm-modal {
         position: fixed;
