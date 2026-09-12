@@ -819,12 +819,7 @@ button:disabled {
   color: white;
   font-size: clamp(2.05rem, 2.8vw, 3rem);
   line-height: 1;
-  margin-bottom: 12px;
-}
-
-.hero-visual-copy p {
-  color: rgba(255, 255, 255, 0.86);
-  max-width: 340px;
+  margin-bottom: 0;
 }
 
 .hero-highlights {
