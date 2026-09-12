@@ -56,7 +56,7 @@
   --bg-soft: #fffdf8;
   --surface: rgba(255, 255, 255, 0.94);
   --surface-strong: #ffffff;
-  --surface-alt: #f5f8fb;
+  --surface-alt: #e8f3fc;
   --surface-border: rgba(15, 35, 51, 0.08);
   --text: #112433;
   --muted: #66717a;
@@ -88,8 +88,8 @@ body {
   font-family: var(--font-ui);
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(255, 91, 58, 0.08), transparent 22%),
-    radial-gradient(circle at right 20%, rgba(184, 210, 232, 0.18), transparent 18%),
+    radial-gradient(circle at top left, rgba(255, 94, 55, 0.08), transparent 22%),
+    radial-gradient(circle at right 20%, rgba(150, 186, 218, 0.18), transparent 18%),
     linear-gradient(180deg, #fffdf9 0%, #f5f7f8 100%);
 }
 
@@ -316,9 +316,9 @@ p {
 }
 
 .alert-success {
-  background: rgba(31, 122, 79, 0.08);
+  background: rgba(0, 99, 32, 0.08);
   color: var(--success);
-  border-color: rgba(31, 122, 79, 0.12);
+  border-color: rgba(0, 99, 32, 0.12);
 }
 
 .alert-error {
@@ -406,8 +406,8 @@ p {
 }
 
 .booking-feedback-success {
-  background: linear-gradient(135deg, rgba(31, 122, 79, 0.12), rgba(255, 255, 255, 0.96));
-  border-color: rgba(31, 122, 79, 0.16);
+  background: linear-gradient(135deg, rgba(0, 99, 32, 0.12), rgba(255, 255, 255, 0.96));
+  border-color: rgba(0, 99, 32, 0.16);
 }
 
 .booking-feedback-error {
@@ -428,7 +428,7 @@ p {
 }
 
 .booking-feedback-success .booking-feedback-icon {
-  background: rgba(31, 122, 79, 0.14);
+  background: rgba(0, 99, 32, 0.14);
   color: var(--success);
 }
 
@@ -507,8 +507,8 @@ textarea::placeholder {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: rgba(15, 93, 131, 0.45);
-  box-shadow: 0 0 0 4px rgba(15, 93, 131, 0.08);
+  border-color: rgba(0, 80, 117, 0.45);
+  box-shadow: 0 0 0 4px rgba(0, 80, 117, 0.08);
 }
 
 textarea {
@@ -523,7 +523,7 @@ button {
   color: white;
   font-weight: 800;
   letter-spacing: -0.01em;
-  box-shadow: 0 10px 24px rgba(255, 91, 58, 0.18);
+  box-shadow: 0 10px 24px rgba(255, 94, 55, 0.18);
 }
 
 button:hover {
@@ -650,7 +650,7 @@ button:disabled {
   justify-content: center;
   border-radius: 999px;
   padding: 10px 14px;
-  background: rgba(15, 93, 131, 0.08);
+  background: rgba(0, 80, 117, 0.08);
   color: var(--brand-ocean);
   font-weight: 800;
 }
@@ -666,7 +666,7 @@ button:disabled {
   min-height: 34px;
   padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(255, 91, 58, 0.08);
+  background: rgba(255, 94, 55, 0.08);
   color: var(--brand-coral);
   font-size: 0.86rem;
   font-weight: 800;
@@ -674,8 +674,8 @@ button:disabled {
 
 .public-body {
   background:
-    radial-gradient(circle at top left, rgba(255, 91, 58, 0.08), transparent 20%),
-    radial-gradient(circle at 80% 12%, rgba(184, 210, 232, 0.32), transparent 18%),
+    radial-gradient(circle at top left, rgba(255, 94, 55, 0.08), transparent 20%),
+    radial-gradient(circle at 80% 12%, rgba(150, 186, 218, 0.32), transparent 18%),
     linear-gradient(180deg, #fffefa 0%, #f6f8f9 100%);
 }
 
@@ -750,7 +750,7 @@ button:disabled {
 }
 
 .hero-secondary:hover {
-  border-color: rgba(15, 93, 131, 0.4);
+  border-color: rgba(0, 80, 117, 0.4);
 }
 
 /* Datos concretos del consultorio, en vez de frases de marketing. */
@@ -783,7 +783,7 @@ button:disabled {
 
 .hero-facts a {
   text-decoration: underline;
-  text-decoration-color: rgba(15, 93, 131, 0.35);
+  text-decoration-color: rgba(0, 80, 117, 0.35);
   text-underline-offset: 3px;
 }
 
@@ -805,7 +805,7 @@ button:disabled {
   background: var(--brand-coral);
   color: white;
   font-weight: 800;
-  box-shadow: 0 14px 28px rgba(255, 91, 58, 0.22);
+  box-shadow: 0 14px 28px rgba(255, 94, 55, 0.22);
 }
 
 .hero-visual {
@@ -829,7 +829,7 @@ button:disabled {
 .hero-visual::before {
   width: 170px;
   height: 170px;
-  background: rgba(255, 91, 58, 0.92);
+  background: rgba(255, 94, 55, 0.92);
   right: -34px;
   top: -34px;
 }
@@ -1008,14 +1008,14 @@ button:disabled {
   min-height: 36px;
   padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(15, 93, 131, 0.08);
+  background: rgba(0, 80, 117, 0.08);
   color: var(--brand-ocean);
   font-size: 0.88rem;
   font-weight: 800;
 }
 
 .date-pill.active {
-  background: rgba(255, 91, 58, 0.1);
+  background: rgba(255, 94, 55, 0.1);
   color: var(--brand-coral);
 }
 
@@ -1149,7 +1149,7 @@ button:disabled {
 
 .status-confirmed,
 .status-completed {
-  background: rgba(31, 122, 79, 0.12);
+  background: rgba(0, 99, 32, 0.12);
   color: var(--success);
 }
 
@@ -1218,7 +1218,7 @@ button:disabled {
   margin: 20px 0 24px;
   border: 1px solid rgba(15, 35, 51, 0.08);
   border-radius: var(--radius-md);
-  background: linear-gradient(180deg, rgba(184, 210, 232, 0.08), rgba(255, 255, 255, 0.85));
+  background: linear-gradient(180deg, rgba(150, 186, 218, 0.08), rgba(255, 255, 255, 0.85));
 }
 
 .foldout summary {
@@ -1267,8 +1267,8 @@ button:disabled {
 
 .admin-body {
   background:
-    radial-gradient(circle at top left, rgba(255, 91, 58, 0.08), transparent 18%),
-    radial-gradient(circle at right 20%, rgba(184, 210, 232, 0.22), transparent 18%),
+    radial-gradient(circle at top left, rgba(255, 94, 55, 0.08), transparent 18%),
+    radial-gradient(circle at right 20%, rgba(150, 186, 218, 0.22), transparent 18%),
     linear-gradient(180deg, #fffefa 0%, #f4f7f8 100%);
 }
 
@@ -1507,7 +1507,7 @@ button:disabled {
 
 .login-body {
   background:
-    radial-gradient(circle at top left, rgba(255, 91, 58, 0.1), transparent 18%),
+    radial-gradient(circle at top left, rgba(255, 94, 55, 0.1), transparent 18%),
     linear-gradient(180deg, #fffefb 0%, #f5f7f8 100%);
 }
 
@@ -1547,7 +1547,7 @@ button:disabled {
 .login-showcase::before {
   width: 190px;
   height: 190px;
-  background: rgba(255, 91, 58, 0.92);
+  background: rgba(255, 94, 55, 0.92);
   right: -22px;
   bottom: -22px;
 }
@@ -1555,7 +1555,7 @@ button:disabled {
 .login-showcase::after {
   width: 150px;
   height: 150px;
-  background: rgba(184, 210, 232, 0.64);
+  background: rgba(150, 186, 218, 0.64);
   left: -18px;
   top: 36px;
 }
@@ -1594,7 +1594,7 @@ button:disabled {
 /* ---------------------------------------------------------------- status badges (v2 states) */
 
 .status-pending_payment {
-  background: rgba(15, 93, 131, 0.1);
+  background: rgba(0, 80, 117, 0.1);
   color: var(--brand-ocean);
 }
 
@@ -1605,7 +1605,7 @@ button:disabled {
 }
 
 .status-completed {
-  background: rgba(15, 93, 131, 0.12);
+  background: rgba(0, 80, 117, 0.12);
   color: var(--brand-ocean-deep);
 }
 
@@ -1668,7 +1668,7 @@ button:disabled {
 
 .booking-steps li.current {
   color: var(--brand-coral);
-  border-color: rgba(255, 91, 58, 0.22);
+  border-color: rgba(255, 94, 55, 0.22);
 }
 
 .booking-steps li.current span {
@@ -1681,7 +1681,7 @@ button:disabled {
 }
 
 .booking-steps li.done span {
-  background: rgba(15, 93, 131, 0.12);
+  background: rgba(0, 80, 117, 0.12);
 }
 
 .step-title {
@@ -1702,7 +1702,7 @@ button:disabled {
   width: 32px;
   height: 32px;
   border-radius: 12px;
-  background: rgba(255, 91, 58, 0.1);
+  background: rgba(255, 94, 55, 0.1);
   color: var(--brand-coral);
   font-size: 0.95rem;
 }
@@ -1745,8 +1745,8 @@ button:disabled {
   gap: 2px;
   padding: 10px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(15, 93, 131, 0.14);
-  background: rgba(15, 93, 131, 0.05);
+  border: 1px solid rgba(0, 80, 117, 0.14);
+  background: rgba(0, 80, 117, 0.05);
   color: var(--brand-ocean);
   transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
 }
@@ -1762,12 +1762,12 @@ button:disabled {
 
 .date-chip:hover {
   transform: translateY(-1px);
-  border-color: rgba(15, 93, 131, 0.32);
+  border-color: rgba(0, 80, 117, 0.32);
 }
 
 .date-chip.active {
-  background: rgba(255, 91, 58, 0.1);
-  border-color: rgba(255, 91, 58, 0.36);
+  background: rgba(255, 94, 55, 0.1);
+  border-color: rgba(255, 94, 55, 0.36);
   color: var(--brand-coral);
 }
 
@@ -1777,8 +1777,8 @@ button:disabled {
   margin-top: 24px;
   padding: 18px 20px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, rgba(15, 93, 131, 0.08), rgba(255, 255, 255, 0.9));
-  border: 1px solid rgba(15, 93, 131, 0.12);
+  background: linear-gradient(135deg, rgba(0, 80, 117, 0.08), rgba(255, 255, 255, 0.9));
+  border: 1px solid rgba(0, 80, 117, 0.12);
 }
 
 .deposit-card__label {
@@ -1861,19 +1861,19 @@ button:disabled {
 }
 
 .slot-chip:hover span {
-  border-color: rgba(15, 93, 131, 0.4);
+  border-color: rgba(0, 80, 117, 0.4);
   transform: translateY(-1px);
 }
 
 .slot-chip input:focus-visible + span {
-  box-shadow: 0 0 0 4px rgba(15, 93, 131, 0.14);
+  box-shadow: 0 0 0 4px rgba(0, 80, 117, 0.14);
 }
 
 .slot-chip input:checked + span {
   background: var(--brand-coral);
   border-color: var(--brand-coral);
   color: white;
-  box-shadow: 0 10px 20px rgba(255, 91, 58, 0.2);
+  box-shadow: 0 10px 20px rgba(255, 94, 55, 0.2);
 }
 
 .booking-summary {
@@ -1954,8 +1954,29 @@ button:disabled {
 }
 
 .status-card {
+  position: relative;
   display: grid;
   gap: 8px;
+  overflow: hidden;
+}
+
+/* Barra superior de color según el estado: verde cuando el turno quedó confirmado. */
+.status-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: var(--brand-ocean);
+}
+
+.status-card--confirmed::before,
+.status-card--reserved::before {
+  background: var(--brand-green);
+}
+
+.status-card--expired::before,
+.status-card--cancelled::before {
+  background: var(--danger);
 }
 
 .status-card h1 {
@@ -1973,13 +1994,24 @@ button:disabled {
   border-radius: 20px;
   font-size: 1.6rem;
   font-weight: 900;
-  background: rgba(15, 93, 131, 0.1);
+  background: rgba(0, 80, 117, 0.1);
   color: var(--brand-ocean);
+}
+
+/* El rótulo acompaña el color del estado, no siempre el coral de acción. */
+.status-card--confirmed .eyebrow,
+.status-card--reserved .eyebrow {
+  color: var(--brand-green);
+}
+
+.status-card--expired .eyebrow,
+.status-card--cancelled .eyebrow {
+  color: var(--danger);
 }
 
 .status-card--confirmed .status-icon,
 .status-card--reserved .status-icon {
-  background: rgba(31, 122, 79, 0.12);
+  background: rgba(0, 99, 32, 0.12);
   color: var(--success);
 }
 
@@ -2101,25 +2133,25 @@ button:disabled {
 }
 
 .pay-ok {
-  background: rgba(31, 122, 79, 0.12);
+  background: rgba(0, 99, 32, 0.12);
   color: var(--success);
 }
 
 .pay-waiting {
-  background: rgba(15, 93, 131, 0.1);
+  background: rgba(0, 80, 117, 0.1);
   color: var(--brand-ocean);
 }
 
 .notif-sent,
 .pay-status-approved {
-  background: rgba(31, 122, 79, 0.12);
+  background: rgba(0, 99, 32, 0.12);
   color: var(--success);
 }
 
 .notif-pending,
 .pay-status-pending,
 .pay-status-in_process {
-  background: rgba(15, 93, 131, 0.1);
+  background: rgba(0, 80, 117, 0.1);
   color: var(--brand-ocean);
 }
 
@@ -2234,7 +2266,7 @@ button:disabled {
 }
 
 .weekday-chip input:focus-visible + span {
-  box-shadow: 0 0 0 4px rgba(15, 93, 131, 0.14);
+  box-shadow: 0 0 0 4px rgba(0, 80, 117, 0.14);
 }
 
 .metrics-filter {
@@ -2274,7 +2306,7 @@ button:disabled {
   width: 100%;
   min-height: 2px;
   border-radius: 6px 6px 2px 2px;
-  background: linear-gradient(180deg, var(--brand-coral), rgba(255, 91, 58, 0.55));
+  background: linear-gradient(180deg, var(--brand-coral), rgba(255, 94, 55, 0.55));
 }
 
 .day-bars-axis {
@@ -2305,7 +2337,7 @@ button:disabled {
 }
 
 a.section-pill:hover {
-  background: rgba(255, 91, 58, 0.14);
+  background: rgba(255, 94, 55, 0.14);
 }
 
 @media (max-width: 1280px) {
