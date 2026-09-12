@@ -764,6 +764,8 @@ button:disabled {
 
 .hero-visual {
   position: relative;
+  /* Grid para que el contenido estire hasta el alto de la tarjeta y el pie quede abajo. */
+  display: grid;
   flex: 1;
   min-height: 320px;
   padding: 34px;
@@ -794,7 +796,6 @@ button:disabled {
   display: grid;
   gap: 18px;
   align-content: space-between;
-  min-height: 100%;
 }
 
 .hero-brand {
@@ -809,35 +810,6 @@ button:disabled {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.7);
-}
-
-.hero-visual-copy {
-  max-width: 420px;
-}
-
-.hero-visual-copy h2 {
-  color: white;
-  font-size: clamp(2.05rem, 2.8vw, 3rem);
-  line-height: 1;
-  margin-bottom: 0;
-}
-
-.hero-highlights {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.hero-highlights span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  font-size: 0.84rem;
-  font-weight: 700;
 }
 
 .hero-local-accent {
@@ -2428,10 +2400,6 @@ a.section-pill:hover {
     height: 96px;
     right: -40px;
     top: -40px;
-  }
-
-  .hero-visual-copy {
-    padding-right: 28px;
   }
 
   .sidebar-nav {
