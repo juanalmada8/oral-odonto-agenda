@@ -51,7 +51,13 @@ class Settings(BaseSettings):
     # Clinic identity shown to patients (emails, WhatsApp, booking pages).
     clinic_name: str = "ORAL odontología familiar"
     clinic_address: str | None = None
+    clinic_city: str = "General Belgrano, Buenos Aires"
     clinic_phone: str | None = None
+    # Free text shown on the booking page, e.g. "Lunes a viernes de 9 a 19".
+    clinic_hours: str | None = None
+    clinic_whatsapp: str | None = None  # E.164, opens wa.me
+    clinic_instagram: str | None = None  # handle without @
+    clinic_maps_url: str | None = None
     # Absolute URL where the site is reachable; used for payment callbacks and links in messages.
     public_base_url: str = "http://localhost:8000"
 

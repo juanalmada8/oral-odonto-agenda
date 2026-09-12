@@ -14,6 +14,15 @@ y versionado semántico.
 
 ## [Unreleased]
 
+### Changed
+- Hero de la reserva: texto principal más marcado, datos reales del consultorio (dirección y
+  ubicación configurables) y tarjeta con el logo de la marca, en lugar de frases genéricas.
+- Los archivos estáticos se sirven con versión en la URL, así un deploy nuevo no queda con el CSS
+  viejo en la caché del navegador.
+
+### Fixed
+- La variante blanca del logo tenía fondo negro sólido: se generó una versión transparente y liviana.
+
 ## [0.2.0] - 2026-09-11
 
 ### Added — Infraestructura, CI/CD y operación

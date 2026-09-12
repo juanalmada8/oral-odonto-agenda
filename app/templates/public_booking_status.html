@@ -1,4 +1,4 @@
-{% set brand_logo = request.url_for('static', path='brand/oral-logo-blue-cropped.png') %}
+{% set brand_logo = asset_url('brand/oral-logo-blue-cropped.png') %}
 {% set status = appointment.status.value %}
 {% set professional_name = appointment.professional.first_name ~ ' ' ~ appointment.professional.last_name %}
 <!DOCTYPE html>
@@ -9,7 +9,7 @@
     <meta name="robots" content="noindex" />
     <title>ORAL | Tu turno</title>
     <link rel="icon" type="image/png" href="{{ brand_logo }}" />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="{{ asset_url('styles.css') }}" />
   </head>
   <body class="public-body">
     <div class="public-shell status-shell">

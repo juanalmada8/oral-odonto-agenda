@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from app import __version__
 from app.core.config import get_settings
 from app.core.enums import (
     APPOINTMENT_STATUS_LABELS,
@@ -24,7 +25,16 @@ from app.utils.formatting import DAY_LABELS, format_long_date, format_money, for
 from app.utils.validation import format_phone_for_display
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+
+def asset_url(path: str) -> str:
+    """Static URL with a cache-busting suffix: app version in production, file mtime while developing."""
+    if get_settings().is_production:
+        return f"/static/{path}?v={__version__}"
+    file = STATIC_DIR / path
+    return f"/static/{path}?v={int(file.stat().st_mtime) if file.exists() else 0}"
 
 
 def status_label(status: AppointmentStatus | PaymentStatus | str | None) -> str:
@@ -44,6 +54,7 @@ templates.env.filters["phone"] = format_phone_for_display
 templates.env.filters["role_label"] = lambda role: ROLE_LABELS.get(role, str(role))
 templates.env.filters["percent"] = lambda value: "—" if value is None else f"{value * 100:.0f}%"
 templates.env.globals["settings"] = get_settings()
+templates.env.globals["asset_url"] = asset_url
 
 
 def redirect_with_message(

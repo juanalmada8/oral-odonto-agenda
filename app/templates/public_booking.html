@@ -1,4 +1,5 @@
-{% set brand_logo = request.url_for('static', path='brand/oral-logo-blue-cropped.png') %}
+{% set brand_logo = asset_url('brand/oral-logo-blue-cropped.png') %}
+{% set brand_logo_light = asset_url('brand/oral-logo-white.png') %}
 <!DOCTYPE html>
 <html lang="es">
   <head>
@@ -7,7 +8,7 @@
     <meta name="description" content="Reservá tu turno odontológico online en {{ settings.clinic_name }}." />
     <title>ORAL | Reserva de turnos</title>
     <link rel="icon" type="image/png" href="{{ brand_logo }}" />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="{{ asset_url('styles.css') }}" />
   </head>
   <body class="public-body">
     <div class="public-shell">
@@ -19,31 +20,39 @@
 
       <header class="hero">
         <div class="hero-copy">
+          <span class="eyebrow">{{ settings.clinic_city }}</span>
           <h1>Reservá tu turno</h1>
-          <p class="muted">
-            Elegí profesional, día y horario. {% if deposit_amount or not selected_professional %}Confirmás con una seña online por Mercado Pago{% else %}Te confirmamos por email{% endif %} y te recordamos el turno por WhatsApp.
+          <p class="hero-lead">
+            Elegí profesional, día y horario. Confirmás con una seña online y te recordamos el turno por WhatsApp.
           </p>
           <div class="hero-actions">
-            <a class="hero-scroll-button" href="#booking-flow" data-scroll-target="#booking-flow">Agendar consulta</a>
+            <a class="hero-scroll-button" href="#booking-flow" data-scroll-target="#booking-flow">Elegir horario</a>
+            {% if settings.clinic_whatsapp %}
+            <a class="hero-secondary" href="https://wa.me/{{ settings.clinic_whatsapp | replace('+', '') }}" target="_blank" rel="noopener">Escribinos por WhatsApp</a>
+            {% endif %}
           </div>
+          <dl class="hero-facts">
+            {% if settings.clinic_hours %}
+            <div><dt>Atención</dt><dd>{{ settings.clinic_hours }}</dd></div>
+            {% endif %}
+            {% if settings.clinic_phone %}
+            <div><dt>Teléfono</dt><dd>{{ settings.clinic_phone }}</dd></div>
+            {% endif %}
+          </dl>
         </div>
 
-        <div class="hero-visual">
+        <aside class="hero-visual">
           <div class="hero-visual-inner">
-            <div class="hero-kicker">ORAL odontología familiar</div>
-            <div class="hero-visual-copy">
-              <h2>Reserva online</h2>
-              <p>Disponibilidad real por profesional. El horario queda tuyo apenas se acredita la seña.</p>
+            <img class="hero-brand" src="{{ brand_logo_light }}" alt="{{ settings.clinic_name }}" />
+            {% if settings.clinic_address %}
+            <div class="hero-place">
+              {% if settings.clinic_maps_url %}
+              <a href="{{ settings.clinic_maps_url }}" target="_blank" rel="noopener">{{ settings.clinic_address }}</a>
+              {% else %}<strong>{{ settings.clinic_address }}</strong>{% endif %}
             </div>
-            <div class="hero-highlights">
-              <span>Pago seguro con Mercado Pago</span>
-              <span>Recordatorio por WhatsApp</span>
-            </div>
-            <div class="hero-local-accent">
-              <span class="brand-accent">Belgrano · Buenos Aires</span>
-            </div>
+            {% endif %}
           </div>
-        </div>
+        </aside>
       </header>
 
       <section id="booking-flow" class="booking-section" data-reveal>
