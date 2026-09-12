@@ -17,6 +17,8 @@ y versionado semántico.
 ### Changed
 - Identidad visual alineada a las piezas reales de la marca: azul `#005075` (el del logo), verde
   `#006320`, celeste `#d5ecfc`, coral `#ff5e37`, rosa y lima. Antes el azul del sitio no coincidía.
+- El verde de la marca pasa a ser el color de "confirmado" (turnos, señas acreditadas, barra superior
+  de la página del turno y del email de confirmación) y el celeste el de las superficies de datos.
 - Tipografías propias servidas desde la app (Anton para títulos grandes, Mulish como reemplazo libre
   de Avenir Next, que solo existe en Mac y iPhone): la web se ve igual en Android y Windows.
 - Hero de la reserva: texto principal más marcado, datos reales del consultorio (dirección y
