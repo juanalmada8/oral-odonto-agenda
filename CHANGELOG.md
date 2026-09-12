@@ -15,6 +15,10 @@ y versionado semántico.
 ## [Unreleased]
 
 ### Changed
+- Identidad visual alineada a las piezas reales de la marca: azul `#005075` (el del logo), verde
+  `#006320`, celeste `#d5ecfc`, coral `#ff5e37`, rosa y lima. Antes el azul del sitio no coincidía.
+- Tipografías propias servidas desde la app (Anton para títulos grandes, Mulish como reemplazo libre
+  de Avenir Next, que solo existe en Mac y iPhone): la web se ve igual en Android y Windows.
 - Hero de la reserva: texto principal más marcado, datos reales del consultorio (dirección y
   ubicación configurables) y tarjeta con el logo de la marca, en lugar de frases genéricas.
 - Los archivos estáticos se sirven con versión en la URL, así un deploy nuevo no queda con el CSS

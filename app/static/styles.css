@@ -1,10 +1,57 @@
+/* Tipografías propias: se sirven desde la app, sin pedirle nada a Google en cada visita.
+   Anton para titulares (equivale a la condensada de las piezas de marca) y Mulish como
+   reemplazo libre de Avenir Next, que solo existe en Mac y iPhone. */
+@font-face {
+  font-family: "Anton";
+  src: url("/static/fonts/anton-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mulish";
+  src: url("/static/fonts/mulish-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mulish";
+  src: url("/static/fonts/mulish-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mulish";
+  src: url("/static/fonts/mulish-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mulish";
+  src: url("/static/fonts/mulish-800.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --brand-coral: #ff5b3a;
-  --brand-ocean: #0f5d83;
-  --brand-ocean-deep: #0c4663;
-  --brand-sky: #b8d2e8;
-  --brand-pink: #efc0f1;
-  --brand-lime: #deef3d;
+  /* Paleta tomada de las piezas reales de la marca (posteos y stories). */
+  --brand-coral: #ff5e37;
+  --brand-ocean: #005075;
+  --brand-ocean-deep: #003b57;
+  --brand-green: #006320;
+  --brand-sky: #d5ecfc;
+  --brand-sky-deep: #96bada;
+  --brand-sage: #8fabac;
+  --brand-pink: #ffc2fd;
+  --brand-lime: #e1d641;
   --bg: #f8f6f1;
   --bg-soft: #fffdf8;
   --surface: rgba(255, 255, 255, 0.94);
@@ -13,7 +60,7 @@
   --surface-border: rgba(15, 35, 51, 0.08);
   --text: #112433;
   --muted: #66717a;
-  --success: #1f7a4f;
+  --success: #006320;
   --warning: #b87b22;
   --danger: #bf4b4b;
   --shadow-soft: 0 30px 80px rgba(16, 31, 45, 0.08);
@@ -22,8 +69,8 @@
   --radius-lg: 24px;
   --radius-md: 18px;
   --radius-sm: 12px;
-  --font-ui: "Avenir Next", "Helvetica Neue", "Segoe UI", sans-serif;
-  --font-brand: "Nimpkish ED bold", "Nimpkish ED", "Nimpkish", "Avenir Next", sans-serif;
+  --font-ui: "Avenir Next", "Mulish", "Helvetica Neue", "Segoe UI", sans-serif;
+  --font-display: "Anton", "Avenir Next", "Mulish", "Helvetica Neue", sans-serif;
 }
 
 * {
@@ -64,8 +111,21 @@ h2,
 h3 {
   font-family: var(--font-ui);
   font-weight: 800;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.035em;
   color: var(--text);
+}
+
+/* La tipografía condensada de la marca se reserva para los títulos grandes, como en las piezas
+   de redes; los títulos de tarjetas y tablas siguen en la tipográfica de texto. */
+h1,
+.hero-visual-copy h2,
+.booking-section-head h2,
+.status-card h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.04;
+  text-transform: uppercase;
 }
 
 p {
