@@ -646,7 +646,7 @@ button:disabled {
   justify-content: space-between;
   gap: 34px;
   align-items: center;
-  min-height: min(560px, calc(100vh - 200px));
+  min-height: min(620px, calc(100vh - 170px));
   margin-bottom: 18px;
   padding: 12px 0 28px;
 }
@@ -750,8 +750,8 @@ button:disabled {
 
 .hero-visual {
   position: relative;
-  flex: 0 1 440px;
-  min-height: 240px;
+  flex: 1;
+  min-height: 320px;
   padding: 34px;
   border-radius: var(--radius-xl);
   background: linear-gradient(135deg, var(--brand-ocean), var(--brand-ocean-deep));
@@ -779,34 +779,14 @@ button:disabled {
   z-index: 1;
   display: grid;
   gap: 18px;
-  align-content: center;
+  align-content: space-between;
   min-height: 100%;
 }
 
 .hero-brand {
   display: block;
-  width: min(100%, 210px);
+  width: min(100%, 264px);
   height: auto;
-}
-
-.hero-place {
-  display: grid;
-  gap: 2px;
-  color: rgba(255, 255, 255, 0.86);
-}
-
-.hero-place a,
-.hero-place strong {
-  font-size: 1.45rem;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: white;
-}
-
-.hero-place a {
-  text-decoration: underline;
-  text-decoration-color: rgba(255, 255, 255, 0.4);
-  text-underline-offset: 4px;
 }
 
 .hero-kicker {
@@ -2393,19 +2373,13 @@ a.section-pill:hover {
   }
 
   .hero-visual {
-    /* In column direction the flex-basis would become the height. */
     flex: 0 0 auto;
     min-height: 0;
-    padding: 24px;
+    padding: 26px;
   }
 
   .hero-brand {
-    width: min(60%, 150px);
-  }
-
-  .hero-place a,
-  .hero-place strong {
-    font-size: 1.2rem;
+    width: min(64%, 176px);
   }
 
   .hero-visual::before {

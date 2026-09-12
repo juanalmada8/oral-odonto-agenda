@@ -44,13 +44,15 @@
         <aside class="hero-visual">
           <div class="hero-visual-inner">
             <img class="hero-brand" src="{{ brand_logo_light }}" alt="{{ settings.clinic_name }}" />
-            {% if settings.clinic_address %}
-            <div class="hero-place">
-              {% if settings.clinic_maps_url %}
-              <a href="{{ settings.clinic_maps_url }}" target="_blank" rel="noopener">{{ settings.clinic_address }}</a>
-              {% else %}<strong>{{ settings.clinic_address }}</strong>{% endif %}
+            <div class="hero-visual-copy">
+              <h2>Reserva online</h2>
+              <p>Elegí el profesional y el horario que mejor te quede. Disponibilidad real, actualizada al momento.</p>
             </div>
-            {% endif %}
+            <div class="hero-local-accent">
+              <span class="brand-accent">
+                {% if settings.clinic_address %}{{ settings.clinic_address }} · {% endif %}{{ settings.clinic_city }}
+              </span>
+            </div>
           </div>
         </aside>
       </header>
