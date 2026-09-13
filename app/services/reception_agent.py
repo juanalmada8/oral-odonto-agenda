@@ -45,6 +45,8 @@ class ReceptionAgent:
     def update_patient(self, db: Session, patient_id: int, payload: PatientUpdate, actor: str = "reception_agent") -> Patient:
         patient = self.get_patient(db, patient_id)
         changes = payload.model_dump(exclude_unset=True)
+        # La auditoría va a una columna JSON: fechas y Decimal tienen que ir como texto.
+        audited = payload.model_dump(exclude_unset=True, mode="json")
         if "dni" in changes:
             self._assert_unique_dni(
                 db,
@@ -60,7 +62,7 @@ class ReceptionAgent:
             entity_id=str(patient.id),
             actor=actor,
             description="Patient updated",
-            details=changes,
+            details=audited,
         )
         db.commit()
         db.refresh(patient)

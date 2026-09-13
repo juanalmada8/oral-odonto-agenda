@@ -25,9 +25,13 @@
           {% if message %}<div class="alert alert-success" role="status">{{ message }}</div>{% endif %}
 
           {% if status == 'pending_payment' %}
-            <div class="status-icon" aria-hidden="true">⏱</div>
-            <span class="eyebrow">Paso final</span>
-            <h1>Pagá la seña para confirmar</h1>
+            <div class="status-head">
+              <div class="status-icon" aria-hidden="true">⏱</div>
+              <div>
+                <span class="eyebrow">Paso final</span>
+                <h1>Pagá la seña para confirmar</h1>
+              </div>
+            </div>
             {% if seconds_left > 0 %}
             <p class="status-lead">
               Te guardamos el horario por
@@ -41,40 +45,60 @@
             <div class="alert alert-error">El pago fue rechazado. Probá con otra tarjeta o medio de pago.</div>
             {% endif %}
           {% elif status == 'confirmed' %}
-            <div class="status-icon" aria-hidden="true">✓</div>
-            <span class="eyebrow">Turno confirmado</span>
-            <h1>¡Te esperamos, {{ appointment.patient.first_name }}!</h1>
+            <div class="status-head">
+              <div class="status-icon" aria-hidden="true">✓</div>
+              <div>
+                <span class="eyebrow">Turno confirmado</span>
+                <h1>¡Te esperamos, {{ appointment.patient.first_name }}!</h1>
+              </div>
+            </div>
             <p class="status-lead">
               {% if payment and payment.status.value == 'approved' %}Recibimos tu seña. {% endif %}Te enviamos la confirmación a
               <strong>{{ appointment.notification_email | mask_email }}</strong> y te vamos a recordar el turno por WhatsApp.
             </p>
           {% elif status == 'reserved' %}
-            <div class="status-icon" aria-hidden="true">✓</div>
-            <span class="eyebrow">Turno reservado</span>
-            <h1>Tu turno quedó reservado</h1>
+            <div class="status-head">
+              <div class="status-icon" aria-hidden="true">✓</div>
+              <div>
+                <span class="eyebrow">Turno reservado</span>
+                <h1>Tu turno quedó reservado</h1>
+              </div>
+            </div>
             <p class="status-lead">Te enviamos los detalles a <strong>{{ appointment.notification_email | mask_email }}</strong>.</p>
           {% elif status == 'expired' %}
-            <div class="status-icon" aria-hidden="true">!</div>
-            <span class="eyebrow">Reserva vencida</span>
-            <h1>El horario se liberó</h1>
+            <div class="status-head">
+              <div class="status-icon" aria-hidden="true">!</div>
+              <div>
+                <span class="eyebrow">Reserva vencida</span>
+                <h1>El horario se liberó</h1>
+              </div>
+            </div>
             {% if requires_refund %}
             <p class="status-lead">Recibimos tu pago después de que venciera la reserva y el horario ya no está disponible. El consultorio se va a comunicar con vos para reprogramar o devolverte la seña.</p>
             {% else %}
             <p class="status-lead">No se acreditó la seña a tiempo. Podés reservar otro horario cuando quieras.</p>
             {% endif %}
           {% elif status == 'cancelled' %}
-            <div class="status-icon" aria-hidden="true">✕</div>
-            <span class="eyebrow">Turno cancelado</span>
-            <h1>Este turno fue cancelado</h1>
+            <div class="status-head">
+              <div class="status-icon" aria-hidden="true">✕</div>
+              <div>
+                <span class="eyebrow">Turno cancelado</span>
+                <h1>Este turno fue cancelado</h1>
+              </div>
+            </div>
             {% if requires_refund %}
             <p class="status-lead">El consultorio se va a comunicar con vos por la seña abonada.</p>
             {% else %}
             <p class="status-lead">Si fue un error, reservá un nuevo horario o comunicate con el consultorio.</p>
             {% endif %}
           {% else %}
-            <div class="status-icon" aria-hidden="true">✓</div>
-            <span class="eyebrow">Turno</span>
-            <h1>{{ appointment.status | status_label }}</h1>
+            <div class="status-head">
+              <div class="status-icon" aria-hidden="true">✓</div>
+              <div>
+                <span class="eyebrow">Turno</span>
+                <h1>{{ appointment.status | status_label }}</h1>
+              </div>
+            </div>
           {% endif %}
 
           <dl class="status-details">

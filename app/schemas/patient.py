@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.schemas.common import TimestampedModel
@@ -11,6 +13,14 @@ class PatientBase(BaseModel):
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=40)
     observations: str | None = Field(default=None, max_length=1000)
+    # Ficha clínica: la carga el consultorio a mano, no la reserva online.
+    birth_date: date | None = None
+    address: str | None = Field(default=None, max_length=180)
+    city: str | None = Field(default=None, max_length=80)
+    health_insurance: str | None = Field(default=None, max_length=120)
+    health_insurance_number: str | None = Field(default=None, max_length=60)
+    emergency_contact: str | None = Field(default=None, max_length=160)
+    medical_notes: str | None = Field(default=None, max_length=2000)
 
     @field_validator("dni")
     @classmethod
@@ -50,6 +60,15 @@ class PatientUpdate(BaseModel):
     phone: str | None = Field(default=None, max_length=40)
     observations: str | None = Field(default=None, max_length=1000)
     is_active: bool | None = None
+    # Ficha clínica: la carga el consultorio a mano, no la reserva online.
+    birth_date: date | None = None
+    address: str | None = Field(default=None, max_length=180)
+    city: str | None = Field(default=None, max_length=80)
+    health_insurance: str | None = Field(default=None, max_length=120)
+    health_insurance_number: str | None = Field(default=None, max_length=60)
+    emergency_contact: str | None = Field(default=None, max_length=160)
+    medical_notes: str | None = Field(default=None, max_length=2000)
+
 
     @field_validator("dni")
     @classmethod
@@ -89,3 +108,10 @@ class PatientRead(TimestampedModel):
     phone: str | None
     observations: str | None
     is_active: bool
+    birth_date: date | None
+    address: str | None
+    city: str | None
+    health_insurance: str | None
+    health_insurance_number: str | None
+    emergency_contact: str | None
+    medical_notes: str | None

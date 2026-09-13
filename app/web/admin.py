@@ -45,6 +45,7 @@ from app.services.professional_service import ProfessionalService
 from app.services.reception_agent import ReceptionAgent
 from app.services.schedule_agent import ALLOWED_TRANSITIONS, ScheduleAgent
 from app.tasks.notifications import dispatch_due_notifications
+from app.utils.formatting import format_money
 from app.utils.validation import parse_money
 from app.web.common import (
     active_professionals,
@@ -114,6 +115,38 @@ def _parse_date(value: str | None, default: date) -> date:
         return date.fromisoformat(value) if value else default
     except ValueError:
         return default
+
+
+WEEKDAY_SHORT = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+
+
+def _summarize_availability(rows: list) -> list[dict]:
+    """Collapse the day-by-day windows into the handful of schedules they actually repeat.
+
+    Loading two months of recurring availability produces 40+ identical rows; the clinic
+    thinks in "lunes a viernes de 9 a 13", so that is what the panel shows.
+    """
+    by_shift = defaultdict(list)
+    for row in rows:
+        by_shift[(row.start_time, row.end_time, row.slot_duration_minutes)].append(row)
+
+    summaries = []
+    for (start_time, end_time, slot_minutes), shift_rows in by_shift.items():
+        shift_rows.sort(key=lambda row: row.availability_date)
+        weekdays = sorted({row.availability_date.weekday() for row in shift_rows})
+        summaries.append(
+            {
+                "start_time": start_time,
+                "end_time": end_time,
+                "slot_minutes": slot_minutes,
+                "weekdays": ", ".join(WEEKDAY_SHORT[day] for day in weekdays),
+                "first_date": shift_rows[0].availability_date,
+                "last_date": shift_rows[-1].availability_date,
+                "rows": shift_rows,
+            }
+        )
+    summaries.sort(key=lambda summary: (summary["start_time"], summary["first_date"]))
+    return summaries
 
 
 def _parse_int(value: str | None) -> int | None:
@@ -318,16 +351,18 @@ def create_manual_appointment(
     duration_minutes: int = Form(30),
     reason: str = Form(""),
     notes: str = Form(""),
+    cash_deposit: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
     reception_agent: ReceptionAgent = Depends(get_reception_agent),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    payment_service: PaymentService = Depends(get_payment_service),
 ):
     require_roles(current_user, *STAFF)
     try:
         selected_dt = datetime.fromisoformat(starts_at)
-        schedule_agent.create_appointment(
+        appointment = schedule_agent.create_appointment(
             db,
             AppointmentCreate(
                 patient_id=patient_id,
@@ -342,13 +377,20 @@ def create_manual_appointment(
             followup_agent=followup_agent,
             actor=current_user.username,
         )
+        deposit = parse_money(cash_deposit)
+        if deposit is not None:
+            payment_service.register_cash_deposit(db, appointment, deposit, actor=current_user.username)
+            db.commit()
     except Exception as exc:
         db.rollback()
         return redirect_with_message("/app/appointments", error=user_facing_message(exc))
     background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    message = "Turno creado. Le enviamos la confirmación al paciente."
+    if deposit is not None:
+        message = f"Turno creado con seña de {format_money(deposit)} en efectivo. Le enviamos la confirmación."
     return redirect_with_message(
         f"/app/appointments?selected_date={selected_dt.date().isoformat()}",
-        message="Turno creado. Le enviamos la confirmación al paciente.",
+        message=message,
     )
 
 
@@ -551,6 +593,13 @@ def edit_patient_submit(
     phone: str = Form(""),
     observations: str = Form(""),
     is_active: bool = Form(False),
+    birth_date: str = Form(""),
+    address: str = Form(""),
+    city: str = Form(""),
+    health_insurance: str = Form(""),
+    health_insurance_number: str = Form(""),
+    emergency_contact: str = Form(""),
+    medical_notes: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     reception_agent: ReceptionAgent = Depends(get_reception_agent),
@@ -568,6 +617,13 @@ def edit_patient_submit(
                 phone=phone or None,
                 observations=observations or None,
                 is_active=is_active,
+                birth_date=date.fromisoformat(birth_date) if birth_date else None,
+                address=address or None,
+                city=city or None,
+                health_insurance=health_insurance or None,
+                health_insurance_number=health_insurance_number or None,
+                emergency_contact=emergency_contact or None,
+                medical_notes=medical_notes or None,
             ),
             actor=current_user.username,
         )
@@ -737,6 +793,7 @@ def availability_page(
     grouped_windows = defaultdict(list)
     for row in schedule_agent.list_availability_windows(db, professional_id=scope, date_from=clock.today()):
         grouped_windows[row.professional_id].append(row)
+    schedules = {pid: _summarize_availability(rows) for pid, rows in grouped_windows.items()}
     return render_admin(
         request,
         template_name="admin_availability.html",
@@ -746,6 +803,7 @@ def availability_page(
         active_page="availability",
         professionals=professionals,
         grouped_windows=grouped_windows,
+        schedules=schedules,
         today=clock.today().isoformat(),
         default_until=(clock.today() + timedelta(days=28)).isoformat(),
     )

@@ -79,10 +79,15 @@
         <input name="reason" placeholder="Control, limpieza, urgencia…" />
       </label>
       <label class="field">
+        <span class="field-label">Seña cobrada en efectivo</span>
+        <input name="cash_deposit" inputmode="numeric" placeholder="Opcional — ej: 10000" />
+        <span class="field-hint">Dejalo vacío si no cobraste seña. Si ponés un monto, el turno queda confirmado.</span>
+      </label>
+      <label class="field">
         <span class="field-label">Notas internas</span>
         <textarea name="notes" placeholder="Opcional"></textarea>
       </label>
-      <p class="muted small" id="manual-slot-hint">Los turnos manuales no piden seña y se confirman por email al paciente.</p>
+      <p class="muted small" id="manual-slot-hint">El turno manual no cobra online: se confirma por email al paciente.</p>
       <button type="submit" id="manual-submit" disabled>Guardar turno</button>
     </form>
   </details>
@@ -90,7 +95,7 @@
 
   <p class="muted small table-caption">Mostrando {{ stats.shown }} de {{ stats.total }} turno(s).</p>
   <div class="table-wrap">
-    <table class="data-table">
+    <table class="data-table data-table--stacked">
       <thead>
         <tr>
           <th>Hora</th>
@@ -104,8 +109,8 @@
       <tbody>
         {% for appointment in appointments %}
         <tr>
-          <td><strong>{{ appointment.starts_at.strftime("%H:%M") }}</strong><div class="muted small">{{ appointment.duration_minutes }} min</div></td>
-          <td>
+          <td data-label="Hora"><strong>{{ appointment.starts_at.strftime("%H:%M") }}</strong><div class="muted small">{{ appointment.duration_minutes }} min</div></td>
+          <td data-label="Paciente">
             <strong>{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}</strong>
             <div class="muted small">DNI {{ appointment.patient.dni }}</div>
             {% if appointment.notification_phone or appointment.notification_email %}
@@ -113,14 +118,14 @@
             {% endif %}
             {% if appointment.reason %}<div class="small">{{ appointment.reason }}</div>{% endif %}
           </td>
-          {% if not is_professional %}<td>{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>{% endif %}
-          <td>
+          {% if not is_professional %}<td data-label="Profesional">{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>{% endif %}
+          <td data-label="Estado">
             {{ status_badge(appointment.status) }}
             {% if appointment.attendance_confirmed_at %}<div class="muted small attendance-ok">✓ Confirmó por WhatsApp</div>{% endif %}
             <div class="muted small">{{ 'Online' if appointment.created_by == 'public_booking' else 'Consultorio' }}</div>
           </td>
-          <td>{{ payment_badge(appointment) }}</td>
-          <td>
+          <td data-label="Seña">{{ payment_badge(appointment) }}</td>
+          <td data-label="Acciones">
             <div class="row-actions">
               {% if not is_professional %}
               <a class="quick-link compact" href="/app/appointments/{{ appointment.id }}/edit">Editar</a>
