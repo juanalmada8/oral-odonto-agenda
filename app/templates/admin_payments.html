@@ -5,7 +5,8 @@
 {% if refund_count %}
 <div class="alert alert-warning">
   {{ refund_count }} seña(s) cobradas corresponden a turnos vencidos o cancelados.
-  Devolvelas desde Mercado Pago o reprogramá el turno con el paciente.
+  Devolvelas desde Mercado Pago (se marcan solas al recibir el aviso) o, si las devolvés por
+  otro medio, dejalo asentado con «Marcar devuelta».
   {% if filter != 'refund' %}<a class="inline-link" href="/app/payments?filter=refund">Ver solo esas</a>{% endif %}
 </div>
 {% endif %}
@@ -24,7 +25,7 @@
   <div class="table-wrap">
     <table class="data-table">
       <thead>
-        <tr><th>Pago</th><th>Turno</th><th>Paciente</th><th>Monto</th><th>Estado</th><th>Turno</th></tr>
+        <tr><th>Pago</th><th>Turno</th><th>Paciente</th><th>Monto</th><th>Estado del pago</th><th>Estado del turno</th><th>Devolución</th></tr>
       </thead>
       <tbody>
         {% for payment in payments %}
@@ -39,10 +40,28 @@
           <td>{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}<div class="muted small">DNI {{ appointment.patient.dni }}</div></td>
           <td><strong>{{ payment.amount | money }}</strong></td>
           <td><span class="status-badge pay-status-{{ payment.status.value }}">{{ payment.status | status_label }}</span>{% if payment.status_detail %}<div class="muted small">{{ payment.status_detail }}</div>{% endif %}</td>
-          <td>{{ status_badge(appointment.status) }}{% if payment.id in refund_ids %}<div class="small refund-flag">Devolver seña</div>{% endif %}</td>
+          <td>{{ status_badge(appointment.status) }}</td>
+          <td>
+            {% if payment.id in refund_ids %}
+            <div class="small refund-flag">Pendiente de devolución</div>
+            <form
+              method="post"
+              action="/app/payments/{{ payment.id }}/refund"
+              class="js-confirm-form"
+              data-confirm-title="Marcar seña como devuelta"
+              data-confirm-message="Confirmá que ya le devolviste {{ payment.amount | money }} a {{ appointment.patient.first_name }} {{ appointment.patient.last_name }}. Esto solo lo deja asentado: no mueve plata."
+              data-confirm-accept="Ya la devolví"
+            >
+              <input type="hidden" name="return_to" value="/app/payments{{ '?filter=refund' if filter == 'refund' }}" />
+              <button class="ghost-button compact" type="submit">Marcar devuelta</button>
+            </form>
+            {% elif payment.status.value == 'refunded' %}
+            <span class="muted small">Devuelta</span>
+            {% endif %}
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="empty-row">{{ 'No hay señas para devolver.' if filter == 'refund' else 'Todavía no hay pagos.' }}</td></tr>
+        <tr><td colspan="7" class="empty-row">{{ 'No hay señas para devolver.' if filter == 'refund' else 'Todavía no hay pagos.' }}</td></tr>
         {% endfor %}
       </tbody>
     </table>

@@ -59,10 +59,12 @@ async def security_headers(request: Request, call_next):
 
 @app.exception_handler(DomainError)
 async def domain_error_handler(request: Request, exc: DomainError):
+    # 303 and not the default 307: a rejected POST must land on a GET, otherwise the browser
+    # replays the same POST against the redirect target.
     if request.url.path.startswith("/app") and exc.status_code == 401:
-        return RedirectResponse(url="/app/login")
+        return RedirectResponse(url="/app/login", status_code=303)
     if request.url.path.startswith("/app") and exc.status_code == 403:
-        return RedirectResponse(url=f"/app?error={quote(exc.detail)}")
+        return RedirectResponse(url=f"/app?error={quote(exc.detail)}", status_code=303)
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
