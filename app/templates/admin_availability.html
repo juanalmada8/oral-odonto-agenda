@@ -111,44 +111,37 @@
       </div>
       <span class="section-pill">{{ grouped_windows[professional.id] | length }} día(s)</span>
     </div>
-    <ul class="clean-list schedule-list">
-      {% for shift in schedules.get(professional.id, []) %}
-      <li class="schedule-item">
-        <div class="schedule-head">
-          <strong>{{ shift.start_time.strftime("%H:%M") }} a {{ shift.end_time.strftime("%H:%M") }}</strong>
-          <span class="muted small">{{ shift.weekdays }} · turnos de {{ shift.slot_minutes or professional.default_appointment_duration }} min</span>
-          <span class="muted small">
-            {{ shift.rows | length }} día(s), del {{ shift.first_date | short_date }} al {{ shift.last_date | short_date }}
-          </span>
-        </div>
-        <details class="schedule-days">
-          <summary>Ver días</summary>
-          <ul class="clean-list compact-list">
-            {% for row in shift.rows %}
-            <li>
-              <div>
-                <strong>{{ row.availability_date | short_date }}</strong>
-                {% if row.notes %}<div class="muted small">{{ row.notes }}</div>{% endif %}
-              </div>
-              <form
-                method="post"
-                action="/app/availability/windows/{{ row.id }}/delete"
-                class="js-confirm-form"
-                data-confirm-title="Borrar disponibilidad"
-                data-confirm-message="¿Borrar el bloque del {{ row.availability_date | long_date }}? Si tiene turnos activos no se va a poder."
-                data-confirm-accept="Borrar"
-              >
-                <button class="ghost-button compact danger" type="submit">Borrar</button>
-              </form>
-            </li>
-            {% endfor %}
-          </ul>
-        </details>
-      </li>
-      {% else %}
-      <li><span class="muted">Sin disponibilidad futura cargada.</span></li>
-      {% endfor %}
-    </ul>
+    {% for shift in schedules.get(professional.id, []) %}
+    <div class="schedule-block">
+      <p class="schedule-summary">
+        <strong>{{ shift.weekdays }}</strong> de {{ shift.start_time.strftime("%H:%M") }} a {{ shift.end_time.strftime("%H:%M") }},
+        turnos de {{ shift.slot_minutes or professional.default_appointment_duration }} min
+      </p>
+      <ul class="clean-list compact-list schedule-days">
+        {% for row in shift.rows %}
+        <li>
+          <div>
+            <strong>{{ row.availability_date | short_date }}</strong>
+            <span class="muted small">· {{ row.start_time.strftime("%H:%M") }} a {{ row.end_time.strftime("%H:%M") }}</span>
+            {% if row.notes %}<div class="muted small">{{ row.notes }}</div>{% endif %}
+          </div>
+          <form
+            method="post"
+            action="/app/availability/windows/{{ row.id }}/delete"
+            class="js-confirm-form"
+            data-confirm-title="Borrar disponibilidad"
+            data-confirm-message="¿Borrar el bloque del {{ row.availability_date | long_date }}? Si tiene turnos activos no se va a poder."
+            data-confirm-accept="Borrar"
+          >
+            <button class="ghost-button compact danger" type="submit">Borrar</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% else %}
+    <p class="muted">Sin disponibilidad futura cargada.</p>
+    {% endfor %}
   </article>
   {% else %}
   <p class="muted">No hay profesionales activos.</p>

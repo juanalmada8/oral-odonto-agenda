@@ -25,25 +25,53 @@
   "cancel": "Cancelar",
 } %}
 
-{% macro appointment_actions(appointment, actions, return_to) -%}
-{% for action in actions %}
-  {% set label = ACTION_LABELS[action] %}
-  {% if action == 'reserve' and appointment.status.value in ['cancelled', 'expired'] %}{% set label = 'Reactivar' %}{% endif %}
-  {% if action == 'reserve' and appointment.status.value == 'pending_payment' %}{% set label = 'Reservar sin seña' %}{% endif %}
-  {% if action == 'confirm' and appointment.status.value == 'pending_payment' %}{% set label = 'Seña cobrada' %}{% endif %}
-  <form
-    method="post"
-    action="/app/appointments/{{ appointment.id }}/status"
-    {% if action == 'cancel' %}
-    class="js-confirm-form"
-    data-confirm-title="Cancelar turno"
-    data-confirm-message="Se cancela el turno de {{ appointment.patient.first_name }} {{ appointment.patient.last_name }} del {{ appointment.starts_at | long_date }} a las {{ appointment.starts_at.strftime('%H:%M') }} y se le avisa por email."
-    data-confirm-accept="Cancelar turno"
-    {% endif %}
-  >
-    <input type="hidden" name="action" value="{{ action }}" />
-    <input type="hidden" name="return_to" value="{{ return_to }}" />
-    <button class="ghost-button compact {% if action == 'cancel' %}danger{% endif %}" type="submit">{{ label }}</button>
-  </form>
-{% endfor %}
+{% macro action_form(appointment, action, return_to, primary=False) -%}
+{% set label = ACTION_LABELS[action] %}
+{% if action == 'reserve' and appointment.status.value in ['cancelled', 'expired'] %}{% set label = 'Reactivar' %}{% endif %}
+{% if action == 'reserve' and appointment.status.value == 'pending_payment' %}{% set label = 'Reservar sin seña' %}{% endif %}
+{% if action == 'confirm' and appointment.status.value == 'pending_payment' %}{% set label = 'Seña cobrada' %}{% endif %}
+<form
+  method="post"
+  action="/app/appointments/{{ appointment.id }}/status"
+  {% if action == 'cancel' %}
+  class="js-confirm-form"
+  data-confirm-title="Cancelar turno"
+  data-confirm-message="Se cancela el turno de {{ appointment.patient.first_name }} {{ appointment.patient.last_name }} del {{ appointment.starts_at | long_date }} a las {{ appointment.starts_at.strftime('%H:%M') }} y se le avisa por email."
+  data-confirm-accept="Cancelar turno"
+  {% endif %}
+>
+  <input type="hidden" name="action" value="{{ action }}" />
+  <input type="hidden" name="return_to" value="{{ return_to }}" />
+  <button class="{{ 'primary-button compact' if primary else 'menu-item' }} {% if action == 'cancel' %}danger{% endif %}" type="submit">{{ label }}</button>
+</form>
+{%- endmacro %}
+
+{# El siguiente paso natural de cada estado. Un turno ya atendido o ausente no tiene
+   paso siguiente: lo que queda son correcciones, y esas van adentro del menú. #}
+{% set PRIMARY_ACTION = {
+  "pending_payment": "confirm",
+  "reserved": "confirm",
+  "confirmed": "complete",
+  "cancelled": "reserve",
+  "expired": "reserve",
+} %}
+
+{# La acción esperable queda a la vista; el resto vive detrás de los tres puntos,
+   para que una fila de turno no sea una pared de cinco botones. #}
+{% macro appointment_actions(appointment, actions, return_to, edit_url=None) -%}
+{% set primary = PRIMARY_ACTION.get(appointment.status.value) %}
+{% if primary not in actions %}{% set primary = none %}{% endif %}
+{% if primary %}
+{{ action_form(appointment, primary, return_to, primary=True) }}
+{% endif %}
+{% set extra = actions | reject("equalto", primary) | list %}
+{% if extra or edit_url %}
+<details class="row-menu">
+  <summary aria-label="Más acciones" title="Más acciones">⋯</summary>
+  <div class="row-menu__panel">
+    {% if edit_url %}<a class="menu-item" href="{{ edit_url }}">Editar</a>{% endif %}
+    {% for action in extra %}{{ action_form(appointment, action, return_to) }}{% endfor %}
+  </div>
+</details>
+{% endif %}
 {%- endmacro %}

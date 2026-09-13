@@ -93,7 +93,6 @@
   </details>
   {% endif %}
 
-  <p class="muted small table-caption">Mostrando {{ stats.shown }} de {{ stats.total }} turno(s).</p>
   <div class="table-wrap">
     <table class="data-table data-table--stacked">
       <thead>
@@ -127,10 +126,11 @@
           <td data-label="Seña">{{ payment_badge(appointment) }}</td>
           <td data-label="Acciones">
             <div class="row-actions">
-              {% if not is_professional %}
-              <a class="quick-link compact" href="/app/appointments/{{ appointment.id }}/edit">Editar</a>
-              {% endif %}
-              {{ appointment_actions(appointment, actions_for(appointment), '/app/appointments?' ~ filters_querystring) }}
+              {{ appointment_actions(
+                   appointment,
+                   actions_for(appointment),
+                   '/app/appointments?' ~ filters_querystring,
+                   edit_url=None if is_professional else '/app/appointments/' ~ appointment.id ~ '/edit') }}
             </div>
           </td>
         </tr>

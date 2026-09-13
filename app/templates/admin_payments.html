@@ -16,9 +16,9 @@
     <div>
       <div class="eyebrow">Mercado Pago</div>
       <h2>{{ 'Señas a devolver' if filter == 'refund' else 'Últimos pagos' }}</h2>
-      <p class="muted">
-        Proveedor: {{ 'Mercado Pago' if gateway_name == 'mercadopago' else ('Simulador local (sin cobros reales)' if gateway_name == 'simulator' else 'sin configurar') }}.
-      </p>
+      {% if gateway_name != 'mercadopago' %}
+      <p class="muted small">{{ 'Simulador local: no se cobra de verdad.' if gateway_name == 'simulator' else 'Mercado Pago sin configurar.' }}</p>
+      {% endif %}
     </div>
     {% if filter == 'refund' %}<a class="quick-link" href="/app/payments">Ver todos</a>{% endif %}
   </div>

@@ -499,3 +499,26 @@ def test_editing_a_professional_deposit_does_not_break_the_audit_log(client, db_
     assert "error" not in response.headers["location"]
     db_session.expire_all()
     assert db_session.get(Professional, clinic["laura"]).deposit_amount == Decimal("12500")
+
+
+def test_row_shows_only_the_next_step_and_hides_the_rest_in_a_menu(client, db_session, clinic):
+    """Five buttons per row were unreadable: the expected action stays out, the rest go behind ⋯."""
+    add_appointment(db_session, clinic["laura"], starts_at=datetime(2026, 3, 30, 9, 0), status=AppointmentStatus.RESERVED)
+    login(client, "admin")
+
+    page = client.get("/app/appointments?selected_date=2026-03-30").text
+
+    assert page.count('class="primary-button compact ') == 1
+    assert "Confirmar" in page
+    assert 'class="row-menu"' in page
+
+
+def test_a_finished_appointment_offers_no_primary_action(client, db_session, clinic, frozen_clock):
+    """Nothing "comes next" after Atendido: what is left are corrections, and those live in the menu."""
+    add_appointment(db_session, clinic["laura"], starts_at=datetime(2026, 3, 30, 9, 0), status=AppointmentStatus.COMPLETED)
+    login(client, "admin")
+
+    page = client.get("/app/appointments?selected_date=2026-03-30").text
+
+    assert 'class="primary-button' not in page
+    assert 'class="row-menu"' in page
