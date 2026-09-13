@@ -431,3 +431,23 @@ def test_cancel_link_is_blocked_inside_the_notice_period(client, db_session, mak
     assert "Faltan menos de 24 horas" in response.text
     db_session.expire_all()
     assert appointment.status == AppointmentStatus.CONFIRMED
+
+
+def test_confirmation_email_carries_the_logo_inside_the_message(client, db_session, make_professional, outbox):
+    """Gmail and Outlook block remote images, so a linked logo would show up broken."""
+    from email.message import EmailMessage
+
+    from app.core.config import Settings
+    from app.integrations.email import LOGO_CID, LOGO_PATH, EmailClient
+
+    confirmed_booking(client, db_session, make_professional)
+    assert f'src="cid:{LOGO_CID}"' in outbox.sent[0]["html"]
+    assert LOGO_PATH.exists()
+
+    message = EmailMessage()
+    message.set_content(outbox.sent[0]["text"])
+    message.add_alternative(outbox.sent[0]["html"], subtype="html")
+    EmailClient(Settings(smtp_host="localhost", email_from="turnos@oral.test"))._attach_logo(message)
+
+    images = [part for part in message.walk() if part.get_content_type() == "image/png"]
+    assert [part["Content-ID"] for part in images] == [f"<{LOGO_CID}>"]

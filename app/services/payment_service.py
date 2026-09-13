@@ -209,6 +209,35 @@ class PaymentService:
         )
         return list(candidates)
 
+    def register_cash_deposit(self, db: Session, appointment: Appointment, amount: Decimal, *, actor: str) -> Payment:
+        """Record a deposit collected at the desk, so the appointment counts as paid like an online one."""
+        if amount <= 0:
+            raise DomainError("La seña en efectivo tiene que ser mayor a cero.")
+        payment = Payment(
+            appointment_id=appointment.id,
+            provider="efectivo",
+            status=PaymentStatus.APPROVED,
+            amount=amount,
+            currency=self.settings.currency,
+            status_detail="cobrada_en_mostrador",
+            paid_at=clock.now(),
+        )
+        db.add(payment)
+        db.flush()
+        appointment.deposit_amount = amount
+        create_audit_log(
+            db,
+            action="payment.cash_deposit",
+            entity_name="appointment",
+            entity_id=str(appointment.id),
+            actor=actor,
+            description="Seña cobrada en efectivo en el consultorio",
+            details={"amount": str(amount)},
+        )
+        # Cobrada la seña, el turno vale lo mismo que uno pagado online.
+        self._confirm_paid_appointment(db, payment)
+        return payment
+
     def mark_refunded(self, db: Session, payment_id: int, *, actor: str) -> Payment:
         """Record a refund made outside the provider (transfer, cash at the desk).
 

@@ -1057,7 +1057,9 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 7px 10px;
+  /* Misma altura que .ghost-button para que en la fila de un turno todo quede a la misma linea. */
+  min-height: 40px;
+  padding: 8px 14px;
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 800;
@@ -1211,6 +1213,9 @@ button:disabled {
   position: sticky;
   top: 20px;
   height: calc(100vh - 40px);
+  /* Con la barra a alto fijo, en pantallas bajas el pie (usuario y Salir) quedaba cortado. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: white;
   border: none;
   background:
@@ -1263,8 +1268,10 @@ button:disabled {
 
 .sidebar-foot {
   margin-top: auto;
+  flex-shrink: 0;
   display: grid;
   gap: 10px;
+  padding-top: 8px;
 }
 
 .sidebar .muted {
@@ -1650,6 +1657,12 @@ button:disabled {
   color: var(--muted);
 }
 
+.field-hint {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .date-strip-label {
   margin-top: 22px;
 }
@@ -1906,12 +1919,28 @@ button:disabled {
   margin-bottom: 6px;
 }
 
+/* Icono al lado del titulo, no encima: ocupan la misma linea de lectura. */
+.status-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.status-head .eyebrow {
+  margin-bottom: 6px;
+}
+
+.status-head h1 {
+  margin-bottom: 0;
+}
+
 .status-icon {
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
   width: 60px;
   height: 60px;
-  margin-bottom: 8px;
   border-radius: 20px;
   font-size: 1.6rem;
   font-weight: 900;
@@ -2463,4 +2492,126 @@ a.section-pill:hover {
   .page-header h1 {
     font-size: 2.7rem;
   }
+}
+
+/* Disponibilidad: un renglón por horario repetido, con los días adentro de un desplegable. */
+.schedule-list {
+  display: grid;
+  gap: 10px;
+}
+
+.schedule-item {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+}
+
+.schedule-head {
+  display: grid;
+  gap: 2px;
+}
+
+.schedule-head strong {
+  font-size: 1.05rem;
+}
+
+.schedule-days summary {
+  cursor: pointer;
+  width: fit-content;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--brand-ocean);
+}
+
+.schedule-days .compact-list {
+  margin-top: 8px;
+}
+
+/* En teléfono la tabla de turnos deja de ser tabla: cada turno pasa a ser una tarjeta.
+   Antes había que arrastrar la tabla de costado para llegar a los botones de acción. */
+@media (max-width: 720px) {
+  .data-table--stacked,
+  .data-table--stacked tbody,
+  .data-table--stacked tr,
+  .data-table--stacked td {
+    display: block;
+    width: 100%;
+  }
+
+  .data-table--stacked thead {
+    display: none;
+  }
+
+  .data-table--stacked tr {
+    margin-bottom: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    background: var(--surface-strong);
+  }
+
+  .data-table--stacked td {
+    padding: 8px 0;
+    border: none;
+  }
+
+  .data-table--stacked td + td {
+    border-top: 1px solid var(--surface-border);
+  }
+
+  .data-table--stacked td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .data-table--stacked td[data-label="Acciones"] .row-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+  }
+
+  .data-table--stacked td[data-label="Acciones"] .row-actions form,
+  .data-table--stacked td[data-label="Acciones"] .row-actions > a {
+    width: 100%;
+  }
+
+  .data-table--stacked td[data-label="Acciones"] .row-actions button,
+  .data-table--stacked td[data-label="Acciones"] .row-actions > a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .data-table--stacked .empty-row::before {
+    content: none;
+  }
+}
+
+/* Agrupador dentro de un formulario (ej. la ficha que carga el mostrador). */
+.field-group {
+  display: grid;
+  gap: 14px;
+  margin: 4px 0;
+  padding: 18px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+}
+
+.field-group legend {
+  padding: 0 8px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: var(--brand-ocean);
+}
+
+.field-group > .field-hint {
+  margin: 0;
 }

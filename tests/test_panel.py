@@ -11,6 +11,7 @@ from app.models.appointment import Appointment
 from app.models.availability_window import AvailabilityWindow
 from app.models.patient import Patient
 from app.models.payment import Payment
+from app.models.professional import Professional
 from app.models.user import User
 from tests.conftest import MONDAY, create_user
 
@@ -408,3 +409,93 @@ def test_reception_cannot_mark_a_deposit_refunded(client, db_session, clinic):
     assert response.status_code == 303
     db_session.expire_all()
     assert db_session.get(Payment, payment.id).status == PaymentStatus.APPROVED
+
+
+def test_manual_appointment_can_record_a_cash_deposit(client, db_session, clinic):
+    """At the desk the deposit is often paid in cash; it has to count like an online one."""
+    patient = Patient(dni="41222333", first_name="Rocio", last_name="Paz", email="rocio@example.com")
+    db_session.add(patient)
+    db_session.commit()
+    login(client, "admin")
+
+    client.post(
+        "/app/appointments",
+        data={
+            "patient_id": patient.id, "professional_id": clinic["laura"],
+            "starts_at": "2026-03-30T09:00", "duration_minutes": 30,
+            "reason": "Control", "cash_deposit": "10.000",
+        },
+        follow_redirects=False,
+    )
+
+    appointment = db_session.scalars(select(Appointment).where(Appointment.patient_id == patient.id)).one()
+    assert appointment.status == AppointmentStatus.CONFIRMED
+    assert appointment.deposit_amount == Decimal("10000")
+    payment = db_session.scalars(select(Payment).where(Payment.appointment_id == appointment.id)).one()
+    assert (payment.provider, payment.status) == ("efectivo", PaymentStatus.APPROVED)
+
+
+def test_manual_appointment_without_deposit_stays_reserved(client, db_session, clinic):
+    patient = Patient(dni="41222444", first_name="Nico", last_name="Paz", email="nico@example.com")
+    db_session.add(patient)
+    db_session.commit()
+    login(client, "admin")
+
+    client.post(
+        "/app/appointments",
+        data={
+            "patient_id": patient.id, "professional_id": clinic["laura"],
+            "starts_at": "2026-03-30T10:00", "duration_minutes": 30, "cash_deposit": "",
+        },
+        follow_redirects=False,
+    )
+
+    appointment = db_session.scalars(select(Appointment).where(Appointment.patient_id == patient.id)).one()
+    assert appointment.status == AppointmentStatus.RESERVED
+    assert db_session.scalars(select(Payment).where(Payment.appointment_id == appointment.id)).all() == []
+
+
+def test_patient_record_fields_are_saved_by_hand(client, db_session, clinic):
+    """Address, birth date and insurance are typed at the desk: online booking never asks for them."""
+    patient = Patient(dni="41555666", first_name="Vera", last_name="Luna", email="vera@example.com")
+    db_session.add(patient)
+    db_session.commit()
+    login(client, "admin")
+
+    client.post(
+        f"/app/patients/{patient.id}/edit",
+        data={
+            "dni": "41555666", "first_name": "Vera", "last_name": "Luna",
+            "email": "vera@example.com", "phone": "", "observations": "", "is_active": "true",
+            "birth_date": "1990-07-15", "address": "Soloeta 443", "city": "General Belgrano",
+            "health_insurance": "IOMA", "health_insurance_number": "12345/6",
+            "emergency_contact": "Juan Luna 2241-556677", "medical_notes": "Alérgica a la penicilina",
+        },
+        follow_redirects=False,
+    )
+
+    db_session.expire_all()
+    saved = db_session.get(Patient, patient.id)
+    assert saved.birth_date == date(1990, 7, 15)
+    assert saved.address == "Soloeta 443"
+    assert saved.health_insurance_number == "12345/6"
+    assert saved.medical_notes == "Alérgica a la penicilina"
+
+
+def test_editing_a_professional_deposit_does_not_break_the_audit_log(client, db_session, clinic):
+    """The audit column is JSON: a Decimal (or a date) has to be stored as text, not as the object."""
+    login(client, "admin")
+
+    response = client.post(
+        f"/app/professionals/{clinic['laura']}/edit",
+        data={
+            "first_name": "Laura", "last_name": "Gómez", "specialty": "Odontología general",
+            "email": "laura@example.com", "phone": "", "default_appointment_duration": "30",
+            "deposit_amount": "12500", "is_active": "true",
+        },
+        follow_redirects=False,
+    )
+
+    assert "error" not in response.headers["location"]
+    db_session.expire_all()
+    assert db_session.get(Professional, clinic["laura"]).deposit_amount == Decimal("12500")

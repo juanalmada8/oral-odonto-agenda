@@ -97,7 +97,8 @@ class MessageComposer:
             "clinic_name": self.settings.clinic_name,
             "clinic_address": self.settings.clinic_address,
             "clinic_phone": self.settings.clinic_phone,
-            "logo_url": f"{base_url}/static/brand/oral-logo-blue-cropped.png",
+            # Resolved against the image the EmailClient embeds in the message itself.
+            "logo_url": "cid:oral-logo",
             "booking_url": f"{base_url}/reservar",
             "status_url": f"{base_url}/reservar/turno/{appointment.public_token}",
             "calendar_url": f"{base_url}/reservar/turno/{appointment.public_token}/calendario.ics",
