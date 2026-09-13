@@ -82,7 +82,7 @@ def test_reception_cannot_open_admin_sections(client, clinic, path):
 
     response = client.get(path, follow_redirects=False)
 
-    assert response.status_code in (302, 307)
+    assert response.status_code == 303
     assert "permisos" in response.headers["location"]
 
 
@@ -361,3 +361,50 @@ def test_csv_export_neutralizes_spreadsheet_formulas(client, db_session, clinic)
 
     assert "'=HYPERLINK" in export.text
     assert ";=HYPERLINK" not in export.text
+
+
+def _approved_deposit(db, professional_id: int, *, status=AppointmentStatus.CANCELLED, dni="4100001") -> Payment:
+    appointment = add_appointment(db, professional_id, starts_at=datetime(2026, 3, 30, 15, 0), status=status, dni=dni)
+    payment = Payment(
+        appointment_id=appointment.id, provider="mercadopago", status=PaymentStatus.APPROVED,
+        amount=Decimal("10000"), currency="ARS", paid_at=datetime(2026, 3, 28, 12, 0),
+    )
+    db.add(payment)
+    db.commit()
+    return payment
+
+
+def test_deposit_of_a_cancelled_appointment_can_be_marked_refunded_by_hand(client, db_session, clinic):
+    """Refunds paid outside Mercado Pago (transfer, cash) have to leave a record."""
+    payment = _approved_deposit(db_session, clinic["laura"])
+    login(client, "admin")
+    assert "Marcar devuelta" in client.get("/app/payments?filter=refund").text
+
+    client.post(f"/app/payments/{payment.id}/refund", data={"return_to": "/app/payments"}, follow_redirects=False)
+
+    db_session.expire_all()
+    assert db_session.get(Payment, payment.id).status == PaymentStatus.REFUNDED
+    # Once refunded it stops being pending, so the panel no longer nags about it.
+    assert "Marcar devuelta" not in client.get("/app/payments?filter=refund").text
+
+
+def test_deposit_of_a_live_appointment_cannot_be_marked_refunded(client, db_session, clinic):
+    payment = _approved_deposit(db_session, clinic["laura"], status=AppointmentStatus.CONFIRMED)
+    login(client, "admin")
+
+    client.post(f"/app/payments/{payment.id}/refund", follow_redirects=False)
+
+    db_session.expire_all()
+    assert db_session.get(Payment, payment.id).status == PaymentStatus.APPROVED
+
+
+def test_reception_cannot_mark_a_deposit_refunded(client, db_session, clinic):
+    payment = _approved_deposit(db_session, clinic["laura"])
+    login(client, "recepcion")
+
+    response = client.post(f"/app/payments/{payment.id}/refund", follow_redirects=False)
+
+    # 303 and not 307: the browser must not replay the POST against the redirect target.
+    assert response.status_code == 303
+    db_session.expire_all()
+    assert db_session.get(Payment, payment.id).status == PaymentStatus.APPROVED

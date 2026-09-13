@@ -962,6 +962,25 @@ def payments_page(
     )
 
 
+@router.post("/app/payments/{payment_id}/refund")
+def mark_payment_refunded(
+    payment_id: int,
+    return_to: str = Form(""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    payment_service: PaymentService = Depends(get_payment_service),
+):
+    """Leaves a refund made by hand on record; Mercado Pago's own refunds arrive by webhook."""
+    require_roles(current_user, *ADMIN_ONLY)
+    target = return_to if return_to.startswith("/app") else "/app/payments?filter=refund"
+    try:
+        payment_service.mark_refunded(db, payment_id, actor=current_user.username)
+    except Exception as exc:
+        db.rollback()
+        return redirect_with_message(target, error=user_facing_message(exc))
+    return redirect_with_message(target, message="Seña marcada como devuelta.")
+
+
 def _metrics_period(date_from: str | None, date_to: str | None) -> tuple[date, date]:
     """Defaults to the current month, so upcoming bookings count toward occupancy too."""
     today = clock.today()

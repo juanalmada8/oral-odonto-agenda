@@ -209,6 +209,35 @@ class PaymentService:
         )
         return list(candidates)
 
+    def mark_refunded(self, db: Session, payment_id: int, *, actor: str) -> Payment:
+        """Record a refund made outside the provider (transfer, cash at the desk).
+
+        Mercado Pago notifies its own refunds by webhook; this is for the money that goes
+        back some other way, so the deposit stops showing up as pending.
+        """
+        payment = db.get(Payment, payment_id)
+        if payment is None:
+            raise DomainError("No encontramos ese pago.")
+        if payment.status == PaymentStatus.REFUNDED:
+            return payment
+        if not self.requires_refund(payment):
+            # Guards against wiping the deposit of an appointment that is still going to happen.
+            raise DomainError("Solo se puede devolver la seña de un turno cancelado o vencido.")
+
+        payment.status = PaymentStatus.REFUNDED
+        payment.status_detail = "refunded_manually"
+        create_audit_log(
+            db,
+            action="payment.refunded_manually",
+            entity_name="payment",
+            entity_id=str(payment.id),
+            actor=actor,
+            description="Seña marcada como devuelta a mano desde el panel",
+            details={"amount": str(payment.amount), "appointment_id": payment.appointment_id},
+        )
+        self.schedule_agent.commit(db)
+        return payment
+
     def _confirm_paid_appointment(self, db: Session, payment: Payment) -> None:
         appointment = self.schedule_agent.get_appointment(db, payment.appointment_id)
         if appointment.status == AppointmentStatus.CONFIRMED:
