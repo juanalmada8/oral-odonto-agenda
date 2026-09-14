@@ -119,18 +119,21 @@ def update_appointment(
 def reschedule_appointment(
     appointment_id: int,
     payload: AppointmentReschedule,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
     current_user: User = Depends(get_current_user),
 ):
-    return schedule_agent.reschedule_appointment(
+    appointment = schedule_agent.reschedule_appointment(
         db,
         appointment_id,
         payload,
         followup_agent=followup_agent,
         actor=current_user.username,
     )
+    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    return appointment
 
 
 @router.post("/{appointment_id}/cancel", response_model=AppointmentRead)

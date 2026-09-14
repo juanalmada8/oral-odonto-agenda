@@ -451,3 +451,35 @@ def test_confirmation_email_carries_the_logo_inside_the_message(client, db_sessi
 
     images = [part for part in message.walk() if part.get_content_type() == "image/png"]
     assert [part["Content-ID"] for part in images] == [f"<{LOGO_CID}>"]
+
+
+def test_moving_an_appointment_tells_the_patient_the_new_date(client, db_session, make_professional, outbox, auth_headers):
+    """Without this the patient turns up at the old time: only reminders were being discarded."""
+    appointment = confirmed_booking(client, db_session, make_professional)
+    outbox.sent.clear()
+
+    client.post(
+        f"/api/v1/appointments/{appointment.id}/reschedule",
+        json={"starts_at": "2026-03-30T11:00:00"},
+        headers=auth_headers,
+    )
+
+    assert len(outbox.sent) == 1
+    email = outbox.sent[0]
+    assert "Cambiamos tu turno" in email["subject"]
+    assert "11:00" in email["text"]
+    assert "09:00" in email["text"]  # el horario viejo, para que vea qué cambió
+
+
+def test_moving_a_cancelled_appointment_does_not_email_the_patient(client, db_session, make_professional, outbox, auth_headers):
+    appointment = confirmed_booking(client, db_session, make_professional)
+    client.post(f"/api/v1/appointments/{appointment.id}/cancel", json={}, headers=auth_headers)
+    outbox.sent.clear()
+
+    client.post(
+        f"/api/v1/appointments/{appointment.id}/reschedule",
+        json={"starts_at": "2026-03-30T11:00:00"},
+        headers=auth_headers,
+    )
+
+    assert outbox.sent == []
