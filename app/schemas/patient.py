@@ -115,3 +115,18 @@ class PatientRead(TimestampedModel):
     health_insurance_number: str | None
     emergency_contact: str | None
     medical_notes: str | None
+
+
+class PatientIdentity(BaseModel):
+    """Lo que alguien escribe en el sitio público para identificarse.
+
+    Lo usan la reserva y la lista de espera: ninguna de las dos confía en estos datos
+    para escribir sobre una ficha existente, solo para encontrarla o crear una nueva.
+    """
+
+    dni: str
+    first_name: str
+    last_name: str
+    email: str | None = None
+    phone: str | None = None
+    observations: str | None = None

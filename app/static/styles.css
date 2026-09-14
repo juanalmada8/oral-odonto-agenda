@@ -2816,3 +2816,27 @@ button.secondary:hover,
     margin-top: 8px;
   }
 }
+
+/* Lista de espera en la página pública. */
+.waitlist-section {
+  margin-top: 28px;
+}
+
+.waitlist-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.waitlist-hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.waitlist-waiting { background: rgba(184, 123, 34, 0.12); color: var(--warning); }
+.waitlist-notified { background: rgba(0, 80, 117, 0.1); color: var(--brand-ocean); }
+.waitlist-booked { background: rgba(0, 99, 32, 0.12); color: var(--success); }
+.waitlist-cancelled { background: rgba(102, 113, 122, 0.12); color: var(--muted); }

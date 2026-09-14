@@ -1,0 +1,86 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<section class="surface">
+  <div class="surface-head">
+    <div>
+      <div class="eyebrow">Demanda</div>
+      <h2>Quiénes esperan un horario</h2>
+      <p class="muted">
+        Cuando se cancela un turno o vence una seña, el horario liberado se ofrece por email
+        a los primeros de esta lista a los que les sirva. No se les reserva: reservan por la web.
+      </p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table data-table--stacked">
+      <thead>
+        <tr>
+          <th>Paciente</th>
+          <th>Busca</th>
+          <th>Período</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <td data-label="Paciente">
+            <strong>{{ entry.patient.first_name }} {{ entry.patient.last_name }}</strong>
+            <div class="muted small">DNI {{ entry.patient.dni }}</div>
+            <div class="muted small">
+              {{ entry.contact_phone | phone }}{% if entry.contact_phone and entry.contact_email %} · {% endif %}{{ entry.contact_email or '' }}
+            </div>
+            {% if entry.notes %}<div class="small">{{ entry.notes }}</div>{% endif %}
+          </td>
+          <td data-label="Busca">
+            {% if entry.professional %}
+            {{ entry.professional.first_name }} {{ entry.professional.last_name }}
+            {% else %}
+            <span class="muted">Cualquier profesional</span>
+            {% endif %}
+            <div class="muted small">Anotado el {{ entry.created_at | short_date }}</div>
+          </td>
+          <td data-label="Período">
+            {{ entry.date_from | short_date }} a {{ entry.date_to | short_date }}
+            <div class="muted small">{{ period_labels[entry.period] }}</div>
+          </td>
+          <td data-label="Estado">
+            <span class="status-badge waitlist-{{ entry.status.value }}">{{ status_labels[entry.status] }}</span>
+            {% if entry.notified_slot_at %}
+            <div class="muted small">Avisado por el {{ entry.notified_slot_at | short_date }} {{ entry.notified_slot_at.strftime('%H:%M') }}</div>
+            {% endif %}
+          </td>
+          <td data-label="Acciones">
+            <div class="row-actions">
+              {% if entry.status.value != 'cancelled' %}
+              <form
+                method="post"
+                action="/app/waitlist/{{ entry.id }}/status"
+                class="js-confirm-form"
+                data-confirm-title="Dar de baja"
+                data-confirm-message="Se saca a {{ entry.patient.first_name }} {{ entry.patient.last_name }} de la lista de espera."
+                data-confirm-accept="Dar de baja"
+              >
+                <input type="hidden" name="status" value="cancelled" />
+                <button class="ghost-button compact danger" type="submit">Dar de baja</button>
+              </form>
+              {% else %}
+              <form method="post" action="/app/waitlist/{{ entry.id }}/status">
+                <input type="hidden" name="status" value="waiting" />
+                <button class="ghost-button compact" type="submit">Reactivar</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty-row">No hay nadie anotado en la lista de espera.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

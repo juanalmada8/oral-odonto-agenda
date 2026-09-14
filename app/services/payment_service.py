@@ -184,7 +184,7 @@ class PaymentService:
 
     def expire_unpaid(self, db: Session) -> int:
         """Release holds whose payment window closed and close their pending payments."""
-        expired = self.schedule_agent.release_expired_holds(db)
+        expired = self.schedule_agent.release_expired_holds(db, followup_agent=self.followup_agent)
         for appointment in expired:
             for payment in appointment.payments:
                 if payment.status in {PaymentStatus.PENDING, PaymentStatus.IN_PROCESS, PaymentStatus.REJECTED}:

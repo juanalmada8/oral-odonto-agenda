@@ -65,6 +65,7 @@
             {% endif %}
             {% if role in ['admin', 'receptionist'] %}
             <a href="/app/patients" class="nav-link {% if active_page == 'patients' %}active{% endif %}">Pacientes</a>
+            <a href="/app/waitlist" class="nav-link {% if active_page == 'waitlist' %}active{% endif %}">Lista de espera</a>
             {% endif %}
             {% if role == 'admin' %}
             <a href="/app/professionals" class="nav-link {% if active_page == 'professionals' %}active{% endif %}">Profesionales</a>

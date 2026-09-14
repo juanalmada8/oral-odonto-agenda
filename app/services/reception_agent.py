@@ -10,7 +10,7 @@ from app.models.notification import Notification
 from app.models.patient import Patient
 from app.models.payment import Payment
 from app.schemas.booking import PublicBookingRequest
-from app.schemas.patient import PatientCreate, PatientUpdate, PatientUpsert
+from app.schemas.patient import PatientCreate, PatientIdentity, PatientUpdate, PatientUpsert
 from app.utils.audit import create_audit_log
 from app.utils.validation import names_match
 
@@ -176,7 +176,7 @@ class ReceptionAgent:
         )
         return patient
 
-    def resolve_patient_for_public_booking(self, db: Session, request: PublicBookingRequest) -> Patient:
+    def resolve_patient_for_public_booking(self, db: Session, request: PublicBookingRequest | PatientIdentity) -> Patient:
         """Find or create the patient behind a public booking without trusting the form.
 
         Anyone can type any DNI on the public site, so an existing record is only matched when the
@@ -191,7 +191,7 @@ class ReceptionAgent:
                 last_name=request.last_name,
                 email=request.email,
                 phone=request.phone,
-                observations=request.observations,
+                observations=getattr(request, "observations", None),
             )
             db.add(patient)
             db.flush()

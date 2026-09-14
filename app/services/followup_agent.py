@@ -123,6 +123,28 @@ class FollowUpAgent:
             actor=actor,
         )
 
+    def queue_waitlist_offer(self, db: Session, entry, appointment: Appointment, actor: str = "followup_agent"):
+        """Le ofrece a alguien de la lista de espera un horario que se liberó.
+
+        La notificación se cuelga del turno liberado solo como referencia: el horario no
+        queda reservado para esta persona.
+        """
+        recipient = entry.contact_email or entry.patient.email
+        if not recipient:
+            return None
+        content = self.composer.waitlist_offer(appointment, entry.patient.first_name)
+        return self._queue(
+            db,
+            appointment=appointment,
+            type_=NotificationType.WAITLIST,
+            channel=NotificationChannel.EMAIL,
+            recipient=recipient,
+            subject=content.subject,
+            body=content.text,
+            html_body=content.html,
+            actor=actor,
+        )
+
     def prepare_upcoming_reminders(
         self,
         db: Session,

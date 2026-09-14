@@ -12,6 +12,7 @@ from app.api.deps import (
     get_followup_agent,
     get_payment_service,
     get_professional_service,
+    get_reception_agent,
     get_schedule_agent,
 )
 from app.core import clock
@@ -25,11 +26,15 @@ from app.integrations.fake_payments import FakePaymentGateway
 from app.integrations.payments import PaymentGatewayError, PaymentInfo
 from app.models.appointment import Appointment
 from app.schemas.booking import PublicBookingRequest
+from app.schemas.patient import PatientIdentity
+from app.schemas.waitlist import WaitlistJoin
 from app.services.booking_agent import BookingAgent
 from app.services.followup_agent import FollowUpAgent
 from app.services.payment_service import PaymentService, hold_seconds_left
 from app.services.professional_service import ProfessionalService
+from app.services.reception_agent import ReceptionAgent
 from app.services.schedule_agent import ScheduleAgent
+from app.services.waitlist_service import WaitlistService
 from app.tasks.notifications import dispatch_due_notifications
 from app.web.common import active_professionals, format_long_date, format_short_date, redirect_with_message, templates
 
@@ -223,6 +228,65 @@ def create_public_booking(
     if result.checkout_error:
         return redirect_with_message(status_url, error=result.checkout_error)
     return RedirectResponse(status_url, status_code=303)
+
+
+@router.post("/reservar/lista-de-espera")
+def join_waitlist(
+    request: Request,
+    professional_id: str = Form(""),
+    date_from: str = Form(""),
+    date_to: str = Form(""),
+    period: str = Form("any"),
+    dni: str = Form(""),
+    first_name: str = Form(""),
+    last_name: str = Form(""),
+    email: str = Form(""),
+    phone: str = Form(""),
+    notes: str = Form(""),
+    website: str = Form(""),
+    db: Session = Depends(get_db),
+    reception_agent: ReceptionAgent = Depends(get_reception_agent),
+):
+    """Anotarse para que avisen si se libera un horario antes."""
+    settings = get_settings()
+    if website:
+        logger.info("Waitlist honeypot triggered from %s", client_ip(request))
+        return redirect_with_message("/reservar", error="No pudimos procesar el pedido. Intentá de nuevo.")
+    if not rate_limiter.allow(
+        f"waitlist:{client_ip(request)}", limit=settings.booking_rate_limit_per_hour, window_seconds=3600
+    ):
+        return redirect_with_message("/reservar", error="Hiciste muchos intentos seguidos. Esperá unos minutos.")
+
+    try:
+        # Se reutiliza la misma resolución de identidad que la reserva: el DNI del
+        # formulario no alcanza para escribir sobre la ficha de otro paciente.
+        patient = reception_agent.resolve_patient_for_public_booking(
+            db,
+            PatientIdentity(
+                dni=dni,
+                first_name=first_name,
+                last_name=last_name,
+                email=email.strip() or None,
+                phone=phone or None,
+            ),
+        )
+        entry = WaitlistJoin(
+            professional_id=_parse_int(professional_id),
+            date_from=date.fromisoformat(date_from),
+            date_to=date.fromisoformat(date_to),
+            period=period,
+            contact_email=email.strip() or None,
+            contact_phone=phone or None,
+            notes=notes or None,
+        )
+        WaitlistService().join(db, patient.id, entry, actor="public")
+    except Exception as exc:
+        db.rollback()
+        return redirect_with_message("/reservar", error=user_facing_message(exc))
+    return redirect_with_message(
+        "/reservar",
+        message="Te anotamos en la lista de espera. Si se libera un horario que te sirva, te escribimos por email.",
+    )
 
 
 def _booking_view(appointment: Appointment, payment_service: PaymentService, booking_agent: BookingAgent) -> dict:

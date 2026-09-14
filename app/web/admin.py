@@ -21,10 +21,13 @@ from app.api.deps import (
 from app.core import clock
 from app.core.enums import (
     ROLE_LABELS,
+    WAITLIST_PERIOD_LABELS,
+    WAITLIST_STATUS_LABELS,
     AppointmentStatus,
     NotificationChannel,
     NotificationStatus,
     UserRole,
+    WaitlistStatus,
 )
 from app.core.errors import user_facing_message
 from app.core.exceptions import DomainError
@@ -44,6 +47,7 @@ from app.services.payment_service import PaymentService
 from app.services.professional_service import ProfessionalService
 from app.services.reception_agent import ReceptionAgent
 from app.services.schedule_agent import ALLOWED_TRANSITIONS, ScheduleAgent
+from app.services.waitlist_service import WaitlistService
 from app.tasks.notifications import dispatch_due_notifications
 from app.utils.formatting import format_money
 from app.utils.validation import parse_money
@@ -487,6 +491,48 @@ def edit_appointment_submit(
         f"/app/appointments?selected_date={appointment.starts_at.date().isoformat()}",
         message="Turno actualizado.",
     )
+
+
+# ---------------------------------------------------------------------- waitlist
+
+
+@router.get("/app/waitlist", response_class=HTMLResponse)
+def waitlist_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    professional_service: ProfessionalService = Depends(get_professional_service),
+):
+    require_roles(current_user, *STAFF)
+    entries = WaitlistService().list_entries(db)
+    return render_admin(
+        request,
+        template_name="admin_waitlist.html",
+        current_user=current_user,
+        page_title="Lista de espera",
+        page_subtitle="A quién avisarle cuando se libera un horario.",
+        active_page="waitlist",
+        entries=entries,
+        professionals=active_professionals(db, professional_service),
+        period_labels=WAITLIST_PERIOD_LABELS,
+        status_labels=WAITLIST_STATUS_LABELS,
+    )
+
+
+@router.post("/app/waitlist/{entry_id}/status")
+def waitlist_set_status(
+    entry_id: int,
+    status: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_roles(current_user, *STAFF)
+    try:
+        WaitlistService().set_status(db, entry_id, WaitlistStatus(status), actor=current_user.username)
+    except Exception as exc:
+        db.rollback()
+        return redirect_with_message("/app/waitlist", error=user_facing_message(exc))
+    return redirect_with_message("/app/waitlist", message="Lista de espera actualizada.")
 
 
 # ---------------------------------------------------------------------- patients

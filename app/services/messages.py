@@ -67,6 +67,11 @@ class MessageComposer:
         context = self._context(appointment)
         return self._render("cancellation", f"Turno cancelado: {context['when_short']}", context)
 
+    def waitlist_offer(self, appointment: Appointment, patient_first_name: str) -> EmailContent:
+        """El turno es de otro paciente: el nombre viene de quien está en la lista."""
+        context = self._context(appointment) | {"patient_first_name": patient_first_name}
+        return self._render("waitlist", f"Se liberó un turno: {context['when_short']}", context)
+
     def reschedule(self, appointment: Appointment, previous_when: str | None = None) -> EmailContent:
         """`previous_when` is the old date in words, so the patient sees what changed."""
         context = self._context(appointment) | {"previous_when": previous_when}

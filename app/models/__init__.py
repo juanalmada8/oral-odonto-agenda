@@ -14,6 +14,7 @@ from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.professional import Professional
 from app.models.user import User
+from app.models.waitlist_entry import WaitlistEntry
 from app.models.working_hours import WorkingHours
 
 __all__ = [
@@ -26,5 +27,6 @@ __all__ = [
     "Payment",
     "Professional",
     "User",
+    "WaitlistEntry",
     "WorkingHours",
 ]
