@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core import clock
@@ -108,7 +108,14 @@ class WaitlistService:
         candidates = db.scalars(
             select(WaitlistEntry)
             .where(WaitlistEntry.status == WaitlistStatus.WAITING)
-            .where(WaitlistEntry.professional_id.in_([appointment.professional_id, None]))
+            # Con IN (id, NULL) las filas NULL no matchean, y NULL acá significa
+            # "me sirve cualquier profesional": quedaban afuera de todos los avisos.
+            .where(
+                or_(
+                    WaitlistEntry.professional_id == appointment.professional_id,
+                    WaitlistEntry.professional_id.is_(None),
+                )
+            )
             .where(WaitlistEntry.patient_id != appointment.patient_id)
             .order_by(WaitlistEntry.created_at)
         )

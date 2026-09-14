@@ -18,6 +18,7 @@ from app.services.followup_agent import FollowUpAgent
 from app.services.payment_service import PaymentService
 from app.services.reception_agent import ReceptionAgent
 from app.services.schedule_agent import SLOT_TAKEN_MESSAGE, ScheduleAgent
+from app.services.waitlist_service import WaitlistService
 from app.utils.audit import create_audit_log
 from app.utils.datetime import ensure_local_naive
 
@@ -50,6 +51,7 @@ class BookingAgent:
         self.reception_agent = reception_agent
         self.followup_agent = followup_agent
         self.payment_service = payment_service
+        self.waitlist = WaitlistService()
 
     def book(self, db: Session, request: PublicBookingRequest) -> BookingResult:
         professional = self.schedule_agent.lock_professional(db, request.professional_id)
@@ -89,6 +91,8 @@ class BookingAgent:
         )
         if not requires_deposit:
             self.followup_agent.queue_confirmation(db, appointment, actor=PUBLIC_ACTOR)
+        # Si venía esperando este horario, su anotación se cierra acá.
+        self.waitlist.mark_booked_for(db, appointment.patient_id, appointment.starts_at)
         # Commit the hold before talking to the payment provider so the professional lock is not
         # kept during a network call; a provider failure leaves a retryable held slot.
         self.schedule_agent.commit(db)
