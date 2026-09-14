@@ -55,6 +55,7 @@ class NotificationType(str, Enum):
     CONFIRMATION = "confirmation"
     REMINDER = "reminder"
     CANCELLATION = "cancellation"
+    RESCHEDULE = "reschedule"
     PAYMENT_LINK = "payment_link"
     CUSTOM = "custom"
 

@@ -99,6 +99,30 @@ class FollowUpAgent:
             actor=actor,
         )
 
+    def queue_reschedule(
+        self,
+        db: Session,
+        appointment: Appointment,
+        previous_when: str | None = None,
+        actor: str = "followup_agent",
+    ) -> Notification | None:
+        """Tell the patient their appointment moved: otherwise they show up at the old time."""
+        recipient = appointment.notification_email
+        if not recipient:
+            return None
+        content = self.composer.reschedule(appointment, previous_when=previous_when)
+        return self._queue(
+            db,
+            appointment=appointment,
+            type_=NotificationType.RESCHEDULE,
+            channel=NotificationChannel.EMAIL,
+            recipient=recipient,
+            subject=content.subject,
+            body=content.text,
+            html_body=content.html,
+            actor=actor,
+        )
+
     def prepare_upcoming_reminders(
         self,
         db: Session,

@@ -67,6 +67,11 @@ class MessageComposer:
         context = self._context(appointment)
         return self._render("cancellation", f"Turno cancelado: {context['when_short']}", context)
 
+    def reschedule(self, appointment: Appointment, previous_when: str | None = None) -> EmailContent:
+        """`previous_when` is the old date in words, so the patient sees what changed."""
+        context = self._context(appointment) | {"previous_when": previous_when}
+        return self._render("reschedule", f"Cambiamos tu turno: ahora {context['when_short']}", context)
+
     def whatsapp_reminder(self, appointment: Appointment) -> WhatsAppTemplateContent:
         context = self._context(appointment)
         params = [

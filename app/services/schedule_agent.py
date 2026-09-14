@@ -26,6 +26,7 @@ from app.schemas.availability import (
 from app.services.followup_agent import FollowUpAgent
 from app.services.reception_agent import ReceptionAgent
 from app.utils.audit import create_audit_log
+from app.utils.formatting import format_long_date
 from app.utils.datetime import calculate_end, combine_date_time, date_range_end, date_range_start, ensure_local_naive
 
 
@@ -258,11 +259,15 @@ class ScheduleAgent:
                     patient_id=appointment.patient_id,
                     exclude_appointment_id=appointment.id,
                 )
+                previous_when = f"{format_long_date(appointment.starts_at)} a las {appointment.starts_at:%H:%M} h"
                 appointment.starts_at = starts_at
                 appointment.ends_at = ends_at
                 appointment.duration_minutes = duration
                 if followup_agent:
                     followup_agent.discard_pending_reminders(db, appointment)
+                    # Sin este aviso el paciente se presenta en el horario viejo.
+                    if appointment.status in UPCOMING_APPOINTMENT_STATUSES:
+                        followup_agent.queue_reschedule(db, appointment, previous_when=previous_when, actor=actor)
 
         for field in ("reason", "notes"):
             if field in changes:
