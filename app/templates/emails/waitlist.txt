@@ -1,0 +1,13 @@
+{{ patient_first_name }}, se liberó un turno antes.
+
+{{ date_long_capitalized }} · {{ time }} h · {{ professional_name }}
+{% if clinic_address %}
+Dirección: {{ clinic_address }}
+{% endif %}
+
+Reservalo acá: {{ booking_url }}
+
+El horario NO está reservado a tu nombre: lo toma quien entre primero. Si no llegás,
+seguís en la lista y te avisamos cuando se libere otro.
+
+{{ clinic_name }}{% if clinic_phone %} · Tel: {{ clinic_phone }}{% endif %}

@@ -25,6 +25,7 @@ from app.schemas.availability import (
 )
 from app.services.followup_agent import FollowUpAgent
 from app.services.reception_agent import ReceptionAgent
+from app.services.waitlist_service import WaitlistService
 from app.utils.audit import create_audit_log
 from app.utils.formatting import format_long_date
 from app.utils.datetime import calculate_end, combine_date_time, date_range_end, date_range_start, ensure_local_naive
@@ -64,6 +65,7 @@ class ScheduleAgent:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.timezone_name = settings.app_timezone
+        self.waitlist = WaitlistService()
 
     # ------------------------------------------------------------------ queries
 
@@ -347,7 +349,13 @@ class ScheduleAgent:
     def reserve_appointment(self, db: Session, appointment_id: int, *, actor: str = "schedule_agent") -> Appointment:
         return self.change_status(db, appointment_id, AppointmentStatus.RESERVED, actor=actor)
 
-    def release_expired_holds(self, db: Session, *, professional_id: int | None = None) -> list[Appointment]:
+    def release_expired_holds(
+        self,
+        db: Session,
+        *,
+        professional_id: int | None = None,
+        followup_agent: FollowUpAgent | None = None,
+    ) -> list[Appointment]:
         """Mark unpaid holds whose deadline passed as expired so their slots become bookable."""
         query = (
             select(Appointment)
@@ -368,6 +376,8 @@ class ScheduleAgent:
                 actor="schedule_agent",
                 description="Unpaid hold expired",
             )
+            # El horario vuelve a estar libre: también se ofrece a la lista de espera.
+            self.waitlist.notify_freed_slot(db, appointment, followup_agent=followup_agent)
         if expired:
             db.flush()
         return expired
@@ -419,6 +429,8 @@ class ScheduleAgent:
                 # An abandoned unpaid hold was never a real booking for the patient: no email.
                 if current in (AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED):
                     followup_agent.queue_cancellation(db, appointment)
+                # El horario quedó libre: se lo ofrecemos a quien esté esperando.
+                self.waitlist.notify_freed_slot(db, appointment, followup_agent=followup_agent)
         self.flush(db)
 
     # ------------------------------------------------------------ availability

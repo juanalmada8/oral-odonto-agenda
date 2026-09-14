@@ -56,6 +56,7 @@ class NotificationType(str, Enum):
     REMINDER = "reminder"
     CANCELLATION = "cancellation"
     RESCHEDULE = "reschedule"
+    WAITLIST = "waitlist"
     PAYMENT_LINK = "payment_link"
     CUSTOM = "custom"
 
@@ -91,4 +92,31 @@ ROLE_LABELS = {
     UserRole.ADMIN: "Administración",
     UserRole.RECEPTIONIST: "Recepción",
     UserRole.PROFESSIONAL: "Profesional",
+}
+
+
+class WaitlistPeriod(str, Enum):
+    ANY = "any"
+    MORNING = "morning"
+    AFTERNOON = "afternoon"
+
+
+class WaitlistStatus(str, Enum):
+    WAITING = "waiting"
+    NOTIFIED = "notified"
+    BOOKED = "booked"
+    CANCELLED = "cancelled"
+
+
+WAITLIST_PERIOD_LABELS = {
+    WaitlistPeriod.ANY: "Cualquier horario",
+    WaitlistPeriod.MORNING: "Mañana",
+    WaitlistPeriod.AFTERNOON: "Tarde",
+}
+
+WAITLIST_STATUS_LABELS = {
+    WaitlistStatus.WAITING: "Esperando",
+    WaitlistStatus.NOTIFIED: "Avisado",
+    WaitlistStatus.BOOKED: "Reservó",
+    WaitlistStatus.CANCELLED: "Dado de baja",
 }

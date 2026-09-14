@@ -12,11 +12,19 @@ from sqlalchemy import select
 
 from app.api.deps import get_email_client, get_whatsapp_client
 from app.core.config import get_settings
-from app.core.enums import AppointmentStatus, NotificationChannel, NotificationStatus, NotificationType
+from app.core.enums import (
+    AppointmentStatus,
+    NotificationChannel,
+    NotificationStatus,
+    NotificationType,
+    WaitlistPeriod,
+    WaitlistStatus,
+)
 from app.integrations.whatsapp import GRAPH_BASE_URL, WhatsAppClient, same_whatsapp_number
 from app.main import app
 from app.models.appointment import Appointment
 from app.models.notification import Notification
+from app.models.waitlist_entry import WaitlistEntry
 from app.services.followup_agent import FollowUpAgent
 from app.tasks import run_scheduled
 
@@ -483,3 +491,74 @@ def test_moving_a_cancelled_appointment_does_not_email_the_patient(client, db_se
     )
 
     assert outbox.sent == []
+
+
+# --------------------------------------------------------------------------- lista de espera
+
+
+def _join_waitlist(client, professional_id=None, dni="41999888", **overrides):
+    data = {
+        "professional_id": str(professional_id) if professional_id else "",
+        "date_from": "2026-03-28", "date_to": "2026-04-05", "period": "any",
+        "dni": dni, "first_name": "Rocío", "last_name": "Paz",
+        "email": f"{dni}@example.com", "phone": "11 4444-4444",
+        **overrides,
+    }
+    return client.post("/reservar/lista-de-espera", data=data, follow_redirects=False)
+
+
+def test_cancelling_an_appointment_offers_the_slot_to_the_waitlist(client, db_session, make_professional, outbox, auth_headers):
+    appointment = confirmed_booking(client, db_session, make_professional)
+    _join_waitlist(client, appointment.professional_id)
+    outbox.sent.clear()
+
+    client.post(f"/api/v1/appointments/{appointment.id}/cancel", json={}, headers=auth_headers)
+
+    offers = [email for email in outbox.sent if "Se liberó un turno" in email["subject"]]
+    assert len(offers) == 1
+    assert offers[0]["to"] == "41999888@example.com"
+    assert "Lunes 30 de marzo" in offers[0]["text"]
+    entry = db_session.scalars(select(WaitlistEntry)).one()
+    assert entry.status == WaitlistStatus.NOTIFIED
+    assert entry.notified_slot_at == appointment.starts_at
+
+
+def test_a_slot_outside_the_requested_range_is_not_offered(client, db_session, make_professional, outbox, auth_headers):
+    appointment = confirmed_booking(client, db_session, make_professional)
+    _join_waitlist(client, appointment.professional_id, date_from="2026-05-01", date_to="2026-05-30")
+    outbox.sent.clear()
+
+    client.post(f"/api/v1/appointments/{appointment.id}/cancel", json={}, headers=auth_headers)
+
+    assert [email for email in outbox.sent if "Se liberó" in email["subject"]] == []
+    assert db_session.scalars(select(WaitlistEntry)).one().status == WaitlistStatus.WAITING
+
+
+def test_an_afternoon_only_entry_is_not_offered_a_morning_slot(client, db_session, make_professional, outbox, auth_headers):
+    appointment = confirmed_booking(client, db_session, make_professional)  # 09:00
+    _join_waitlist(client, appointment.professional_id, period="afternoon")
+    outbox.sent.clear()
+
+    client.post(f"/api/v1/appointments/{appointment.id}/cancel", json={}, headers=auth_headers)
+
+    assert [email for email in outbox.sent if "Se liberó" in email["subject"]] == []
+
+
+def test_the_patient_who_cancelled_is_not_offered_their_own_slot(client, db_session, make_professional, outbox, auth_headers):
+    appointment = confirmed_booking(client, db_session, make_professional)
+    _join_waitlist(client, appointment.professional_id, dni="30555111", first_name="Lucía", last_name="O'Connor")
+    outbox.sent.clear()
+
+    client.post(f"/api/v1/appointments/{appointment.id}/cancel", json={}, headers=auth_headers)
+
+    assert [email for email in outbox.sent if "Se liberó" in email["subject"]] == []
+
+
+def test_joining_the_waitlist_twice_updates_the_entry_instead_of_duplicating(client, db_session, make_professional):
+    professional_id = make_professional()
+    _join_waitlist(client, professional_id)
+
+    _join_waitlist(client, professional_id, date_to="2026-04-20", period="morning")
+
+    entry = db_session.scalars(select(WaitlistEntry)).one()
+    assert (entry.date_to.isoformat(), entry.period) == ("2026-04-20", WaitlistPeriod.MORNING)

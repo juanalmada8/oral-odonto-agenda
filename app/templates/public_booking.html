@@ -228,6 +228,60 @@
           </section>
         </main>
       </section>
+
+      <section class="booking-section waitlist-section" data-reveal>
+        <div class="booking-section-head">
+          <div class="eyebrow">Lista de espera</div>
+          <h2>¿No hay horario que te sirva?</h2>
+          <p class="muted">
+            Anotate y te escribimos por email apenas se libere uno en los días que elijas.
+            No te reservamos el horario: te avisamos para que entres a tomarlo.
+          </p>
+        </div>
+        <form method="post" action="/reservar/lista-de-espera" class="panel waitlist-form">
+          <div class="waitlist-hp" aria-hidden="true">
+            <label>No completar<input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+          </div>
+          <div class="two-cols">
+            <label class="field">
+              <span class="field-label">Profesional</span>
+              <select name="professional_id">
+                <option value="">Cualquiera</option>
+                {% for professional in professionals %}
+                <option value="{{ professional.id }}" {% if selected_professional and selected_professional.id == professional.id %}selected{% endif %}>
+                  {{ professional.first_name }} {{ professional.last_name }}
+                </option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="field">
+              <span class="field-label">Franja</span>
+              <select name="period">
+                <option value="any">Cualquier horario</option>
+                <option value="morning">Mañana</option>
+                <option value="afternoon">Tarde</option>
+              </select>
+            </label>
+          </div>
+          <div class="two-cols">
+            <label class="field"><span class="field-label">Desde</span><input type="date" name="date_from" required /></label>
+            <label class="field"><span class="field-label">Hasta</span><input type="date" name="date_to" required /></label>
+          </div>
+          <div class="two-cols">
+            <label class="field"><span class="field-label">DNI</span><input name="dni" inputmode="numeric" placeholder="Sin puntos" required /></label>
+            <label class="field"><span class="field-label">Celular</span><input name="phone" type="tel" placeholder="11 5555-5555" /></label>
+          </div>
+          <div class="two-cols">
+            <label class="field"><span class="field-label">Nombre</span><input name="first_name" required /></label>
+            <label class="field"><span class="field-label">Apellido</span><input name="last_name" required /></label>
+          </div>
+          <label class="field">
+            <span class="field-label">Email</span>
+            <input name="email" type="email" placeholder="Te avisamos acá" required />
+          </label>
+          <button type="submit">Avisame si se libera</button>
+        </form>
+      </section>
     </div>
     <script>
       document.addEventListener("DOMContentLoaded", () => {
