@@ -619,3 +619,34 @@ def test_a_series_skips_taken_dates_instead_of_failing(client, db_session, clini
     created = db_session.scalars(select(Appointment).where(Appointment.patient_id == patient.id)).all()
     assert len(created) == 2
     assert "No se pudieron cargar 1" in unquote_plus(response.headers["location"])
+
+
+def test_the_agenda_does_not_query_more_as_appointments_grow(client, db_session, clinic):
+    """El badge de seña lee latest_payment: sin eager loading la agenda hacía una consulta por fila."""
+    from sqlalchemy import event
+
+    from app.db.session import engine
+
+    for minuto in range(0, 60, 30):
+        add_appointment(db_session, clinic["laura"], starts_at=datetime(2026, 3, 30, 9, minuto), dni=f"3011{minuto:04d}")
+    login(client, "admin")
+
+    consultas: list[str] = []
+
+    def registrar(conn, cursor, statement, params, context, executemany):
+        consultas.append(statement)
+
+    event.listen(engine, "before_cursor_execute", registrar)
+    try:
+        client.get("/app/appointments?selected_date=2026-03-30")
+        con_dos = len(consultas)
+        for minuto in range(0, 60, 5):
+            add_appointment(db_session, clinic["laura"], starts_at=datetime(2026, 3, 30, 11, minuto), dni=f"3022{minuto:04d}")
+        consultas.clear()
+        client.get("/app/appointments?selected_date=2026-03-30")
+        con_muchos = len(consultas)
+    finally:
+        event.remove(engine, "before_cursor_execute", registrar)
+
+    # No tiene que crecer con la cantidad de filas; que baje alguna es indistinto.
+    assert con_muchos <= con_dos, f"la agenda escala con la cantidad de turnos: {con_dos} -> {con_muchos}"

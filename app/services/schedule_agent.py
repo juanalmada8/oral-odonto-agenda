@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core import clock
 from app.core.config import Settings
@@ -92,7 +92,13 @@ class ScheduleAgent:
     ) -> list[Appointment]:
         query = (
             select(Appointment)
-            .options(joinedload(Appointment.patient), joinedload(Appointment.professional))
+            .options(
+                joinedload(Appointment.patient),
+                joinedload(Appointment.professional),
+                # El badge de seña de cada fila lee latest_payment: sin esto la agenda
+                # hace una consulta de pagos por turno mostrado.
+                selectinload(Appointment.payments),
+            )
             .order_by(Appointment.starts_at)
         )
         if professional_id:

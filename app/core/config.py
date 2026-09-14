@@ -33,8 +33,6 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     email_from: str | None = None
 
-    openai_api_key: str | None = None
-    openai_model: str = "gpt-5-mini"
 
     reminder_hours_ahead: int = Field(default=24, ge=1, le=168)
     notification_max_attempts: int = Field(default=4, ge=1, le=10)

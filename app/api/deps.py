@@ -14,7 +14,6 @@ from app.integrations.mercadopago import MercadoPagoGateway
 from app.integrations.payments import PaymentGateway
 from app.integrations.whatsapp import WhatsAppClient
 from app.models.user import User
-from app.services.ai_agent import AIAgent
 from app.services.auth_service import AuthService
 from app.services.booking_agent import BookingAgent
 from app.services.followup_agent import FollowUpAgent
@@ -97,10 +96,6 @@ def get_whatsapp_bot(
         booking_agent=booking_agent,
         schedule_agent=schedule_agent,
     )
-
-
-def get_ai_agent() -> AIAgent:
-    return AIAgent(get_settings())
 
 
 def get_auth_service() -> AuthService:
