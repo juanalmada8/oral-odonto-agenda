@@ -597,3 +597,26 @@ def test_a_series_sends_one_email_with_every_date(client, db_session, make_profe
     assert "Lunes 30 de marzo" in body
     assert "Lunes 27 de abril" in body
     assert "Lunes 25 de mayo" in body
+
+
+def test_someone_waiting_for_any_professional_is_offered_the_slot(client, db_session, make_professional, outbox, auth_headers):
+    """professional_id NULL es "cualquiera": con IN (id, NULL) esas filas nunca matchean."""
+    appointment = confirmed_booking(client, db_session, make_professional)
+    _join_waitlist(client, professional_id=None)
+    outbox.sent.clear()
+
+    client.post(f"/api/v1/appointments/{appointment.id}/cancel", json={}, headers=auth_headers)
+
+    assert [email["subject"] for email in outbox.sent if "Se liberó" in email["subject"]]
+    assert db_session.scalars(select(WaitlistEntry)).one().status == WaitlistStatus.NOTIFIED
+
+
+def test_booking_the_offered_slot_closes_the_waitlist_entry(client, db_session, make_professional, outbox):
+    """Si no se cierra, esa persona queda "Avisado" para siempre y sigue recibiendo ofertas."""
+    professional_id = make_professional(deposit=Decimal("0"))
+    _join_waitlist(client, professional_id, dni="35777666", first_name="Vera", last_name="Paz")
+
+    book(client, professional_id, dni="35777666", first_name="Vera", last_name="Paz", email="35777666@example.com")
+
+    db_session.expire_all()
+    assert db_session.scalars(select(WaitlistEntry)).one().status == WaitlistStatus.BOOKED
