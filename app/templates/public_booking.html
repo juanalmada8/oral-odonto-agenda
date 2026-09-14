@@ -336,6 +336,32 @@
         );
         revealItems.forEach((item) => observer.observe(item));
       });
+
+      // El fondo vira del crema al celeste pastel según cuánto se bajó. Se actualiza
+      // dentro de requestAnimationFrame para no hacer trabajo de más en cada scroll.
+      (() => {
+        const root = document.body;
+        let pending = false;
+
+        const paint = () => {
+          pending = false;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          const progress = scrollable > 0 ? Math.min(window.scrollY / scrollable, 1) : 0;
+          root.style.setProperty("--scroll-tint", progress.toFixed(3));
+        };
+
+        window.addEventListener(
+          "scroll",
+          () => {
+            if (pending) return;
+            pending = true;
+            window.requestAnimationFrame(paint);
+          },
+          { passive: true }
+        );
+        window.addEventListener("resize", paint, { passive: true });
+        paint();
+      })();
     </script>
   </body>
 </html>

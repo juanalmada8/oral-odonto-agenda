@@ -186,6 +186,24 @@
           hideModal();
         });
       })();
+
+      // Menús de acciones de cada fila: uno solo abierto a la vez, y se cierran al
+      // hacer click afuera o con Escape.
+      (() => {
+        const menus = () => document.querySelectorAll("details.row-menu[open]");
+        const closeAll = (except) => menus().forEach((menu) => {
+          if (menu !== except) menu.open = false;
+        });
+
+        document.addEventListener("click", (event) => {
+          const clicked = event.target.closest("details.row-menu");
+          closeAll(clicked);
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") closeAll(null);
+        });
+      })();
     </script>
   </body>
 </html>
