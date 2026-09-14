@@ -35,10 +35,19 @@
       <input name="reason" value="{{ appointment.reason or '' }}" />
     </label>
     <label class="field">
+      <span class="field-label">Cobrado en la consulta</span>
+      <input name="charged_amount" inputmode="numeric" value="{{ appointment.charged_amount | money_input }}" placeholder="Ej: 40000" />
+      <span class="field-hint">
+        Lo que pagó el paciente en total.
+        {% if appointment.deposit_amount %}La seña de {{ appointment.deposit_amount | money }} es parte de este monto.{% endif %}
+        Alimenta la métrica de ingresos.
+      </span>
+    </label>
+    <label class="field">
       <span class="field-label">Notas internas</span>
       <textarea name="notes">{{ appointment.notes or '' }}</textarea>
     </label>
-    <p class="muted small">Si cambiás el horario se validan disponibilidad y superposiciones, y se reprograman los recordatorios.</p>
+    <p class="muted small">Si cambiás el horario se validan disponibilidad y superposiciones, se reprograman los recordatorios y se le avisa al paciente por email.</p>
     <div class="button-row">
       <button type="submit">Guardar cambios</button>
       <a class="ghost-button" href="/app/appointments?selected_date={{ appointment.starts_at.date().isoformat() }}">Volver</a>

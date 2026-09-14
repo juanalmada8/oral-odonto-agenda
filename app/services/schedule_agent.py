@@ -269,7 +269,7 @@ class ScheduleAgent:
                     if appointment.status in UPCOMING_APPOINTMENT_STATUSES:
                         followup_agent.queue_reschedule(db, appointment, previous_when=previous_when, actor=actor)
 
-        for field in ("reason", "notes"):
+        for field in ("reason", "notes", "charged_amount"):
             if field in changes:
                 setattr(appointment, field, changes[field])
 
@@ -283,7 +283,7 @@ class ScheduleAgent:
             entity_id=str(appointment.id),
             actor=actor,
             description="Appointment updated",
-            details={key: (value.isoformat() if isinstance(value, datetime) else value) for key, value in changes.items()},
+            details=changes,
         )
         self.commit(db)
         return self.get_appointment(db, appointment.id)

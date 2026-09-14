@@ -46,6 +46,7 @@ class ProfessionalStats:
     no_show: int = 0
     cancelled: int = 0
     deposits: Decimal = Decimal("0")
+    charged: Decimal = Decimal("0")
 
     @property
     def occupancy(self) -> float | None:
@@ -67,6 +68,10 @@ class ClinicStats:
     deposit_bookings: int = 0
     deposit_paid: int = 0
     deposits_collected: Decimal = Decimal("0")
+    # Lo facturado de verdad: la seña es un adelanto, no el precio de la consulta.
+    charged_total: Decimal = Decimal("0")
+    charged_appointments: int = 0
+    attended_without_charge: int = 0
     refunds_pending: int = 0
     attendance_confirmed: int = 0
     published_minutes: int = 0
@@ -180,8 +185,14 @@ class AnalyticsService:
             if appointment.status in OCCUPYING:
                 stats.booked_minutes += appointment.duration_minutes
                 daily[appointment.starts_at.date()] += 1
+            if appointment.charged_amount:
+                stats.charged_total += appointment.charged_amount
+                stats.charged_appointments += 1
+            elif appointment.status == AppointmentStatus.COMPLETED:
+                stats.attended_without_charge += 1
             if row:
                 row.appointments += 1
+                row.charged += appointment.charged_amount or Decimal("0")
                 if appointment.status in OCCUPYING:
                     row.booked_minutes += appointment.duration_minutes
                 row.completed += appointment.status == AppointmentStatus.COMPLETED
@@ -240,7 +251,7 @@ class AnalyticsService:
         writer.writerow(
             [
                 "fecha", "hora", "duracion_min", "profesional", "paciente", "dni", "estado", "origen",
-                "sena", "estado_pago", "asistencia_confirmada", "motivo",
+                "sena", "cobrado", "estado_pago", "asistencia_confirmada", "motivo",
             ]
         )
         for appointment in db.scalars(query).unique():
@@ -257,6 +268,7 @@ class AnalyticsService:
                     APPOINTMENT_STATUS_LABELS[appointment.status],
                     "online" if appointment.created_by == ONLINE_SOURCE else "consultorio",
                     str(appointment.deposit_amount or "").replace(".", ","),
+                    str(appointment.charged_amount or "").replace(".", ","),
                     payment.status.value if payment else "",
                     "si" if appointment.attendance_confirmed_at else "",
                     appointment.reason,

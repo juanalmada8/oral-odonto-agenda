@@ -53,6 +53,8 @@ templates.env.filters["status_label"] = status_label
 templates.env.filters["phone"] = format_phone_for_display
 templates.env.filters["role_label"] = lambda role: ROLE_LABELS.get(role, str(role))
 templates.env.filters["percent"] = lambda value: "—" if value is None else f"{value * 100:.0f}%"
+# Para un <input>: número pelado, sin símbolo ni separadores, y vacío cuando no hay dato.
+templates.env.filters["money_input"] = lambda value: "" if value is None else f"{value:.2f}".rstrip("0").rstrip(".")
 templates.env.globals["settings"] = get_settings()
 templates.env.globals["asset_url"] = asset_url
 
