@@ -1,6 +1,7 @@
 """Schedule agent: manages availability and protects the clinic calendar."""
 
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
@@ -15,7 +16,12 @@ from app.core.exceptions import DomainError
 from app.models.appointment import Appointment
 from app.models.availability_window import AvailabilityWindow
 from app.models.professional import Professional
-from app.schemas.appointment import AppointmentCreate, AppointmentReschedule, AppointmentUpdate
+from app.schemas.appointment import (
+    AppointmentCreate,
+    AppointmentReschedule,
+    AppointmentSeriesCreate,
+    AppointmentUpdate,
+)
 from app.schemas.availability import (
     AvailabilityBulkResult,
     AvailabilitySlot,
@@ -59,6 +65,12 @@ ALLOWED_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {
 
 # Moving into these states takes the slot again, so the calendar must be re-validated.
 REACTIVATING_SOURCES = {AppointmentStatus.CANCELLED, AppointmentStatus.EXPIRED}
+
+
+@dataclass(frozen=True)
+class SeriesResult:
+    created: list[Appointment]
+    skipped: list[tuple[datetime, str]]
 
 
 class ScheduleAgent:
@@ -165,6 +177,65 @@ class ScheduleAgent:
         followup_agent.queue_confirmation(db, appointment, actor=actor)
         self.commit(db)
         return self.get_appointment(db, appointment.id)
+
+
+    def create_series(
+        self,
+        db: Session,
+        payload: AppointmentSeriesCreate,
+        *,
+        reception_agent: ReceptionAgent,
+        followup_agent: FollowUpAgent,
+        actor: str = "schedule_agent",
+    ) -> SeriesResult:
+        """Carga de una vez los turnos de un tratamiento que repite.
+
+        Sobre un año de controles siempre hay fechas que caen en un feriado o en un
+        horario ya tomado: esas se saltean y se informan, en vez de hacer fallar todo.
+        """
+        professional = self.lock_professional(db, payload.professional_id)
+        patient = reception_agent.resolve_patient(db, patient_id=payload.patient_id, actor=actor)
+        duration = payload.duration_minutes or professional.default_appointment_duration
+        first = ensure_local_naive(payload.starts_at, self.timezone_name)
+
+        created: list[Appointment] = []
+        skipped: list[tuple[datetime, str]] = []
+        for index in range(payload.occurrences):
+            starts_at = first + timedelta(weeks=payload.every_weeks * index)
+            try:
+                self.validate_slot(
+                    db,
+                    professional=professional,
+                    starts_at=starts_at,
+                    ends_at=calculate_end(starts_at, duration),
+                    patient_id=patient.id,
+                )
+                created.append(
+                    self.insert_appointment(
+                        db,
+                        professional=professional,
+                        patient_id=patient.id,
+                        starts_at=starts_at,
+                        duration_minutes=duration,
+                        status=AppointmentStatus.RESERVED,
+                        reason=payload.reason,
+                        notes=payload.notes,
+                        created_by=payload.created_by,
+                        actor=actor,
+                    )
+                )
+            except DomainError as exc:
+                skipped.append((starts_at, exc.detail))
+
+        if not created:
+            raise DomainError(
+                "No pudimos cargar ninguno de los turnos de la serie: revisá la disponibilidad del profesional.",
+                status_code=409,
+            )
+        # Un solo email con todas las fechas: doce confirmaciones seguidas son spam.
+        followup_agent.queue_series(db, created, actor=actor)
+        self.commit(db)
+        return SeriesResult(created=created, skipped=skipped)
 
     def insert_appointment(
         self,

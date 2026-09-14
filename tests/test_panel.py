@@ -2,6 +2,7 @@
 
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from urllib.parse import unquote_plus
 
 import pytest
 from sqlalchemy import select
@@ -556,3 +557,65 @@ def test_an_attended_visit_with_no_charge_loaded_is_flagged(client, db_session, 
     stats = AnalyticsService().clinic_stats(db_session, date_from=date(2026, 3, 27), date_to=date(2026, 3, 31))
 
     assert (stats.charged_total, stats.attended_without_charge) == (Decimal("0"), 1)
+
+
+def _publish_mornings(db, professional_id: int, days: list[date]) -> None:
+    for day in days:
+        db.add(
+            AvailabilityWindow(
+                professional_id=professional_id, availability_date=day,
+                start_time=time(9, 0), end_time=time(12, 0), slot_duration_minutes=30,
+            )
+        )
+    db.commit()
+
+
+def test_a_treatment_series_loads_every_appointment_at_once(client, db_session, clinic):
+    """Ortodoncia es control mensual por meses: cargarlos de a uno es inviable."""
+    patient = Patient(dni="41777888", first_name="Tomás", last_name="Ruiz", email="tomas@example.com")
+    db_session.add(patient)
+    _publish_mornings(db_session, clinic["laura"], [date(2026, 4, 27), date(2026, 5, 25)])
+    db_session.commit()
+    login(client, "admin")
+
+    client.post(
+        "/app/appointments/series",
+        data={
+            "patient_id": patient.id, "professional_id": clinic["laura"],
+            "starts_at": "2026-03-30T09:00", "duration_minutes": "30",
+            "every_weeks": "4", "occurrences": "3", "reason": "Control de ortodoncia",
+        },
+        follow_redirects=False,
+    )
+
+    appointments = db_session.scalars(
+        select(Appointment).where(Appointment.patient_id == patient.id).order_by(Appointment.starts_at)
+    ).all()
+    assert [a.starts_at for a in appointments] == [
+        datetime(2026, 3, 30, 9, 0), datetime(2026, 4, 27, 9, 0), datetime(2026, 5, 25, 9, 0)
+    ]
+    assert {a.status for a in appointments} == {AppointmentStatus.RESERVED}
+
+
+def test_a_series_skips_taken_dates_instead_of_failing(client, db_session, clinic):
+    """Sobre un año de controles alguna fecha siempre va a estar ocupada."""
+    patient = Patient(dni="41777999", first_name="Ana", last_name="Ruiz", email="ana2@example.com")
+    db_session.add(patient)
+    db_session.commit()
+    _publish_mornings(db_session, clinic["laura"], [date(2026, 4, 27), date(2026, 5, 25)])
+    # El segundo turno de la serie cae sobre uno que ya existe.
+    add_appointment(db_session, clinic["laura"], starts_at=datetime(2026, 4, 27, 9, 0), dni="30111222")
+    login(client, "admin")
+
+    response = client.post(
+        "/app/appointments/series",
+        data={
+            "patient_id": patient.id, "professional_id": clinic["laura"],
+            "starts_at": "2026-03-30T09:00", "every_weeks": "4", "occurrences": "3",
+        },
+        follow_redirects=False,
+    )
+
+    created = db_session.scalars(select(Appointment).where(Appointment.patient_id == patient.id)).all()
+    assert len(created) == 2
+    assert "No se pudieron cargar 1" in unquote_plus(response.headers["location"])

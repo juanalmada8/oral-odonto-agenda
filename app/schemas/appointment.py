@@ -80,3 +80,17 @@ class AgendaQuery(BaseModel):
 class WeeklyAgendaQuery(BaseModel):
     week_start: date
     professional_id: int | None = None
+
+
+class AppointmentSeriesCreate(BaseModel):
+    """Una serie de turnos iguales, para tratamientos que repiten (ortodoncia, controles)."""
+
+    patient_id: int
+    professional_id: int
+    starts_at: datetime
+    duration_minutes: int | None = Field(default=None, ge=10, le=240)
+    every_weeks: int = Field(default=4, ge=1, le=12)
+    occurrences: int = Field(default=6, ge=2, le=24)
+    reason: str | None = Field(default=None, max_length=255)
+    notes: str | None = None
+    created_by: str = Field(default="reception_agent", max_length=80)

@@ -72,6 +72,15 @@ class MessageComposer:
         context = self._context(appointment) | {"patient_first_name": patient_first_name}
         return self._render("waitlist", f"Se liberó un turno: {context['when_short']}", context)
 
+    def series(self, appointments: list[Appointment]) -> EmailContent:
+        """Un solo mail con todas las fechas: doce confirmaciones seguidas son spam."""
+        first = appointments[0]
+        context = self._context(first) | {
+            "appointments": [{"when": self.when_text(item).capitalize()} for item in appointments],
+        }
+        subject = f"Tus {len(appointments)} turnos: desde el {context['when_short']}"
+        return self._render("series", subject, context)
+
     def reschedule(self, appointment: Appointment, previous_when: str | None = None) -> EmailContent:
         """`previous_when` is the old date in words, so the patient sees what changed."""
         context = self._context(appointment) | {"previous_when": previous_when}

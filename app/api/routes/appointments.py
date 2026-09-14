@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.appointment import (
     AppointmentCreate,
+    AppointmentSeriesCreate,
     AppointmentRead,
     AppointmentReschedule,
     AppointmentStatusUpdate,
@@ -94,6 +95,26 @@ def create_appointment(
     return appointment
 
 
+@router.post("/series", response_model=list[AppointmentRead], status_code=status.HTTP_201_CREATED)
+def create_appointment_series(
+    payload: AppointmentSeriesCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    reception_agent: ReceptionAgent = Depends(get_reception_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    current_user: User = Depends(get_current_user),
+):
+    """Los turnos de un tratamiento que repite. Las fechas sin lugar se saltean."""
+    result = schedule_agent.create_series(
+        db,
+        payload,
+        reception_agent=reception_agent,
+        followup_agent=followup_agent,
+        actor=current_user.username,
+    )
+    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    return result.created
 @router.put("/{appointment_id}", response_model=AppointmentRead)
 def update_appointment(
     appointment_id: int,

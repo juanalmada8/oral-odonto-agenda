@@ -91,6 +91,71 @@
       <button type="submit" id="manual-submit" disabled>Guardar turno</button>
     </form>
   </details>
+
+  <details class="foldout">
+    <summary>Turnos en serie (ortodoncia, controles)</summary>
+    <form method="post" action="/app/appointments/series" class="form-grid">
+      <p class="field-hint">
+        Carga varios turnos iguales de una vez. Las fechas que caigan en un horario ocupado o sin
+        atención se saltean y te avisamos cuáles. Al paciente le llega un solo email con todas.
+      </p>
+      <label class="field">
+        <span class="field-label">Paciente</span>
+        <select name="patient_id" required>
+          <option value="">Elegí un paciente</option>
+          {% for patient in patients if patient.is_active %}
+          <option value="{{ patient.id }}">{{ patient.last_name }}, {{ patient.first_name }} · DNI {{ patient.dni }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="two-cols">
+        <label class="field">
+          <span class="field-label">Profesional</span>
+          <select name="professional_id" required>
+            <option value="">Elegí un profesional</option>
+            {% for professional in professionals %}
+            <option value="{{ professional.id }}">{{ professional.first_name }} {{ professional.last_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Primer turno</span>
+          <input type="datetime-local" name="starts_at" step="300" required />
+        </label>
+      </div>
+      <div class="two-cols">
+        <label class="field">
+          <span class="field-label">Se repite</span>
+          <select name="every_weeks">
+            <option value="1">Cada semana</option>
+            <option value="2">Cada 2 semanas</option>
+            <option value="3">Cada 3 semanas</option>
+            <option value="4" selected>Cada 4 semanas (mensual)</option>
+            <option value="8">Cada 8 semanas</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Cantidad de turnos</span>
+          <input type="number" name="occurrences" min="2" max="24" value="6" />
+        </label>
+      </div>
+      <div class="two-cols">
+        <label class="field">
+          <span class="field-label">Duración</span>
+          <input type="number" name="duration_minutes" min="10" max="240" step="5" value="30" />
+        </label>
+        <label class="field">
+          <span class="field-label">Motivo</span>
+          <input name="reason" placeholder="Control de ortodoncia" />
+        </label>
+      </div>
+      <label class="field">
+        <span class="field-label">Notas internas</span>
+        <textarea name="notes" placeholder="Opcional"></textarea>
+      </label>
+      <button type="submit">Cargar la serie</button>
+    </form>
+  </details>
   {% endif %}
 
   <div class="table-wrap">

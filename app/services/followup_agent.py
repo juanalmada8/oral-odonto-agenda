@@ -145,6 +145,25 @@ class FollowUpAgent:
             actor=actor,
         )
 
+    def queue_series(self, db: Session, appointments: list[Appointment], actor: str = "followup_agent") -> Notification | None:
+        """Confirma una serie completa en un mensaje, colgado del primer turno."""
+        first = appointments[0]
+        recipient = first.notification_email
+        if not recipient:
+            return None
+        content = self.composer.series(appointments)
+        return self._queue(
+            db,
+            appointment=first,
+            type_=NotificationType.CONFIRMATION,
+            channel=NotificationChannel.EMAIL,
+            recipient=recipient,
+            subject=content.subject,
+            body=content.text,
+            html_body=content.html,
+            actor=actor,
+        )
+
     def prepare_upcoming_reminders(
         self,
         db: Session,
