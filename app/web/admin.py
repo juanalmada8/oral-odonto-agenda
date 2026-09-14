@@ -35,7 +35,7 @@ from app.core.rate_limit import enforce_login_rate_limit
 from app.db.session import get_db
 from app.models.notification import Notification
 from app.models.user import User
-from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
+from app.schemas.appointment import AppointmentCreate, AppointmentSeriesCreate, AppointmentUpdate
 from app.schemas.auth import UserCreate, UserUpdate
 from app.schemas.availability import AvailabilityWindowCreate, RecurringAvailabilityCreate
 from app.schemas.patient import PatientCreate, PatientUpdate
@@ -397,6 +397,57 @@ def create_manual_appointment(
         message=message,
     )
 
+
+@router.post("/app/appointments/series")
+def create_appointment_series(
+    background_tasks: BackgroundTasks,
+    patient_id: int = Form(...),
+    professional_id: int = Form(...),
+    starts_at: str = Form(...),
+    duration_minutes: int = Form(30),
+    every_weeks: int = Form(4),
+    occurrences: int = Form(6),
+    reason: str = Form(""),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    reception_agent: ReceptionAgent = Depends(get_reception_agent),
+    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+):
+    """Carga de una vez los controles de un tratamiento (ortodoncia, seguimientos)."""
+    require_roles(current_user, *STAFF)
+    try:
+        selected_dt = datetime.fromisoformat(starts_at)
+        result = schedule_agent.create_series(
+            db,
+            AppointmentSeriesCreate(
+                patient_id=patient_id,
+                professional_id=professional_id,
+                starts_at=selected_dt,
+                duration_minutes=duration_minutes,
+                every_weeks=every_weeks,
+                occurrences=occurrences,
+                reason=reason or None,
+                notes=notes or None,
+                created_by=current_user.username,
+            ),
+            reception_agent=reception_agent,
+            followup_agent=followup_agent,
+            actor=current_user.username,
+        )
+    except Exception as exc:
+        db.rollback()
+        return redirect_with_message("/app/appointments", error=user_facing_message(exc))
+    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    message = f"Se cargaron {len(result.created)} turnos y le avisamos al paciente."
+    if result.skipped:
+        fechas = ", ".join(format_short_date(day) for day, _ in result.skipped)
+        message += f" No se pudieron cargar {len(result.skipped)}: {fechas}."
+    return redirect_with_message(
+        f"/app/appointments?selected_date={selected_dt.date().isoformat()}",
+        message=message,
+    )
 
 @router.post("/app/appointments/{appointment_id}/status")
 def update_appointment_status(

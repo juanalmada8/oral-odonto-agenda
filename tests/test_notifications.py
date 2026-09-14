@@ -3,7 +3,7 @@
 import hashlib
 import hmac
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import httpx
@@ -562,3 +562,38 @@ def test_joining_the_waitlist_twice_updates_the_entry_instead_of_duplicating(cli
 
     entry = db_session.scalars(select(WaitlistEntry)).one()
     assert (entry.date_to.isoformat(), entry.period) == ("2026-04-20", WaitlistPeriod.MORNING)
+
+
+def test_a_series_sends_one_email_with_every_date(client, db_session, make_professional, outbox, auth_headers):
+    """Doce confirmaciones seguidas son spam: va un solo mensaje con la lista."""
+    from datetime import time as time_of_day
+
+    from app.models.availability_window import AvailabilityWindow
+    from app.models.patient import Patient
+
+    professional_id = make_professional(deposit=Decimal("0"))
+    patient = Patient(dni="41333222", first_name="Tomás", last_name="Ruiz", email="tomas@example.com")
+    db_session.add(patient)
+    for day in (date(2026, 4, 27), date(2026, 5, 25)):
+        db_session.add(
+            AvailabilityWindow(
+                professional_id=professional_id, availability_date=day,
+                start_time=time_of_day(9, 0), end_time=time_of_day(12, 0), slot_duration_minutes=30,
+            )
+        )
+    db_session.commit()
+
+    client.post(
+        "/api/v1/appointments/series",
+        json={
+            "patient_id": patient.id, "professional_id": professional_id,
+            "starts_at": "2026-03-30T09:00:00", "every_weeks": 4, "occurrences": 3,
+        },
+        headers=auth_headers,
+    )
+
+    assert len(outbox.sent) == 1
+    body = outbox.sent[0]["text"]
+    assert "Lunes 30 de marzo" in body
+    assert "Lunes 27 de abril" in body
+    assert "Lunes 25 de mayo" in body

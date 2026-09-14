@@ -1236,8 +1236,6 @@ button:disabled {
   position: sticky;
   top: 20px;
   height: calc(100vh - 40px);
-  /* Con la barra a alto fijo, en pantallas bajas el pie (usuario y Salir) quedaba cortado. */
-  overflow-y: auto;
   overscroll-behavior: contain;
   color: white;
   border: none;
@@ -1260,6 +1258,9 @@ button:disabled {
 .sidebar-top {
   display: grid;
   gap: 20px;
+  /* Scrollea el menú y no la barra entera, para que el usuario y Salir queden siempre abajo. */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .sidebar-nav {
