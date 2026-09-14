@@ -48,6 +48,9 @@ class Appointment(TimestampMixin, Base):
     contact_phone: Mapped[str | None] = mapped_column(String(40))
     # Deposit required when the appointment was booked (snapshot; the professional's amount may change).
     deposit_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    # Lo que realmente se cobró por la consulta. La seña es una parte de esto, no el total:
+    # sin este dato las métricas de ingresos solo ven señas.
+    charged_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     # While the deposit is unpaid the slot is held until this moment, then released.
     hold_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))

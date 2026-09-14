@@ -13,6 +13,7 @@ from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.professional import Professional
 from app.models.user import User
+from app.services.analytics import AnalyticsService
 from tests.conftest import MONDAY, create_user
 
 
@@ -522,3 +523,36 @@ def test_a_finished_appointment_offers_no_primary_action(client, db_session, cli
 
     assert 'class="primary-button' not in page
     assert 'class="row-menu"' in page
+
+
+def test_what_the_visit_was_charged_feeds_the_revenue_metric(client, db_session, clinic):
+    """The deposit is an advance, not the price: revenue counted only deposits before this."""
+    appointment = add_appointment(
+        db_session, clinic["laura"], starts_at=datetime(2026, 3, 30, 9, 0),
+        status=AppointmentStatus.COMPLETED, deposit_amount=Decimal("10000"),
+    )
+    login(client, "admin")
+
+    client.post(
+        f"/app/appointments/{appointment.id}/edit",
+        data={
+            "starts_at": "2026-03-30T09:00", "duration_minutes": "30", "status": "completed",
+            "reason": "Limpieza", "notes": "", "charged_amount": "40.000",
+        },
+        follow_redirects=False,
+    )
+
+    db_session.expire_all()
+    assert db_session.get(Appointment, appointment.id).charged_amount == Decimal("40000")
+    stats = AnalyticsService().clinic_stats(db_session, date_from=date(2026, 3, 27), date_to=date(2026, 3, 31))
+    assert stats.charged_total == Decimal("40000")
+    assert stats.charged_appointments == 1
+    assert stats.attended_without_charge == 0
+
+
+def test_an_attended_visit_with_no_charge_loaded_is_flagged(client, db_session, clinic):
+    add_appointment(db_session, clinic["laura"], starts_at=datetime(2026, 3, 30, 9, 0), status=AppointmentStatus.COMPLETED)
+
+    stats = AnalyticsService().clinic_stats(db_session, date_from=date(2026, 3, 27), date_to=date(2026, 3, 31))
+
+    assert (stats.charged_total, stats.attended_without_charge) == (Decimal("0"), 1)

@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -31,6 +32,8 @@ class AppointmentUpdate(BaseModel):
     status: AppointmentStatus | None = None
     reason: str | None = Field(default=None, max_length=255)
     notes: str | None = None
+    # Lo cobrado en la consulta; la seña es una parte, no el total.
+    charged_amount: Decimal | None = Field(default=None, ge=0, le=100_000_000, decimal_places=2)
 
 
 class AppointmentReschedule(BaseModel):

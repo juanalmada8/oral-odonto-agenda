@@ -44,8 +44,6 @@ class ProfessionalService:
     ) -> Professional:
         professional = self.get_professional(db, professional_id)
         changes = payload.model_dump(exclude_unset=True)
-        # La auditoría va a una columna JSON: fechas y Decimal tienen que ir como texto.
-        audited = payload.model_dump(exclude_unset=True, mode="json")
         if "email" in changes or "phone" in changes:
             self._assert_unique_contact(
                 db,
@@ -62,7 +60,7 @@ class ProfessionalService:
             entity_id=str(professional.id),
             actor=actor,
             description="Professional updated",
-            details=audited,
+            details=changes,
         )
         db.commit()
         db.refresh(professional)

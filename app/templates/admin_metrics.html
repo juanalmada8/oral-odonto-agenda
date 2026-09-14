@@ -41,6 +41,14 @@
     <span class="metric-foot">{{ stats.by_status['no_show'] }} ausentes · {{ stats.by_status['completed'] }} atendidos</span>
   </article>
   <article class="metric-card">
+    <span class="metric-label">Facturado</span>
+    <strong class="metric-value metric-value-sm">{{ stats.charged_total | money }}</strong>
+    <span class="metric-foot">
+      {{ stats.charged_appointments }} turno(s) con cobro cargado
+      {% if stats.attended_without_charge %} · {{ stats.attended_without_charge }} atendido(s) sin cargar{% endif %}
+    </span>
+  </article>
+  <article class="metric-card">
     <span class="metric-label">Señas cobradas</span>
     <strong class="metric-value metric-value-sm">{{ stats.deposits_collected | money }}</strong>
     <span class="metric-foot">{% if stats.refunds_pending %}{{ stats.refunds_pending }} a devolver{% else %}sin devoluciones pendientes{% endif %}</span>
@@ -80,7 +88,7 @@
   <div class="table-wrap">
     <table class="data-table">
       <thead>
-        <tr><th>Profesional</th><th>Ocupación</th><th>Turnos</th><th>Atendidos</th><th>Ausentes</th><th>Cancelados</th><th>Señas</th></tr>
+        <tr><th>Profesional</th><th>Ocupación</th><th>Turnos</th><th>Atendidos</th><th>Ausentes</th><th>Cancelados</th><th>Señas</th><th>Facturado</th></tr>
       </thead>
       <tbody>
         {% for row in stats.professionals %}
@@ -95,6 +103,7 @@
           <td>{{ row.no_show }}{% if row.no_show_rate %} <span class="muted small">({{ row.no_show_rate | percent }})</span>{% endif %}</td>
           <td>{{ row.cancelled }}</td>
           <td>{{ row.deposits | money }}</td>
+          <td><strong>{{ row.charged | money }}</strong></td>
         </tr>
         {% else %}
         <tr><td colspan="7" class="empty-row">Sin actividad en el período.</td></tr>
