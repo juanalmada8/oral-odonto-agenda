@@ -1,0 +1,20 @@
+¡Te esperamos, {{ patient_first_name }}!
+
+{% if deposit_paid %}Recibimos tu seña de {{ deposit_paid | money }} y tu turno quedó confirmado.{% else %}Tu turno quedó registrado.{% endif %}
+
+
+Día: {{ date_long_capitalized }}
+Horario: {{ time }} a {{ end_time }} h
+Profesional: {{ professional_name }}{% if specialty %} ({{ specialty }}){% endif %}
+
+{% if clinic_address %}
+Dirección: {{ clinic_address }}
+{% endif %}
+
+Ver tu turno: {{ status_url }}
+Agregar al calendario: {{ calendar_url }}
+
+Si necesitás cancelar, hacelo desde el link de tu turno o respondiendo el recordatorio de WhatsApp, hasta {{ cancellation_notice_hours }} horas antes.
+{{ deposit_policy }}
+
+{{ clinic_name }}{% if clinic_phone %} · Tel: {{ clinic_phone }}{% endif %}

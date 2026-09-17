@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, Integer, String
+from decimal import Decimal
+
+from sqlalchemy import Boolean, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -18,6 +20,8 @@ class Professional(TimestampMixin, Base):
         default=30,
         server_default="30",
     )
+    # Deposit charged for online bookings; NULL falls back to DEPOSIT_DEFAULT_AMOUNT, 0 disables it.
+    deposit_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
     appointments = relationship("Appointment", back_populates="professional")

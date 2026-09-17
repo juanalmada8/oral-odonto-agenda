@@ -1,0 +1,19 @@
+{{ patient_first_name }}, cambiamos tu turno de día.
+{% if previous_when %}
+Antes: {{ previous_when }}
+{% endif %}
+
+Ahora:
+Día: {{ date_long_capitalized }}
+Horario: {{ time }} a {{ end_time }} h
+Profesional: {{ professional_name }}
+{% if clinic_address %}
+Dirección: {{ clinic_address }}
+{% endif %}
+
+Ver tu turno: {{ status_url }}
+Agregar al calendario: {{ calendar_url }}
+
+Si este horario no te sirve, avisanos desde el link de arriba{% if clinic_phone %} o llamanos al {{ clinic_phone }}{% endif %}.
+
+{{ clinic_name }}{% if clinic_phone %} · Tel: {{ clinic_phone }}{% endif %}

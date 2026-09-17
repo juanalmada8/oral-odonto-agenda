@@ -1,0 +1,55 @@
+name: Release
+
+# When the version in pyproject.toml changes on main (normally by merging a "release: vX.Y.Z" PR),
+# tag it, publish a GitHub Release with the CHANGELOG notes and deploy it to production.
+on:
+  push:
+    branches: [main]
+    paths: [pyproject.toml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag and publish
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.release.outputs.created }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: release
+        name: Create the release if this version is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(python3 ops/release.py current)"
+          tag="v${version}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "${tag} already exists, nothing to release."
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python3 ops/release.py notes "${version}" > notes.md
+          gh release create "${tag}" --target "${GITHUB_SHA}" --title "${tag}" --notes-file notes.md
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: tag
+    # Until the GCP variables exist (docs/DEPLOYMENT.md) releases are published without deploying.
+    if: needs.tag.outputs.created == 'true' && vars.GCP_PROJECT_ID != ''
+    uses: ./.github/workflows/deploy.yml
+    with:
+      ref: ${{ needs.tag.outputs.tag }}
+      environment: production
+    secrets: inherit

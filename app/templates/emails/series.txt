@@ -1,0 +1,9 @@
+{{ patient_first_name }}, estos son tus turnos con {{ professional_name }}:
+{% for item in appointments %}
+- {{ item.when }}
+{% endfor %}
+
+Te vamos a recordar cada uno antes de la fecha.
+Si alguna fecha no te sirve, avisanos{% if clinic_phone %} al {{ clinic_phone }}{% endif %} y la cambiamos.
+
+{{ clinic_name }}{% if clinic_phone %} · Tel: {{ clinic_phone }}{% endif %}
