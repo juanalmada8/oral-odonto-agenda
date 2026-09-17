@@ -120,6 +120,11 @@ img {
   height: auto;
 }
 
+/* Sin esto, cualquier display del CSS le gana al atributo hidden. */
+[hidden] {
+  display: none !important;
+}
+
 :focus-visible {
   outline: 2px solid var(--ocean-700);
   outline-offset: 2px;
@@ -712,29 +717,51 @@ fieldset {
   padding-block: 40px 64px;
 }
 
-.intro {
+/* Portada: la marca en grande y un solo botón que lleva a la reserva. */
+.hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  align-items: stretch;
-  gap: 24px;
-  margin-bottom: 32px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  align-items: center;
+  gap: 48px;
+  min-height: min(620px, calc(100vh - 77px));
+  padding-block: 24px 64px;
 }
 
-.intro__copy {
-  align-self: center;
+.hero h1 {
+  font-size: clamp(38px, 5vw, 60px);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
 }
 
-.intro h1 {
-  font-size: clamp(32px, 4.2vw, 44px);
-  letter-spacing: -0.02em;
-}
-
-.intro__lead {
-  max-width: 34ch;
-  margin-top: 10px;
-  font-size: 18px;
+.hero__lead {
+  max-width: 30ch;
+  margin-top: 16px;
+  font-size: 20px;
   line-height: 1.45;
   color: var(--ink-2);
+}
+
+.hero__cta {
+  margin-top: 32px;
+  padding-inline: 28px;
+}
+
+.hero__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  margin: 36px 0 0;
+}
+
+.hero__facts dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.hero__facts dd {
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 /* La tarjeta de marca: logo en blanco sobre océano, con el acento coral de las piezas. */
@@ -743,11 +770,11 @@ fieldset {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 24px;
-  min-height: 176px;
-  padding: 22px 24px;
+  gap: 32px;
+  min-height: 380px;
+  padding: 40px;
   overflow: hidden;
-  border-radius: var(--radius-lg);
+  border-radius: 20px;
   background: var(--ocean-700);
   color: #fff;
 }
@@ -757,20 +784,24 @@ fieldset {
   position: absolute;
   top: 0;
   right: 0;
-  width: 64px;
-  height: 64px;
-  border-bottom-left-radius: 28px;
+  width: 112px;
+  height: 112px;
+  border-bottom-left-radius: 48px;
   background: var(--coral-500);
 }
 
 .brand-card img {
-  width: 150px;
+  width: min(300px, 70%);
 }
 
 .brand-card p {
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.85);
+}
+
+.booking {
+  scroll-margin-top: 24px;
 }
 
 .booking[aria-busy="true"] {
@@ -847,6 +878,39 @@ fieldset {
   font-size: 14px;
   font-weight: 600;
   color: var(--ink-2);
+}
+
+.pro-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.chip:hover {
+  border-color: var(--ocean-200);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.chip.is-active {
+  border-color: var(--ocean-700);
+  background: var(--ocean-700);
+  color: #fff;
+}
+
+.pro-more {
+  justify-self: start;
 }
 
 .pro-options {
@@ -2202,8 +2266,13 @@ fieldset {
     position: static;
   }
 
-  .intro {
-    grid-template-columns: minmax(0, 1fr) 260px;
+  .hero {
+    gap: 32px;
+  }
+
+  .brand-card {
+    min-height: 320px;
+    padding: 32px;
   }
 }
 
@@ -2297,17 +2366,40 @@ fieldset {
     padding-block: 24px 48px;
   }
 
-  .intro {
+  .hero {
     grid-template-columns: minmax(0, 1fr);
-    margin-bottom: 20px;
+    gap: 28px;
+    min-height: 0;
+    padding-block: 8px 40px;
   }
 
-  .intro__lead {
-    font-size: 16px;
+  .hero__lead {
+    font-size: 17px;
+  }
+
+  .hero__cta {
+    width: 100%;
+    margin-top: 24px;
   }
 
   .brand-card {
-    display: none;
+    min-height: 200px;
+    padding: 24px;
+    border-radius: 16px;
+  }
+
+  .brand-card::after {
+    width: 72px;
+    height: 72px;
+    border-bottom-left-radius: 32px;
+  }
+
+  .brand-card img {
+    width: 190px;
+  }
+
+  .brand-card p {
+    font-size: 14px;
   }
 
   .step {
@@ -2317,6 +2409,41 @@ fieldset {
   .date-strip {
     margin: 0 -16px;
     padding-inline: 16px;
+  }
+
+  /* Mismo patrón que los días: una tira que se desliza, no tres renglones de filtros. */
+  .pro-filter {
+    flex-wrap: nowrap;
+    margin: 0 -16px;
+    padding: 2px 16px 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .pro-filter::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chip {
+    flex: none;
+  }
+
+  .pro-options {
+    gap: 8px;
+  }
+
+  .pro-option {
+    padding: 10px 12px;
+  }
+
+  .pro-option__avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 13px;
+  }
+
+  .pro-more {
+    width: 100%;
   }
 
   .field-row,
