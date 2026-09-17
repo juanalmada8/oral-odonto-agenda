@@ -11,44 +11,48 @@
     <link rel="stylesheet" href="{{ asset_url('styles.css') }}" />
   </head>
   <body class="public-body">
-    <header class="site-header">
-      <div class="site-header__inner">
-        <a class="site-header__brand" href="/reservar" aria-label="{{ settings.clinic_name }}, inicio">
-          <img src="{{ brand_logo }}" alt="{{ settings.clinic_name }}" width="132" height="61" />
+    <div class="landing">
+      <div class="public-topbar">
+        <a class="topbar-brand" href="/reservar">
+          <img class="brand-logo-topbar" src="{{ brand_logo }}" alt="{{ settings.clinic_name }}" />
         </a>
-        <div class="site-header__meta">
-          {% if settings.clinic_address %}
-          {% if settings.clinic_maps_url %}
-          <a href="{{ settings.clinic_maps_url }}" target="_blank" rel="noopener">{{ settings.clinic_address }}, {{ settings.clinic_city.split(',')[0] }}</a>
-          {% else %}
-          <span>{{ settings.clinic_address }}, {{ settings.clinic_city.split(',')[0] }}</span>
-          {% endif %}
-          {% endif %}
-          {% if settings.clinic_phone %}<a href="tel:{{ settings.clinic_phone | replace(' ', '') }}">{{ settings.clinic_phone }}</a>{% endif %}
-        </div>
       </div>
-    </header>
 
-    <main class="page">
-      <section class="hero" aria-labelledby="hero-title">
-        <div class="hero__copy">
-          <h1 id="hero-title">Reservá tu turno</h1>
-          <p class="hero__lead">Elegí el día y la hora que te queden bien. Sin llamar, sin esperar respuesta.</p>
-          <a class="button button--lg hero__cta" href="#booking-flow" data-scroll-to-booking>Reservar turno</a>
+      <header class="hero">
+        <div class="hero-copy">
+          <span class="eyebrow">{{ settings.clinic_city }}</span>
+          <h1>Reservá tu turno</h1>
+          <p class="hero-lead">
+            Elegí el día y la hora que te queden bien. Sin llamar, sin esperar respuesta.
+          </p>
+          <div class="hero-actions">
+            <a class="hero-scroll-button" href="#booking-flow" data-scroll-to-booking>Elegir horario</a>
+            {% if settings.clinic_whatsapp %}
+            <a class="hero-secondary" href="https://wa.me/{{ settings.clinic_whatsapp | replace('+', '') }}" target="_blank" rel="noopener">Escribinos por WhatsApp</a>
+            {% endif %}
+          </div>
           {% if settings.clinic_hours or settings.clinic_phone %}
-          <dl class="hero__facts">
+          <dl class="hero-facts">
             {% if settings.clinic_hours %}<div><dt>Atención</dt><dd>{{ settings.clinic_hours }}</dd></div>{% endif %}
             {% if settings.clinic_phone %}<div><dt>Teléfono</dt><dd>{{ settings.clinic_phone }}</dd></div>{% endif %}
           </dl>
           {% endif %}
         </div>
-        <aside class="brand-card" aria-label="{{ settings.clinic_name }}">
-          <img src="{{ brand_logo_light }}" alt="" width="300" height="139" />
-          <p>
-            {% if settings.clinic_address %}{{ settings.clinic_address }} · {% endif %}{{ settings.clinic_city }}
-          </p>
+
+        <aside class="hero-visual">
+          <div class="hero-visual-inner">
+            <img class="hero-brand" src="{{ brand_logo_light }}" alt="{{ settings.clinic_name }}" />
+            <div class="hero-local-accent">
+              <span class="brand-accent">
+                {% if settings.clinic_address %}{{ settings.clinic_address }} · {% endif %}{{ settings.clinic_city }}
+              </span>
+            </div>
+          </div>
         </aside>
-      </section>
+      </header>
+    </div>
+
+    <main class="page">
 
       <div id="booking-flow" class="booking">
         {% if message %}
