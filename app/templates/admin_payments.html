@@ -14,7 +14,6 @@
 <section class="surface surface-main">
   <div class="surface-head">
     <div>
-      <div class="eyebrow">Mercado Pago</div>
       <h2>{{ 'Señas a devolver' if filter == 'refund' else 'Últimos pagos' }}</h2>
       {% if gateway_name != 'mercadopago' %}
       <p class="muted small">{{ 'Simulador local: no se cobra de verdad.' if gateway_name == 'simulator' else 'Mercado Pago sin configurar.' }}</p>

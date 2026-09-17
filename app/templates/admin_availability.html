@@ -38,7 +38,6 @@
 {% block content %}
 <section class="availability-tools">
   <article class="surface">
-    <div class="eyebrow">Carga rápida</div>
     <h2>Repetir cada semana</h2>
     <p class="muted">Ej.: lunes, miércoles y viernes de 9 a 13 durante las próximas 4 semanas. Los días que ya tienen horarios superpuestos se saltean.</p>
     <form method="post" action="/app/availability/recurring" class="form-grid">
@@ -66,7 +65,6 @@
   </article>
 
   <article class="surface">
-    <div class="eyebrow">Día puntual</div>
     <h2>Agregar un bloque</h2>
     <form method="post" action="/app/availability/windows" class="form-grid">
       {{ professional_field() }}

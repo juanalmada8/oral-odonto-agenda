@@ -35,7 +35,6 @@
 <section class="surface surface-main">
   <div class="surface-head">
     <div>
-      <div class="eyebrow">Operación diaria</div>
       <h2>Agenda del día</h2>
     </div>
     <form method="get" action="/app" class="toolbar-form">
@@ -55,7 +54,7 @@
   </div>
 
   <div class="table-wrap">
-    <table class="data-table">
+    <table class="data-table data-table--stacked data-table--agenda">
       <thead>
         <tr>
           <th>Hora</th>
@@ -70,19 +69,19 @@
       <tbody>
         {% for appointment in appointments if appointment.status.value != 'expired' %}
         <tr>
-          <td><strong>{{ appointment.starts_at.strftime("%H:%M") }}</strong><div class="muted small">{{ appointment.duration_minutes }} min</div></td>
-          <td>
+          <td data-label="Hora"><strong>{{ appointment.starts_at.strftime("%H:%M") }}</strong><div class="muted small">{{ appointment.duration_minutes }} min</div></td>
+          <td data-label="Paciente">
             <strong>{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}</strong>
             <div class="muted small">DNI {{ appointment.patient.dni }}{% if appointment.notification_phone %} · {{ appointment.notification_phone | phone }}{% endif %}</div>
           </td>
-          {% if not is_professional %}<td>{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>{% endif %}
-          <td>
+          {% if not is_professional %}<td data-label="Profesional">{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>{% endif %}
+          <td data-label="Estado">
             {{ status_badge(appointment.status) }}
             {% if appointment.attendance_confirmed_at %}<div class="muted small attendance-ok">✓ Confirmó por WhatsApp</div>{% endif %}
           </td>
-          <td>{{ payment_badge(appointment) }}</td>
-          <td>{{ appointment.reason or "—" }}</td>
-          <td><div class="row-actions">{{ appointment_actions(appointment, actions_for(appointment), request.url.path ~ '?' ~ request.url.query) }}</div></td>
+          <td data-label="Seña">{{ payment_badge(appointment) }}</td>
+          <td data-label="Motivo">{{ appointment.reason or "—" }}</td>
+          <td data-label="Acciones"><div class="row-actions">{{ appointment_actions(appointment, actions_for(appointment), request.url.path ~ '?' ~ request.url.query) }}</div></td>
         </tr>
         {% else %}
         <tr>
@@ -94,22 +93,4 @@
   </div>
 </section>
 
-{% if not is_professional %}
-<section class="surface dashboard-utility-bar">
-  <div class="surface-head">
-    <div>
-      <div class="eyebrow">Accesos rápidos</div>
-      <h2>Gestión</h2>
-    </div>
-  </div>
-  <div class="utility-links">
-    <a class="quick-link" href="/app/appointments">Turnos y alta manual</a>
-    <a class="quick-link" href="/app/patients">Pacientes</a>
-    {% if current_user.role.value == 'admin' %}
-    <a class="quick-link" href="/app/availability">Disponibilidad</a>
-    <a class="quick-link" href="/app/metrics">Métricas del mes</a>
-    {% endif %}
-  </div>
-</section>
-{% endif %}
 {% endblock %}

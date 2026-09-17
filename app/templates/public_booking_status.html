@@ -13,11 +13,11 @@
   </head>
   <body class="public-body">
     <div class="public-shell status-shell">
-      <div class="public-topbar">
-        <a class="topbar-brand" href="/reservar">
-          <img class="brand-logo brand-logo-wide brand-logo-topbar" src="{{ brand_logo }}" alt="ORAL odontología familiar" />
+      <header class="status-header">
+        <a class="site-header__brand" href="/reservar" aria-label="ORAL odontología familiar, reservar turno">
+          <img src="{{ brand_logo }}" alt="ORAL odontología familiar" width="120" height="55" />
         </a>
-      </div>
+      </header>
 
       <main class="status-layout">
         <section class="panel status-card status-card--{{ status }}" data-status="{{ status }}" data-token="{{ appointment.public_token }}">

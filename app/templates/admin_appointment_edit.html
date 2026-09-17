@@ -3,7 +3,7 @@
 
 {% block content %}
 <section class="surface narrow-surface">
-  <div class="eyebrow">Turno #{{ appointment.id }}</div>
+  <p class="meta">Turno #{{ appointment.id }}</p>
   <h2>{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}</h2>
   <p class="muted">
     {{ appointment.professional.first_name }} {{ appointment.professional.last_name }} ·
