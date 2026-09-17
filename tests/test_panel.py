@@ -640,8 +640,13 @@ def test_the_agenda_does_not_query_more_as_appointments_grow(client, db_session,
     try:
         client.get("/app/appointments?selected_date=2026-03-30")
         con_dos = len(consultas)
-        for minuto in range(0, 60, 5):
-            add_appointment(db_session, clinic["laura"], starts_at=datetime(2026, 3, 30, 11, minuto), dni=f"3022{minuto:04d}")
+        # Uno detrás del otro: superpuestos, PostgreSQL los rechaza por la restricción de exclusión.
+        for indice in range(12):
+            add_appointment(
+                db_session, clinic["laura"],
+                starts_at=datetime(2026, 3, 30, 11, 0) + timedelta(minutes=30 * indice),
+                dni=f"3022{indice:04d}",
+            )
         consultas.clear()
         client.get("/app/appointments?selected_date=2026-03-30")
         con_muchos = len(consultas)
