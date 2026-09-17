@@ -4,6 +4,7 @@ from app.models.audit_log import AuditLog
 from app.models.holiday_block import HolidayBlock
 from app.models.notification import Notification
 from app.models.patient import Patient
+from app.models.payment import Payment
 from app.models.professional import Professional
 from app.models.user import User
 from app.models.working_hours import WorkingHours
@@ -15,6 +16,7 @@ __all__ = [
     "HolidayBlock",
     "Notification",
     "Patient",
+    "Payment",
     "Professional",
     "User",
     "WorkingHours",

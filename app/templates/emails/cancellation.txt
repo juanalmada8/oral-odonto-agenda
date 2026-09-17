@@ -1,0 +1,12 @@
+{{ patient_first_name }}, tu turno fue cancelado.
+
+Día: {{ date_long_capitalized }}
+Horario: {{ time }} a {{ end_time }} h
+Profesional: {{ professional_name }}
+
+Podés reservar otro turno en {{ booking_url }}
+{% if deposit_paid %}
+Sobre la seña abonada: {{ deposit_policy }}
+{% endif %}
+
+{{ clinic_name }}{% if clinic_phone %} · Tel: {{ clinic_phone }}{% endif %}

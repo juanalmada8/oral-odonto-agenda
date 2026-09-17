@@ -1,6 +1,13 @@
 {% extends "base_admin.html" %}
+{% from "_macros.html" import status_badge, payment_badge, appointment_actions %}
 
 {% block content %}
+{% for alert in alerts %}
+<div class="alert alert-warning">
+  {{ alert.text }}{% if alert.href %} <a class="inline-link" href="{{ alert.href }}">Ver detalle</a>{% endif %}
+</div>
+{% endfor %}
+
 <section class="metrics-grid">
   <article class="metric-card">
     <span class="metric-label">Turnos del día</span>
@@ -9,26 +16,31 @@
   <article class="metric-card">
     <span class="metric-label">Confirmados</span>
     <strong class="metric-value">{{ summary.confirmed }}</strong>
+    {% if summary.attendance_confirmed %}<span class="metric-foot">{{ summary.attendance_confirmed }} confirmaron asistencia</span>{% endif %}
   </article>
   <article class="metric-card">
-    <span class="metric-label">Pendientes</span>
+    <span class="metric-label">Reservados sin seña</span>
     <strong class="metric-value">{{ summary.reserved }}</strong>
   </article>
   <article class="metric-card">
-    <span class="metric-label">Notificaciones pendientes</span>
-    <strong class="metric-value">{{ summary.pending_notifications }}</strong>
+    <span class="metric-label">Esperando seña</span>
+    <strong class="metric-value">{{ summary.pending_payment }}</strong>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Próximos 7 días</span>
+    <strong class="metric-value">{{ summary.week }}</strong>
   </article>
 </section>
 
 <section class="surface surface-main">
   <div class="surface-head">
     <div>
-      <div class="eyebrow">Operación diaria</div>
-      <h2>Turnos del día</h2>
+      <h2>Agenda del día</h2>
     </div>
     <form method="get" action="/app" class="toolbar-form">
-      <input type="date" name="selected_date" value="{{ agenda_date }}" />
-      <select name="professional_id">
+      <input type="date" name="selected_date" value="{{ agenda_date }}" aria-label="Fecha" />
+      {% if not is_professional %}
+      <select name="professional_id" aria-label="Profesional">
         <option value="">Todos los profesionales</option>
         {% for professional in professionals %}
         <option value="{{ professional.id }}" {% if selected_professional_id == professional.id %}selected{% endif %}>
@@ -36,36 +48,44 @@
         </option>
         {% endfor %}
       </select>
-      <button type="submit">Aplicar</button>
+      {% endif %}
+      <button type="submit">Ver</button>
     </form>
   </div>
 
   <div class="table-wrap">
-    <table class="data-table">
+    <table class="data-table data-table--stacked data-table--agenda">
       <thead>
         <tr>
           <th>Hora</th>
           <th>Paciente</th>
-          <th>Profesional</th>
+          {% if not is_professional %}<th>Profesional</th>{% endif %}
           <th>Estado</th>
+          <th>Seña</th>
           <th>Motivo</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
-        {% for appointment in appointments %}
+        {% for appointment in appointments if appointment.status.value != 'expired' %}
         <tr>
-          <td>{{ appointment.starts_at.strftime("%H:%M") }}</td>
-          <td>
+          <td data-label="Hora"><strong>{{ appointment.starts_at.strftime("%H:%M") }}</strong><div class="muted small">{{ appointment.duration_minutes }} min</div></td>
+          <td data-label="Paciente">
             <strong>{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}</strong>
-            <div class="muted small">DNI {{ appointment.patient.dni }}</div>
+            <div class="muted small">DNI {{ appointment.patient.dni }}{% if appointment.notification_phone %} · {{ appointment.notification_phone | phone }}{% endif %}</div>
           </td>
-          <td>{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>
-          <td><span class="status-badge status-{{ appointment.status.value }}">{{ appointment.status.value }}</span></td>
-          <td>{{ appointment.reason or "-" }}</td>
+          {% if not is_professional %}<td data-label="Profesional">{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>{% endif %}
+          <td data-label="Estado">
+            {{ status_badge(appointment.status) }}
+            {% if appointment.attendance_confirmed_at %}<div class="muted small attendance-ok">✓ Confirmó por WhatsApp</div>{% endif %}
+          </td>
+          <td data-label="Seña">{{ payment_badge(appointment) }}</td>
+          <td data-label="Motivo">{{ appointment.reason or "—" }}</td>
+          <td data-label="Acciones"><div class="row-actions">{{ appointment_actions(appointment, actions_for(appointment), request.url.path ~ '?' ~ request.url.query) }}</div></td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="5">No hay turnos para la fecha seleccionada.</td>
+          <td colspan="7" class="empty-row">No hay turnos para esta fecha.</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -73,34 +93,4 @@
   </div>
 </section>
 
-<section class="surface dashboard-utility-bar">
-  <div class="surface-head">
-    <div>
-      <div class="eyebrow">Operación secundaria</div>
-      <h2>Atajos y estado</h2>
-    </div>
-    <span class="section-pill">{{ summary.pending_notifications }} pendientes</span>
-  </div>
-  <div class="utility-content">
-    <div class="utility-stats">
-      <div class="utility-stat">
-        <span class="muted small">Reservas por confirmar</span>
-        <strong>{{ summary.reserved }}</strong>
-      </div>
-      <div class="utility-stat">
-        <span class="muted small">Turnos completados hoy</span>
-        <strong>{{ summary.completed }}</strong>
-      </div>
-      <div class="utility-stat">
-        <span class="muted small">Notificaciones pendientes</span>
-        <strong>{{ summary.pending_notifications }}</strong>
-      </div>
-    </div>
-    <div class="utility-links">
-      {% for action in next_actions %}
-      <a class="quick-link" href="{{ action.href }}">{{ action.label }}</a>
-      {% endfor %}
-    </div>
-  </div>
-</section>
 {% endblock %}

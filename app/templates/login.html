@@ -1,52 +1,36 @@
-{% set brand_logo = request.url_for('static', path='brand/Sin título-4-04.png') %}
+{% set brand_logo = asset_url('brand/oral-logo-blue-cropped.png') %}
 <!DOCTYPE html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ORAL | Ingreso interno</title>
+    <meta name="robots" content="noindex" />
+    <title>Ingresar | ORAL</title>
     <link rel="icon" type="image/png" href="{{ brand_logo }}" />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="{{ asset_url('styles.css') }}" />
   </head>
   <body class="login-body">
-    <div class="login-shell">
-      <main class="login-layout">
-        <section class="login-showcase">
-          <div class="login-showcase-inner">
-            <div class="brand-badge brand-badge-showcase">
-              <img class="brand-logo brand-logo-wide brand-logo-showcase" src="{{ brand_logo }}" alt="ORAL odontología familiar" />
-            </div>
-            <div>
-              <div class="eyebrow">Ingreso interno</div>
-              <h2>Recepción y administración clínica en un solo lugar.</h2>
-            </div>
-            <p>
-              Panel para operar el día con más claridad, menos ruido y la estética de la identidad ORAL.
-            </p>
-            <div class="brand-accent">Buenos Aires</div>
-          </div>
-        </section>
-
-        <section class="login-card">
-          <div class="eyebrow">Equipo ORAL</div>
-          <h1>Entrar al panel</h1>
-          <p class="muted">Este acceso es solo para recepción y administración.</p>
-          {% if error %}
-          <div class="alert alert-error">{{ error }}</div>
-          {% endif %}
-          <form method="post" action="/app/login" class="stack">
-            <label>
-              Usuario
-              <input type="text" name="username" placeholder="admin" required />
-            </label>
-            <label>
-              Password
-              <input type="password" name="password" placeholder="demo12345" required />
-            </label>
-            <button type="submit">Entrar</button>
-          </form>
-        </section>
-      </main>
-    </div>
+    <main class="login">
+      <img class="login__logo" src="{{ brand_logo }}" alt="ORAL odontología familiar" width="140" height="65" />
+      <section class="login__card" aria-labelledby="login-title">
+        <h1 id="login-title">Ingresar al panel</h1>
+        <p class="login__lead">Para el equipo del consultorio.</p>
+        {% if error %}
+        <div class="notice notice--error" role="alert">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="/app/login" class="stack">
+          <label class="field">
+            <span class="field-label">Usuario</span>
+            <input type="text" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus />
+          </label>
+          <label class="field">
+            <span class="field-label">Contraseña</span>
+            <input type="password" name="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit" class="button button--block button--lg">Ingresar</button>
+        </form>
+      </section>
+      <p class="login__foot"><a class="text-link" href="/reservar">Ir a la reserva de turnos</a></p>
+    </main>
   </body>
 </html>

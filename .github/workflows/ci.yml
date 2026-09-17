@@ -1,30 +1,140 @@
 name: CI
 
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
 
-      - name: Install dependencies
+  test:
+    name: Tests (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: oral_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Empty for SQLite; on PostgreSQL the schema is built by the Alembic migrations.
+      TEST_DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql+psycopg://postgres:postgres@localhost:5432/oral_test' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Run tests
+        run: pytest -o addopts="-q" --cov=app --cov=ops --cov-report=term-missing:skip-covered --cov-report=xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.database }}
+          path: coverage.xml
+
+  migrations:
+    name: Migrations up/down (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: oral
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      APP_ENV_FILE: ""
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/oral
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: alembic upgrade head
+      - run: alembic downgrade base
+      - run: alembic upgrade head
+      - run: python -m app.tasks.seed_demo
+      - run: python -m app.tasks.run_scheduled
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: oral:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test the container
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          docker run -d --name oral -p 8080:8080 \
+            -e APP_ENV=development -e SECRET_KEY=ci-secret-key-with-at-least-32-chars \
+            -e DATABASE_URL=sqlite+pysqlite:////tmp/ci.db \
+            oral:ci sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8080"
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://localhost:8080/health/ready; then break; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:8080/reservar > /dev/null
+          docker run --rm -e APP_ENV=development -e DATABASE_URL=sqlite+pysqlite:////tmp/ci.db oral:ci \
+            python -c "import app.services.messages as m, pathlib; assert (m.EMAIL_TEMPLATES_DIR / 'confirmation.html').exists()"
+      - if: failure()
+        run: docker logs oral
 
-      - name: Lint
-        run: ruff check .
-
-      - name: Tests
-        run: pytest
-
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate

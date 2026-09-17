@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block preheader %}Tu turno pasó al {{ date_long }} a las {{ time }} h.{% endblock %}
+{% block accent %}#b87b22{% endblock %}
+{% block content %}
+<p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#b87b22;">Turno reprogramado</p>
+<h1 style="margin:0 0 12px;font-size:28px;line-height:1.1;letter-spacing:-0.03em;color:#112433;">{{ patient_first_name }}, cambiamos tu turno de día</h1>
+<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:#112433;">
+  {% if previous_when %}Tenías turno el <span style="text-decoration:line-through;color:#66717a;">{{ previous_when }}</span>.{% endif %}
+  Estos son los datos nuevos:
+</p>
+{% include "_details.html" %}
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 18px;">
+  <tr>
+    <td style="border-radius:999px;background:#ff5e37;">
+      <a href="{{ status_url }}" style="display:inline-block;padding:14px 24px;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;">Ver mi turno</a>
+    </td>
+    <td style="padding-left:10px;">
+      <a href="{{ calendar_url }}" style="display:inline-block;padding:13px 20px;border:1px solid #d9e1e7;border-radius:999px;font-size:15px;font-weight:800;color:#005075;text-decoration:none;">Actualizar el calendario</a>
+    </td>
+  </tr>
+</table>
+<p style="margin:0;font-size:14px;line-height:1.6;color:#66717a;">
+  Si este horario no te sirve, avisanos desde <a href="{{ status_url }}" style="color:#005075;">el link de tu turno</a>
+  {% if clinic_phone %} o llamanos al {{ clinic_phone }}{% endif %} y buscamos otro.
+</p>
+{% endblock %}

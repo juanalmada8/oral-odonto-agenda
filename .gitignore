@@ -6,7 +6,12 @@ __pycache__/
 *.sqlite3
 *.db
 .DS_Store
+# Cualquier archivo de entorno (respaldos incluidos) lleva credenciales reales.
+# Solo las plantillas sin valores se versionan.
 .env
+.env.*
+!.env.example
+!.env.*.example
 .venv/
 venv/
 dist/
@@ -15,3 +20,10 @@ htmlcov/
 .coverage
 *.egg-info/
 coverage.xml
+
+# Terraform
+infra/terraform/.terraform/
+*.tfstate
+*.tfstate.*
+infra/terraform/terraform.tfvars
+crash.log

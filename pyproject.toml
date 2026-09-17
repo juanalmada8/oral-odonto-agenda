@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odonto-agenda-ai"
-version = "0.1.0"
+version = "0.2.0"
 description = "Agenda odontológica full-stack con FastAPI, panel admin y reserva pública."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -19,17 +19,18 @@ dependencies = [
   "sqlalchemy>=2.0.36",
   "email-validator>=2.2.0",
   "uvicorn[standard]>=0.32.0",
-  "openai>=1.68.0",
+  "httpx>=0.28.0",
+  "phonenumbers>=8.13.0",
 ]
 
 [project.scripts]
 odonto-seed-demo = "app.tasks.seed_demo:main"
-odonto-send-reminders = "app.tasks.send_reminders:main"
+odonto-send-reminders = "app.tasks.run_scheduled:main"
+odonto-run-scheduled = "app.tasks.run_scheduled:main"
 odonto-prod-check = "app.tasks.production_check:main"
 
 [project.optional-dependencies]
 dev = [
-  "httpx>=0.28.0",
   "pytest>=8.3.0",
   "pytest-cov>=6.0.0",
   "ruff>=0.11.0",
@@ -37,6 +38,9 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[tool.setuptools.package-data]
+app = ["templates/*.html", "templates/emails/*", "static/*.css", "static/brand/*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, String, Text
+from datetime import date
+
+from sqlalchemy import Boolean, Date, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -13,6 +15,16 @@ class Patient(TimestampMixin, Base):
     email: Mapped[str | None] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(40))
     observations: Mapped[str | None] = mapped_column(Text())
+
+    # Ficha que carga el mostrador cuando el paciente viene por primera vez: la reserva
+    # online solo pide lo mínimo para dar el turno.
+    birth_date: Mapped[date | None] = mapped_column(Date())
+    address: Mapped[str | None] = mapped_column(String(180))
+    city: Mapped[str | None] = mapped_column(String(80))
+    health_insurance: Mapped[str | None] = mapped_column(String(120))
+    health_insurance_number: Mapped[str | None] = mapped_column(String(60))
+    emergency_contact: Mapped[str | None] = mapped_column(String(160))
+    medical_notes: Mapped[str | None] = mapped_column(Text())
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
     appointments = relationship("Appointment", back_populates="patient")

@@ -1,118 +1,102 @@
-{% set brand_logo = request.url_for('static', path='brand/oral-logo-blue-cropped.png') %}
+{% set brand_logo = asset_url('brand/oral-logo-blue-cropped.png') %}
+{% set brand_logo_light = asset_url('brand/oral-logo-white.png') %}
+{% set role = current_user.role.value %}
 <!DOCTYPE html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
     <title>{{ page_title }} | ORAL</title>
     <link rel="icon" type="image/png" href="{{ brand_logo }}" />
-    <link rel="stylesheet" href="/static/styles.css" />
-    <style>
-      #confirm-modal {
-        position: fixed;
-        inset: 0;
-        z-index: 4000;
-        display: none;
-        place-items: center;
-        padding: 20px;
-      }
-      #confirm-modal.is-open {
-        display: grid;
-      }
-      #confirm-modal .confirm-modal__backdrop {
-        position: absolute;
-        inset: 0;
-        background: rgba(8, 18, 28, 0.52);
-        backdrop-filter: blur(4px);
-      }
-      #confirm-modal .confirm-modal__panel {
-        position: relative;
-        width: min(560px, 100%);
-        border-radius: 22px;
-        border: 1px solid rgba(15, 35, 51, 0.12);
-        background: linear-gradient(165deg, #ffffff 0%, #f8fbfd 100%);
-        box-shadow: 0 34px 72px rgba(8, 22, 34, 0.22);
-        padding: 26px;
-      }
-      #confirm-modal .confirm-modal__actions {
-        margin-top: 22px;
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-      }
-    </style>
+    <link rel="stylesheet" href="{{ asset_url('styles.css') }}" />
   </head>
   <body class="admin-body">
-    <div class="admin-shell">
-      <aside class="sidebar">
-        <div class="sidebar-top">
-          <a href="/app" class="brand">
-            <div class="brand-badge brand-badge-sidebar">
-              <img class="brand-logo brand-logo-wide brand-logo-sidebar" src="{{ brand_logo }}" alt="ORAL odontología familiar" />
-            </div>
-            <div class="brand-meta">
-              <strong>Agenda clínica</strong>
-              <div class="brand-caption">Recepción y operación diaria</div>
-            </div>
+    <div class="app">
+      <aside class="sidebar" data-sidebar>
+        <div class="sidebar__top">
+          <a href="/app" class="sidebar__brand" aria-label="Panel de ORAL, inicio">
+            <img src="{{ brand_logo_light }}" alt="ORAL odontología familiar" width="112" height="52" />
           </a>
-
-          <nav class="sidebar-nav">
-            <a href="/app" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
-            <a href="/app/appointments" class="nav-link {% if active_page == 'appointments' %}active{% endif %}">Turnos</a>
-            <a href="/app/patients" class="nav-link {% if active_page == 'patients' %}active{% endif %}">Pacientes</a>
-            {% if current_user.role.value == "admin" %}
-            <a href="/app/professionals" class="nav-link {% if active_page == 'professionals' %}active{% endif %}">Profesionales</a>
-            <a href="/app/notifications" class="nav-link {% if active_page == 'notifications' %}active{% endif %}">Notificaciones</a>
-            <a href="/app/settings" class="nav-link {% if active_page == 'settings' %}active{% endif %}">Configuración</a>
-            {% endif %}
-          </nav>
+          <button type="button" class="sidebar__toggle" data-sidebar-toggle aria-expanded="false" aria-controls="sidebar-nav">
+            Menú
+          </button>
         </div>
 
-        <div class="sidebar-foot">
-          <div class="user-card">
-            <div class="avatar">{{ current_user.full_name[:1] }}</div>
-            <div class="user-meta">
-              <strong>{{ current_user.username }}</strong>
-              <div class="muted small">Perfil {{ current_user.role.value }}</div>
-            </div>
+        <nav id="sidebar-nav" class="sidebar__nav" aria-label="Secciones del panel">
+          <div class="nav-group">
+            <p class="nav-group__label">Agenda</p>
+            <a href="/app" class="nav-link {% if active_page == 'dashboard' %}is-active{% endif %}" {% if active_page == 'dashboard' %}aria-current="page"{% endif %}>{{ 'Mi agenda' if role == 'professional' else 'Hoy' }}</a>
+            <a href="/app/appointments" class="nav-link {% if active_page == 'appointments' %}is-active{% endif %}" {% if active_page == 'appointments' %}aria-current="page"{% endif %}>Turnos</a>
+            {% if role in ['admin', 'professional'] %}
+            <a href="/app/availability" class="nav-link {% if active_page == 'availability' %}is-active{% endif %}" {% if active_page == 'availability' %}aria-current="page"{% endif %}>{{ 'Mi disponibilidad' if role == 'professional' else 'Disponibilidad' }}</a>
+            {% endif %}
+            {% if role in ['admin', 'receptionist'] %}
+            <a href="/app/waitlist" class="nav-link {% if active_page == 'waitlist' %}is-active{% endif %}" {% if active_page == 'waitlist' %}aria-current="page"{% endif %}>Lista de espera</a>
+            {% endif %}
           </div>
-          <div class="sidebar-links">
-            <form method="post" action="/app/logout">
-              <button class="ghost-button ghost-button-sidebar" type="submit">Salir</button>
-            </form>
+
+          {% if role in ['admin', 'receptionist'] %}
+          <div class="nav-group">
+            <p class="nav-group__label">Consultorio</p>
+            <a href="/app/patients" class="nav-link {% if active_page == 'patients' %}is-active{% endif %}" {% if active_page == 'patients' %}aria-current="page"{% endif %}>Pacientes</a>
+            {% if role == 'admin' %}
+            <a href="/app/professionals" class="nav-link {% if active_page == 'professionals' %}is-active{% endif %}" {% if active_page == 'professionals' %}aria-current="page"{% endif %}>Profesionales</a>
+            <a href="/app/payments" class="nav-link {% if active_page == 'payments' %}is-active{% endif %}" {% if active_page == 'payments' %}aria-current="page"{% endif %}>Pagos</a>
+            {% endif %}
           </div>
+          {% endif %}
+
+          {% if role == 'admin' %}
+          <div class="nav-group">
+            <p class="nav-group__label">Administración</p>
+            <a href="/app/metrics" class="nav-link {% if active_page == 'metrics' %}is-active{% endif %}" {% if active_page == 'metrics' %}aria-current="page"{% endif %}>Métricas</a>
+            <a href="/app/notifications" class="nav-link {% if active_page == 'notifications' %}is-active{% endif %}" {% if active_page == 'notifications' %}aria-current="page"{% endif %}>Notificaciones</a>
+            <a href="/app/users" class="nav-link {% if active_page == 'users' %}is-active{% endif %}" {% if active_page == 'users' %}aria-current="page"{% endif %}>Usuarios</a>
+          </div>
+          {% endif %}
+        </nav>
+
+        <div class="sidebar__user">
+          <span class="avatar" aria-hidden="true">{{ current_user.full_name[:1] }}</span>
+          <span class="sidebar__user-text">
+            <strong>{{ current_user.full_name }}</strong>
+            <span>{{ current_user.role | role_label }}</span>
+          </span>
+          <form method="post" action="/app/logout">
+            <button class="sidebar__logout" type="submit">Salir</button>
+          </form>
         </div>
       </aside>
 
-      <main class="main-panel">
+      <main class="main">
         <header class="page-header">
-          <div>
-            <div class="eyebrow">Administración</div>
+          <div class="page-header__text">
             <h1>{{ page_title }}</h1>
-            <p class="muted">{{ page_subtitle }}</p>
+            {% if page_subtitle %}<p>{{ page_subtitle }}</p>{% endif %}
           </div>
-          <div class="header-chip">Perfil {{ current_user.role.value }}</div>
+          <a class="button button--secondary button--sm" href="/reservar" target="_blank" rel="noopener">Ver sitio de reservas</a>
         </header>
 
         {% if message %}
-        <div class="alert alert-success">{{ message }}</div>
+        <div class="notice notice--success" role="status">{{ message }}</div>
         {% endif %}
         {% if error %}
-        <div class="alert alert-error">{{ error }}</div>
+        <div class="notice notice--error" role="alert">{{ error }}</div>
         {% endif %}
 
         {% block content %}{% endblock %}
       </main>
     </div>
 
-    <div id="confirm-modal" class="confirm-modal" aria-hidden="true">
-      <div class="confirm-modal__backdrop" data-confirm-close></div>
-      <div class="confirm-modal__panel" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
-        <h3 id="confirm-modal-title" class="confirm-modal__title">Confirmar acción</h3>
-        <p id="confirm-modal-message" class="confirm-modal__message">¿Querés continuar?</p>
-        <div class="confirm-modal__actions">
-          <button type="button" class="ghost-button" data-confirm-cancel>Cancelar</button>
-          <button type="button" class="ghost-button danger" data-confirm-accept>Aceptar</button>
+    <div id="confirm-modal" class="modal" aria-hidden="true">
+      <div class="modal__backdrop" data-confirm-close></div>
+      <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <h2 id="confirm-modal-title" class="modal__title">Confirmar acción</h2>
+        <p id="confirm-modal-message" class="modal__message">¿Querés continuar?</p>
+        <div class="modal__actions">
+          <button type="button" class="button button--secondary" data-confirm-cancel>Volver</button>
+          <button type="button" class="button button--danger" data-confirm-accept>Aceptar</button>
         </div>
       </div>
     </div>
@@ -130,20 +114,24 @@
 
         let pendingForm = null;
         let pendingSubmitter = null;
+        let lastFocus = null;
 
         const hideModal = () => {
           modal.classList.remove("is-open");
           modal.setAttribute("aria-hidden", "true");
           pendingForm = null;
           pendingSubmitter = null;
+          lastFocus?.focus();
         };
 
         const showModal = ({ modalTitle, modalMessage, modalAccept }) => {
           title.textContent = modalTitle || "Confirmar acción";
           message.textContent = modalMessage || "¿Querés continuar?";
           acceptBtn.textContent = modalAccept || "Aceptar";
+          lastFocus = document.activeElement;
           modal.classList.add("is-open");
           modal.setAttribute("aria-hidden", "false");
+          cancelBtn.focus();
         };
 
         document.querySelectorAll("form.js-confirm-form").forEach((form) => {
@@ -168,14 +156,39 @@
 
         acceptBtn.addEventListener("click", () => {
           if (!pendingForm) return hideModal();
-          pendingForm.dataset.skipConfirm = "true";
-          if (pendingSubmitter && typeof pendingForm.requestSubmit === "function") {
-            pendingForm.requestSubmit(pendingSubmitter);
+          const form = pendingForm;
+          form.dataset.skipConfirm = "true";
+          if (pendingSubmitter && typeof form.requestSubmit === "function") {
+            form.requestSubmit(pendingSubmitter);
           } else {
-            pendingForm.submit();
+            form.submit();
           }
-          delete pendingForm.dataset.skipConfirm;
+          delete form.dataset.skipConfirm;
           hideModal();
+        });
+      })();
+
+      // Menús de acciones de cada fila: uno solo abierto a la vez; se cierran al
+      // hacer click afuera o con Escape.
+      (() => {
+        const closeAll = (except) => document.querySelectorAll("details.row-menu[open]").forEach((menu) => {
+          if (menu !== except) menu.open = false;
+        });
+        document.addEventListener("click", (event) => closeAll(event.target.closest("details.row-menu")));
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") closeAll(null);
+        });
+      })();
+
+      // En pantallas chicas la navegación se pliega detrás de "Menú".
+      (() => {
+        const sidebar = document.querySelector("[data-sidebar]");
+        const toggle = document.querySelector("[data-sidebar-toggle]");
+        if (!sidebar || !toggle) return;
+        toggle.addEventListener("click", () => {
+          const open = sidebar.classList.toggle("is-open");
+          toggle.setAttribute("aria-expanded", String(open));
+          toggle.textContent = open ? "Cerrar" : "Menú";
         });
       })();
     </script>

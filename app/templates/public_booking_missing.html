@@ -1,0 +1,29 @@
+{% set brand_logo = asset_url('brand/oral-logo-blue-cropped.png') %}
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>ORAL | Turno no encontrado</title>
+    <link rel="icon" type="image/png" href="{{ brand_logo }}" />
+    <link rel="stylesheet" href="{{ asset_url('styles.css') }}" />
+  </head>
+  <body class="public-body">
+    <div class="public-shell status-shell">
+      <header class="status-header">
+        <a class="site-header__brand" href="/reservar" aria-label="ORAL odontología familiar, reservar turno">
+          <img src="{{ brand_logo }}" alt="ORAL odontología familiar" width="120" height="55" />
+        </a>
+      </header>
+      <main class="status-layout">
+        <section class="panel status-card status-card--expired">
+          <div class="status-icon" aria-hidden="true">?</div>
+          <h1>No encontramos ese turno</h1>
+          <p class="status-lead">Revisá que el link esté completo. Si el problema sigue, comunicate con el consultorio.</p>
+          <div class="status-actions"><a class="cta-link" href="/reservar">Ir a reservas</a></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

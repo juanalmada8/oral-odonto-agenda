@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block preheader %}Cancelamos tu turno del {{ date_long }} a las {{ time }} h.{% endblock %}
+{% block accent %}#bf4b4b{% endblock %}
+{% block content %}
+<p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#bf4b4b;">Turno cancelado</p>
+<h1 style="margin:0 0 12px;font-size:28px;line-height:1.1;letter-spacing:-0.03em;color:#112433;">{{ patient_first_name }}, tu turno fue cancelado</h1>
+<p style="margin:0;font-size:16px;line-height:1.6;color:#112433;">Este horario ya no está reservado a tu nombre:</p>
+{% include "_details.html" %}
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 18px;">
+  <tr>
+    <td style="border-radius:999px;background:#ff5e37;">
+      <a href="{{ booking_url }}" style="display:inline-block;padding:14px 24px;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;">Reservar otro turno</a>
+    </td>
+  </tr>
+</table>
+<p style="margin:0;font-size:13px;line-height:1.6;color:#66717a;">
+  {% if deposit_paid %}Sobre la seña abonada: {{ deposit_policy }}{% endif %}
+  {% if clinic_phone %} Ante cualquier duda llamanos al {{ clinic_phone }}.{% endif %}
+</p>
+{% endblock %}

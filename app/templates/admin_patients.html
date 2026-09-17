@@ -4,8 +4,7 @@
 <section class="surface">
   <div class="surface-head">
     <div>
-      <div class="eyebrow">Pacientes</div>
-      <h2>Gestión secundaria</h2>
+      <h2>Fichas</h2>
     </div>
     <form method="get" action="/app/patients" class="toolbar-form">
       <input type="search" name="query" value="{{ query }}" placeholder="Buscar por nombre o DNI" />
@@ -16,11 +15,15 @@
   <details class="foldout">
     <summary>Alta manual de paciente</summary>
     <form method="post" action="/app/patients" class="form-grid">
-      <input name="dni" placeholder="DNI" required />
-      <input name="first_name" placeholder="Nombre" required />
-      <input name="last_name" placeholder="Apellido" required />
-      <input name="email" type="email" placeholder="Email" />
-      <input name="phone" placeholder="Teléfono" />
+      <input name="dni" placeholder="DNI (sin puntos)" required aria-label="DNI" />
+      <div class="two-cols">
+        <input name="first_name" placeholder="Nombre" required aria-label="Nombre" />
+        <input name="last_name" placeholder="Apellido" required aria-label="Apellido" />
+      </div>
+      <div class="two-cols">
+        <input name="email" type="email" placeholder="Email" aria-label="Email" />
+        <input name="phone" type="tel" placeholder="Celular (11 5555-5555)" aria-label="Celular" />
+      </div>
       <textarea name="observations" placeholder="Observaciones"></textarea>
       <button type="submit">Guardar paciente</button>
     </form>
@@ -44,16 +47,16 @@
           <td>{{ patient.first_name }} {{ patient.last_name }}</td>
           <td>
             <div>{{ patient.email or "-" }}</div>
-            <div class="muted small">{{ patient.phone or "-" }}</div>
+            <div class="muted small">{{ (patient.phone | phone) or "-" }}</div>
           </td>
           <td>
             <span class="status-badge {% if patient.is_active %}status-confirmed{% else %}status-cancelled{% endif %}">
-              {% if patient.is_active %}activo{% else %}inactivo{% endif %}
+              {% if patient.is_active %}Activo{% else %}Inactivo{% endif %}
             </span>
           </td>
           <td>
             <div class="row-actions">
-              <a class="quick-link compact" href="/app/patients/{{ patient.id }}/edit">Editar</a>
+              <a class="quick-link compact" href="/app/patients/{{ patient.id }}/edit">Ver ficha</a>
               <form
                 method="post"
                 action="/app/patients/{{ patient.id }}/delete"

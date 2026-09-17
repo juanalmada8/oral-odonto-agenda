@@ -1,1 +1,3 @@
-"""ORAL application package."""
+"""ORAL · Odonto Agenda."""
+
+__version__ = "0.2.0"

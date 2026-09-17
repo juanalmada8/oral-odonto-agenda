@@ -1,0 +1,38 @@
+name: Preparar release
+
+# Actions tab -> "Preparar release" -> version (e.g. 0.3.0). Opens a PR that bumps the version and
+# turns the [Unreleased] notes of CHANGELOG.md into [0.3.0]. Merging it publishes and deploys.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Nueva versión (X.Y.Z)
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bump version and changelog
+        env:
+          VERSION: ${{ inputs.version }}
+        # Inputs go through the environment, never interpolated into the shell command.
+        run: python3 ops/release.py prepare "$VERSION"
+      - name: Open the release pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          branch="release/v${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "release: v${VERSION}"
+          git push origin "$branch"
+          python3 ops/release.py notes "$VERSION" > notes.md
+          gh pr create --base main --head "$branch" --title "release: v${VERSION}" --body-file notes.md

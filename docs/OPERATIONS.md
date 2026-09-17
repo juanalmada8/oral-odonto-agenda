@@ -1,98 +1,81 @@
-# Operación y Runbook
+# Operación del día a día
 
-## 1) Inicialización local
+## Qué pasa solo y qué hace falta hacer a mano
 
-```bash
-cp .env.example .env
-docker compose up -d db mailhog
-alembic upgrade head
-python -m app.tasks.seed_demo
-uvicorn app.main:app --reload
-```
+| Pasa solo | Cuándo |
+| --- | --- |
+| Se libera el horario de una seña impaga | al vencer el bloqueo (20 min) |
+| Email de confirmación | al acreditarse la seña o al crear un turno desde el panel |
+| Recordatorio (email + WhatsApp) | `REMINDER_HOURS_AHEAD` antes del turno (24 h por defecto) |
+| Reintento de un envío que falló | a los 5, 10 y 20 minutos; después queda como *fallida* |
+| Email de cancelación | cuando se cancela un turno reservado o confirmado |
 
-## 2) Recordatorios y notificaciones
+Todo eso lo dispara la tarea programada (Cloud Scheduler cada 10 minutos) y, además, cada operación
+despacha lo suyo en el momento.
 
-### Flujo recomendado
+Queda a cargo del consultorio: cargar disponibilidad, atender los avisos del dashboard (señas a
+devolver, notificaciones fallidas) y marcar los turnos como **atendido** o **ausente**.
 
-1. Confirmar turnos desde panel de turnos.
-2. Ir a `Notificaciones`.
-3. Ejecutar `Preparar recordatorios`.
-4. Revisar previsualización de “Se enviarán ahora”.
-5. Ejecutar `Despachar pendientes`.
+## Rutina sugerida
 
-### Regla de envío
+**Cada mañana (recepción)**
 
-- Se despachan por lote únicamente recordatorios (`REMINDER`) de turnos confirmados.
-- Confirmaciones (`CONFIRMATION`) se envían en el momento de confirmar.
+1. `/app` → agenda del día. Los turnos con ✓ ya confirmaron asistencia por WhatsApp.
+2. Atender los avisos que aparezcan arriba.
+3. Al cerrar el día, marcar atendidos y ausentes (de ahí sale la métrica de ausentismo).
 
-## 3) SMTP con Gmail
+**Cada semana (cada profesional)**
 
-### Configuración sugerida
+- `/app/availability` → *Repetir cada semana* para dejar cargadas las próximas semanas.
+- Vacaciones o congresos: *Bloquear días*. Si algún día tiene turnos tomados, el sistema lo avisa y no
+  lo toca hasta que los reprogrames.
 
-```env
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=tu_cuenta@gmail.com
-SMTP_PASSWORD=tu_app_password_de_google
-SMTP_USE_TLS=true
-EMAIL_FROM=tu_cuenta@gmail.com
-```
+**Cada mes (administración)**
 
-### Cómo generar App Password
+- `/app/metrics`: ocupación, conversión de la seña, ausentismo e ingresos. *Exportar CSV* abre en Excel.
+- `/app/payments`: señas a devolver.
 
-1. Activar verificación en dos pasos en tu cuenta Google.
-2. Ir a Google Account > Seguridad > Contraseñas de aplicaciones.
-3. Crear nueva contraseña para “Correo”.
-4. Copiar la clave de 16 caracteres en `SMTP_PASSWORD`.
+## Situaciones frecuentes
 
-## 4) Migraciones
+**El paciente dice que pagó pero el turno figura pendiente.**
+`/app/payments` → buscá el pago. Si figura aprobado, el turno se confirma solo al llegar la
+notificación; si el horario ya lo tomó otra persona, aparece en *Señas a devolver*.
 
-### Crear migración
+**El paciente quiere cambiar el horario.**
+Recepción: `/app/appointments` → *Editar*. Se valida disponibilidad y se reprograman los
+recordatorios. La seña sigue asociada al mismo turno.
 
-```bash
-alembic revision -m "descripcion"
-```
+**El paciente pide cancelar sobre la hora.**
+Online solo puede cancelar hasta `CANCELLATION_NOTICE_HOURS` antes. Después lo hace recepción desde
+el panel (queda registrado quién y cuándo).
 
-### Aplicar migraciones
+**Un profesional nuevo.**
+`/app/professionals` (alta, duración del turno y seña) → `/app/users` (acceso) →
+`/app/availability` (horarios).
 
-```bash
-alembic upgrade head
-```
+**Alguien se olvidó la contraseña.**
+`/app/users` → columna *Contraseña* → cambiarla y pasársela por un canal seguro.
 
-## 5) Comandos de mantenimiento
+## Diagnóstico
 
-```bash
-# tests
-pytest
+| Síntoma | Dónde mirar |
+| --- | --- |
+| No salen emails | `/app/notifications`: estado SMTP y error de cada mensaje |
+| No salen WhatsApp | `/app/notifications` + [WHATSAPP.md](WHATSAPP.md) |
+| El paciente no ve horarios | `/app/availability`: que haya bloques futuros; la reserva online exige anticipación mínima |
+| Falla un pago | [MERCADOPAGO.md](MERCADOPAGO.md) |
+| Error inesperado en pantalla | logs: `gcloud run services logs tail oral-web --region ...` |
 
-# lint
-ruff check .
-
-# seed demo
-python -m app.tasks.seed_demo
-
-# enviar pendientes por script
-python -m app.tasks.send_reminders
-```
-
-## 6) Resolución de problemas
-
-### Error: tablas faltantes al hacer seed
-
-- Ejecutar:
+## Comandos
 
 ```bash
-alembic upgrade head
+make scheduled     # correr la tarea programada a mano
+make prod-check    # validar configuración de producción
+make migrate       # aplicar migraciones
 ```
 
-### Error SMTP no configurado
+En producción, la tarea programada a mano:
 
-- Revisar `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM`.
-- Confirmar que `SMTP_USE_TLS` sea consistente con el proveedor.
-
-### Se preparan notificaciones pero no se envían
-
-- Verificar que estén vencidas (`scheduled_for <= now`).
-- Verificar que el turno siga `CONFIRMED`.
-- Revisar sección de `Fallidas` y `Omitidas`.
-
+```bash
+gcloud run jobs execute oral-scheduled --region southamerica-east1 --wait
+```

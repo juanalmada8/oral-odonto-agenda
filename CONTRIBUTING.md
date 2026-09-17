@@ -1,79 +1,47 @@
 # Contributing
 
-Gracias por aportar al proyecto ORAL · Odonto Agenda.
-
-## Flujo recomendado
-
-1. Crear branch desde `main`:
+## Entorno
 
 ```bash
-git checkout main
-git pull
-git checkout -b feature/mi-cambio
-```
-
-2. Instalar entorno:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
+cp .env.example .env
+alembic upgrade head && python -m app.tasks.seed_demo
+uvicorn app.main:app --reload
 ```
 
-3. Ejecutar validaciones antes de commit:
+## Antes de cada commit
 
 ```bash
-ruff check .
-pytest
+make lint
+make test
+TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/oral_test make test-pg   # si tocaste la base
 ```
 
-4. Commits claros y atómicos:
+Los tests corren sobre SQLite y sobre PostgreSQL. Sobre PostgreSQL se aplican las migraciones reales,
+se prueban la restricción de superposición y la concurrencia, y hay un chequeo que falla si los
+modelos y las migraciones se desalinean: **si cambiás un modelo, agregá su migración**.
 
-- `feat: ...`
-- `fix: ...`
-- `refactor: ...`
-- `docs: ...`
-- `test: ...`
+Los tests nunca leen tu `.env` (podría tener credenciales reales de SMTP o Mercado Pago).
 
-5. Abrir PR con:
+## Convenciones
 
-- contexto del problema
-- cambios realizados
-- forma de validar
-- capturas de UI si aplica
+- Commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`, `ci:`.
+- Mensajes de error que ve el paciente o el consultorio: **en español**, claros y sin detalles
+  técnicos. Los mensajes internos y los comentarios del código, en inglés.
+- Toda fecha u hora de negocio se calcula con `app.core.clock`, nunca con `datetime.now()`.
+- Nada de secretos en el repo (es público).
 
-## Guías de código
+## Pull requests
 
-- Evitar lógica de negocio en templates.
-- Mantener responsabilidades separadas por servicio/agente.
-- Priorizar validación en schemas + servicios.
-- Evitar hardcodear secretos y datos sensibles.
-- Mantener UI consistente con branding y criterio clínico-operativo.
+Usá la plantilla. CI corre lint, tests (SQLite y PostgreSQL), migraciones ida y vuelta, build de la
+imagen Docker con prueba de humo y validación de Terraform.
 
-## Base de datos
+## Releases
 
-- No usar `create_all` para producción.
-- Toda evolución de esquema va por Alembic.
-- Comandos:
+1. Anotá los cambios en `CHANGELOG.md`, bajo `[Unreleased]`.
+2. Actions → **Preparar release** → versión (`0.3.0`). Abre un PR con la versión y el changelog.
+3. Al mergearlo, se crea el tag, se publica el GitHub Release con esas notas y se despliega a
+   producción.
 
-```bash
-alembic revision -m "descripcion_del_cambio"
-alembic upgrade head
-```
-
-## Testing
-
-Tests mínimos esperados para cambios funcionales:
-
-- flujo principal afectado
-- caso borde
-- regresión básica del módulo tocado
-
-## Checklist de PR
-
-- [ ] Código compila y levanta
-- [ ] Tests pasan localmente
-- [ ] Lint sin errores
-- [ ] Sin secretos en commits
-- [ ] Docs actualizadas (README/CHANGELOG si corresponde)
-
+Localmente equivale a `python ops/release.py prepare 0.3.0`.
