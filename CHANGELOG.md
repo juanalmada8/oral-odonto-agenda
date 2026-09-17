@@ -14,22 +14,48 @@ y versionado semántico.
 
 ## [Unreleased]
 
-### Changed
-- Identidad visual alineada a las piezas reales de la marca: azul `#005075` (el del logo), verde
-  `#006320`, celeste `#d5ecfc`, coral `#ff5e37`, rosa y lima. Antes el azul del sitio no coincidía.
-- El verde de la marca pasa a ser el color de "confirmado" (turnos, señas acreditadas, barra superior
-  de la página del turno y del email de confirmación) y el celeste el de las superficies de datos.
-- Tipografías propias servidas desde la app (Anton para títulos grandes, Mulish como reemplazo libre
-  de Avenir Next, que solo existe en Mac y iPhone): la web se ve igual en Android y Windows.
-- Hero de la reserva: texto principal más marcado, datos reales del consultorio (dirección y
-  ubicación configurables) y tarjeta con el logo de la marca, en lugar de frases genéricas.
-- Los archivos estáticos se sirven con versión en la URL, así un deploy nuevo no queda con el CSS
-  viejo en la caché del navegador.
+## [0.2.0] - 2026-09-17
+
+### Added — Agenda del consultorio
+- **Lista de espera**: el paciente se anota desde la web (profesional o cualquiera, rango de fechas y
+  franja). Cuando un turno se cancela o vence una seña, el horario se ofrece por email a los primeros
+  a los que les sirve; nadie queda con el horario reservado. Pantalla en el panel para ver y dar de baja.
+- **Turnos en serie** para tratamientos que repiten (ortodoncia, controles): primer turno, cada cuántas
+  semanas y cuántos. Las fechas sin lugar se saltean y se informan; el paciente recibe un solo email.
+- **Aviso al reprogramar**: si se mueve un turno, el paciente recibe un email con la fecha nueva y la
+  anterior. Antes se descartaban los recordatorios pero no se le avisaba.
+- **Cobrado en la consulta**: se registra lo que pagó el paciente además de la seña; alimenta la
+  métrica "Facturado" (total y por profesional), el CSV y el aviso de atendidos sin cobro cargado.
+- **Seña en efectivo** al crear un turno por mostrador, que lo confirma igual que un pago online.
+- **Devolución de seña a mano** desde Pagos, para las que se devuelven fuera de Mercado Pago.
+- **Ficha del paciente**: nacimiento, domicilio, localidad, obra social y afiliado, contacto de urgencia
+  y antecedentes, cargados por el consultorio.
+
+### Changed — Diseño
+- Reserva: el formulario pasa a tener profesionales como opciones visibles (con filtros por especialidad
+  y "ver todos" cuando son muchos), días en tira, horarios agrupados en mañana y tarde y un resumen
+  "Tu turno" fijo al costado. La portada mantiene el logo grande y la tarjeta de marca.
+- Panel: sistema visual propio (sin rótulos repetidos, sombras ni degradés), barra lateral agrupada que
+  se pliega en el teléfono, una acción principal por turno y el resto en un menú, agenda en tarjetas
+  compactas en el teléfono, métricas agrupadas y gráfico de turnos por día con tooltip.
+- El azul océano es el color de acción: blanco sobre coral no llega al contraste mínimo de lectura.
+- Emails con el logo embebido: Gmail y Outlook bloquean imágenes remotas.
+- Paleta tomada de las piezas reales de la marca y Mulish como reemplazo libre de Avenir Next.
+- Los archivos estáticos se sirven con versión en la URL para que un deploy no quede con CSS viejo.
 
 ### Fixed
-- La variante blanca del logo tenía fondo negro sólido: se generó una versión transparente y liviana.
+- Lista de espera: quien elegía "cualquier profesional" no recibía avisos (`IN` con `NULL`) y quien
+  reservaba desde el aviso seguía figurando como "avisado".
+- La auditoría fallaba al guardar fechas o importes (columna JSON): editar la seña de un profesional
+  rompía el guardado.
+- Redirects del panel con 303: con 307 el navegador repetía el POST rechazado.
+- La agenda hacía una consulta de pagos por cada turno mostrado.
+- El menú de acciones tapaba la fila siguiente y podía disparar la acción del turno equivocado.
+- La variante blanca del logo tenía fondo negro sólido.
 
-## [0.2.0] - 2026-09-11
+### Removed
+- Módulo de IA sin uso y la dependencia `openai`.
+
 
 ### Added — Infraestructura, CI/CD y operación
 - Infraestructura como código (`infra/terraform`): Cloud Run (web + jobs de migración y tareas),
