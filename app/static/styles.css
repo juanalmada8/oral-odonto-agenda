@@ -732,26 +732,6 @@ fieldset {
   padding-top: 8px;
 }
 
-.landing .eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--coral-500);
-}
-
-.landing .eyebrow::before {
-  content: "";
-  width: 26px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
 .landing .hero-copy h1 {
   margin-bottom: 16px;
   font-size: clamp(2.75rem, 4.6vw, 4.7rem);
@@ -767,6 +747,8 @@ fieldset {
   line-height: 1.5;
   letter-spacing: -0.01em;
   color: #2b3a46;
+  /* Reparte la frase en renglones parejos: sin una palabra sola abajo. */
+  text-wrap: balance;
 }
 
 .landing .hero-actions {
@@ -790,13 +772,13 @@ fieldset {
 }
 
 .landing .hero-scroll-button {
-  background: var(--coral-500);
+  background: var(--ocean-700);
   color: #fff;
-  box-shadow: 0 14px 28px rgba(255, 94, 55, 0.22);
+  box-shadow: 0 14px 28px rgba(0, 80, 117, 0.2);
 }
 
 .landing .hero-scroll-button:hover {
-  background: #f24e2b;
+  background: var(--ocean-800);
 }
 
 .landing .hero-secondary {
