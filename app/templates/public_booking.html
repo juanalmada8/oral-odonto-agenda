@@ -5,306 +5,309 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Reservá tu turno odontológico online en {{ settings.clinic_name }}." />
-    <title>ORAL | Reserva de turnos</title>
+    <meta name="description" content="Reservá tu turno odontológico online en {{ settings.clinic_name }}, {{ settings.clinic_city }}." />
+    <title>Reservar turno | {{ settings.clinic_name }}</title>
     <link rel="icon" type="image/png" href="{{ brand_logo }}" />
     <link rel="stylesheet" href="{{ asset_url('styles.css') }}" />
   </head>
   <body class="public-body">
-    <div class="public-shell">
-      <div class="public-topbar">
-        <a class="topbar-brand" href="/reservar">
-          <img class="brand-logo brand-logo-wide brand-logo-topbar" src="{{ brand_logo }}" alt="ORAL odontología familiar" />
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="site-header__brand" href="/reservar" aria-label="{{ settings.clinic_name }}, inicio">
+          <img src="{{ brand_logo }}" alt="{{ settings.clinic_name }}" width="132" height="61" />
         </a>
+        <div class="site-header__meta">
+          {% if settings.clinic_address %}
+          {% if settings.clinic_maps_url %}
+          <a href="{{ settings.clinic_maps_url }}" target="_blank" rel="noopener">{{ settings.clinic_address }}, {{ settings.clinic_city.split(',')[0] }}</a>
+          {% else %}
+          <span>{{ settings.clinic_address }}, {{ settings.clinic_city.split(',')[0] }}</span>
+          {% endif %}
+          {% endif %}
+          {% if settings.clinic_phone %}<a href="tel:{{ settings.clinic_phone | replace(' ', '') }}">{{ settings.clinic_phone }}</a>{% endif %}
+        </div>
       </div>
+    </header>
 
-      <header class="hero">
-        <div class="hero-copy">
-          <span class="eyebrow">{{ settings.clinic_city }}</span>
+    <main class="page">
+      <section class="intro">
+        <div class="intro__copy">
           <h1>Reservá tu turno</h1>
-          <p class="hero-lead">
-            Elegí el día y la hora que te queden bien. Sin llamar, sin esperar respuesta.
+          <p class="intro__lead">Elegí el día y la hora que te queden bien. Sin llamar, sin esperar respuesta.</p>
+        </div>
+        <aside class="brand-card" aria-label="{{ settings.clinic_name }}">
+          <img src="{{ brand_logo_light }}" alt="" width="180" height="83" />
+          <p>
+            {% if settings.clinic_address %}{{ settings.clinic_address }}<br />{% endif %}
+            {{ settings.clinic_city }}
+            {% if settings.clinic_hours %}<br />{{ settings.clinic_hours }}{% endif %}
           </p>
-          <div class="hero-actions">
-            <a class="hero-scroll-button" href="#booking-flow" data-scroll-target="#booking-flow">Elegir horario</a>
-            {% if settings.clinic_whatsapp %}
-            <a class="hero-secondary" href="https://wa.me/{{ settings.clinic_whatsapp | replace('+', '') }}" target="_blank" rel="noopener">Escribinos por WhatsApp</a>
-            {% endif %}
-          </div>
-          <dl class="hero-facts">
-            {% if settings.clinic_hours %}
-            <div><dt>Atención</dt><dd>{{ settings.clinic_hours }}</dd></div>
-            {% endif %}
-            {% if settings.clinic_phone %}
-            <div><dt>Teléfono</dt><dd>{{ settings.clinic_phone }}</dd></div>
-            {% endif %}
-          </dl>
-        </div>
-
-        <aside class="hero-visual">
-          <div class="hero-visual-inner">
-            <img class="hero-brand" src="{{ brand_logo_light }}" alt="{{ settings.clinic_name }}" />
-            <div class="hero-local-accent">
-              <span class="brand-accent">
-                {% if settings.clinic_address %}{{ settings.clinic_address }} · {% endif %}{{ settings.clinic_city }}
-              </span>
-            </div>
-          </div>
         </aside>
-      </header>
+      </section>
 
-      <section id="booking-flow" class="booking-section" data-reveal>
-        <div class="booking-section-head">
-          <div>
-            <span class="eyebrow">Reserva online</span>
-            <h2>Sacá tu turno en 4 pasos</h2>
-          </div>
-          <ol class="booking-steps" aria-label="Pasos de la reserva">
-            <li class="{{ 'done' if selected_professional else 'current' }}"><span>1</span>Profesional</li>
-            <li class="{{ 'done' if form.starts_at else ('current' if selected_professional else '') }}"><span>2</span>Día y horario</li>
-            <li class="{{ 'current' if form.starts_at else '' }}"><span>3</span>Tus datos</li>
-            <li><span>4</span>{{ 'Seña' if deposit_amount else 'Confirmación' }}</li>
-          </ol>
-        </div>
-
+      <div id="booking-flow" class="booking">
         {% if message %}
-        <div class="booking-feedback booking-feedback-success" role="status" aria-live="polite">
-          <div class="booking-feedback-icon" aria-hidden="true">✓</div>
-          <div class="booking-feedback-copy"><strong>Listo</strong><p>{{ message }}</p></div>
+        <div class="notice notice--success" role="status" aria-live="polite">
+          <strong>Listo.</strong> {{ message }}
         </div>
         {% endif %}
         {% if error %}
-        <div class="booking-feedback booking-feedback-error" role="alert">
-          <div class="booking-feedback-icon" aria-hidden="true">!</div>
-          <div class="booking-feedback-copy">
-            <strong>No pudimos tomar la reserva</strong>
-            <p>{{ error }}</p>
-          </div>
+        <div class="notice notice--error" role="alert">
+          <strong>No pudimos tomar la reserva.</strong> {{ error }}
         </div>
         {% endif %}
 
-        <main class="booking-layout">
-          <section class="panel booking-sidebar" aria-labelledby="step-professional">
-            <div class="surface-head">
-              <h2 id="step-professional" class="step-title"><span class="step-number">1</span>Profesional y día</h2>
-            </div>
-            <form method="get" action="/reservar" class="stack" id="availability-form">
-              <label class="field">
-                <span class="field-label">Profesional</span>
-                <select name="professional_id" data-auto-submit-on-change>
-                  <option value="" {% if not selected_professional %}selected{% endif %}>Elegí un profesional</option>
-                  {% for professional in professionals %}
-                  <option value="{{ professional.id }}" {% if selected_professional and selected_professional.id == professional.id %}selected{% endif %}>
-                    {{ professional.first_name }} {{ professional.last_name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}
-                  </option>
-                  {% endfor %}
-                </select>
-              </label>
-              <noscript><button type="submit" class="secondary">Ver fechas</button></noscript>
-            </form>
+        <form method="post" action="/reservar" id="booking-form" class="booking__grid">
+          <input type="hidden" name="professional_id" value="{{ selected_professional.id if selected_professional else '' }}" />
+          <div class="hp-field" aria-hidden="true">
+            <label>Sitio web <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+          </div>
 
-            {% if selected_professional and available_dates %}
-            <div class="field-label date-strip-label">Días con horarios libres</div>
-            <nav class="date-strip" aria-label="Días disponibles">
-              {% for item in available_dates %}
-              <a
-                class="date-chip {% if selected_date == item.value %}active{% endif %}"
-                href="/reservar?professional_id={{ selected_professional.id }}&selected_date={{ item.value }}#booking-flow"
-                data-refresh-booking
-                {% if selected_date == item.value %}aria-current="date"{% endif %}
-              >
-                <strong>{{ item.label }}</strong>
-                <span>{{ item.slots }} horario{{ 's' if item.slots != 1 }}</span>
-              </a>
-              {% endfor %}
-            </nav>
-            {% elif not selected_professional %}
-            <p class="muted small booking-note">Seleccioná un profesional para ver sus días disponibles.</p>
-            {% else %}
-            <p class="muted small booking-note">Este profesional no tiene horarios libres por ahora. Elegí otro o volvé más tarde.</p>
-            {% endif %}
-
-            {% if selected_professional %}
-            <div class="deposit-card">
-              {% if deposit_amount %}
-              <span class="deposit-card__label">Seña para reservar</span>
-              <strong class="deposit-card__amount">{{ deposit_amount | money }}</strong>
-              <p>Se descuenta del valor de la consulta. Tenés {{ hold_minutes }} minutos para pagarla; si no, el horario se libera.</p>
-              {% else %}
-              <span class="deposit-card__label">Sin seña</span>
-              <p>Este profesional no requiere seña para reservar online.</p>
-              {% endif %}
-            </div>
-            {% endif %}
-          </section>
-
-          <section class="panel booking-main" aria-labelledby="step-slot">
-            <form method="post" action="/reservar" id="booking-form">
-              <input type="hidden" name="professional_id" value="{{ selected_professional.id if selected_professional else '' }}" />
-              <div class="hp-field" aria-hidden="true">
-                <label>Sitio web <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+          <div class="booking__flow">
+            <section class="step" aria-labelledby="step-professional">
+              <header class="step__head">
+                <span class="step__index {{ 'is-done' if selected_professional }}">1</span>
+                <h2 id="step-professional">Profesional</h2>
+              </header>
+              <div class="pro-options">
+                {% for professional in professionals %}
+                {% set is_selected = selected_professional and selected_professional.id == professional.id %}
+                <a
+                  class="pro-option {{ 'is-selected' if is_selected }}"
+                  href="/reservar?professional_id={{ professional.id }}#booking-flow"
+                  data-refresh-booking
+                  {% if is_selected %}aria-current="true"{% endif %}
+                >
+                  <span class="pro-option__avatar" aria-hidden="true">{{ professional.first_name[:1] }}{{ professional.last_name[:1] }}</span>
+                  <span class="pro-option__text">
+                    <strong>{{ professional.first_name }} {{ professional.last_name }}</strong>
+                    <span>{{ professional.specialty or 'Odontología' }}</span>
+                  </span>
+                </a>
+                {% else %}
+                <p class="step__empty">Todavía no hay profesionales con agenda online.</p>
+                {% endfor %}
               </div>
+            </section>
 
-              <fieldset class="booking-fieldset">
-                <legend id="step-slot" class="step-title"><span class="step-number">2</span>Horario{% if selected_date_label %} · <span class="step-context">{{ selected_date_label }}</span>{% endif %}</legend>
-                {% if available_slots %}
-                <div class="slot-grid" role="radiogroup">
-                  {% for slot in available_slots %}
+            <section class="step {{ 'is-locked' if not selected_professional }}" aria-labelledby="step-slot">
+              <header class="step__head">
+                <span class="step__index {{ 'is-done' if form.starts_at }}">2</span>
+                <h2 id="step-slot">Día y horario</h2>
+              </header>
+
+              {% if not selected_professional %}
+              <p class="step__empty">Elegí un profesional para ver sus días disponibles.</p>
+              {% elif not available_dates %}
+              <p class="step__empty">{{ selected_professional.first_name }} no tiene horarios libres por ahora. Probá con otro profesional o anotate en la lista de espera.</p>
+              {% else %}
+              <nav class="date-strip" aria-label="Días disponibles">
+                {% for item in available_dates %}
+                <a
+                  class="date-chip {{ 'is-selected' if selected_date == item.value }}"
+                  href="/reservar?professional_id={{ selected_professional.id }}&selected_date={{ item.value }}#booking-flow"
+                  data-refresh-booking
+                  {% if selected_date == item.value %}aria-current="date"{% endif %}
+                  aria-label="{{ item.long_label }}, {{ item.slots }} horario{{ 's' if item.slots != 1 }}"
+                >
+                  <span class="date-chip__day">{{ item.label[:3] }}</span>
+                  <span class="date-chip__date">{{ item.label[4:] }}</span>
+                  <span class="date-chip__count">{{ item.slots }} libre{{ 's' if item.slots != 1 }}</span>
+                </a>
+                {% endfor %}
+              </nav>
+
+              {% if available_slots %}
+              <p class="step__context">{{ selected_date_label | capitalize }}</p>
+              {% set morning = available_slots | selectattr('starts_at.hour', 'lt', 13) | list %}
+              {% set afternoon = available_slots | selectattr('starts_at.hour', 'ge', 13) | list %}
+              {% for group_label, group in [('Mañana', morning), ('Tarde', afternoon)] if group %}
+              <fieldset class="slot-group">
+                <legend>{{ group_label }}</legend>
+                <div class="slot-grid">
+                  {% for slot in group %}
                   {% set value = slot.starts_at.isoformat() %}
-                  <label class="slot-chip">
+                  <label class="slot">
                     <input type="radio" name="starts_at" value="{{ value }}" required {% if form.starts_at == value %}checked{% endif %} data-slot-label="{{ slot.starts_at.strftime('%H:%M') }}" />
                     <span>{{ slot.starts_at.strftime("%H:%M") }}</span>
                   </label>
                   {% endfor %}
                 </div>
-                {% elif selected_professional %}
-                <p class="muted small booking-note">No hay horarios para ese día. Probá con otra fecha.</p>
-                {% else %}
-                <p class="muted small booking-note">Primero elegí un profesional.</p>
-                {% endif %}
               </fieldset>
+              {% endfor %}
+              {% else %}
+              <p class="step__empty">No quedan horarios ese día. Elegí otra fecha.</p>
+              {% endif %}
+              {% endif %}
+            </section>
 
-              <fieldset class="booking-fieldset" {% if not available_slots %}disabled{% endif %}>
-                <legend class="step-title"><span class="step-number">3</span>Tus datos</legend>
-                <div class="two-cols">
-                  <label class="field">
-                    <span class="field-label">DNI</span>
-                    <input name="dni" value="{{ form.dni or '' }}" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="Sin puntos" required />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Celular (WhatsApp)</span>
-                    <input name="phone" type="tel" value="{{ form.phone or '' }}" autocomplete="tel" maxlength="25" placeholder="11 5555-5555" required />
-                  </label>
-                </div>
-                <div class="two-cols">
-                  <label class="field">
-                    <span class="field-label">Nombre</span>
-                    <input name="first_name" value="{{ form.first_name or '' }}" autocomplete="given-name" maxlength="80" required />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Apellido</span>
-                    <input name="last_name" value="{{ form.last_name or '' }}" autocomplete="family-name" maxlength="80" required />
-                  </label>
-                </div>
+            <fieldset class="step {{ 'is-locked' if not available_slots }}" {% if not available_slots %}disabled{% endif %} aria-labelledby="step-data">
+              <header class="step__head">
+                <span class="step__index">3</span>
+                <h2 id="step-data">Tus datos</h2>
+              </header>
+              <div class="field-row">
                 <label class="field">
-                  <span class="field-label">Email</span>
-                  <input name="email" type="email" value="{{ form.email or '' }}" autocomplete="email" maxlength="255" placeholder="Te enviamos la confirmación acá" required />
+                  <span class="field-label">Nombre</span>
+                  <input name="first_name" value="{{ form.first_name or '' }}" autocomplete="given-name" maxlength="80" required />
                 </label>
                 <label class="field">
-                  <span class="field-label">Motivo de la consulta <em>(opcional)</em></span>
-                  <input name="reason" value="{{ form.reason or '' }}" maxlength="255" placeholder="Control, limpieza, dolor…" />
+                  <span class="field-label">Apellido</span>
+                  <input name="last_name" value="{{ form.last_name or '' }}" autocomplete="family-name" maxlength="80" required />
+                </label>
+              </div>
+              <div class="field-row">
+                <label class="field">
+                  <span class="field-label">DNI</span>
+                  <input name="dni" value="{{ form.dni or '' }}" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="Sin puntos" required />
                 </label>
                 <label class="field">
-                  <span class="field-label">Observaciones <em>(opcional)</em></span>
-                  <textarea name="observations" maxlength="1000" placeholder="Alergias, medicación, lo que el profesional deba saber">{{ form.observations or '' }}</textarea>
+                  <span class="field-label">Celular</span>
+                  <input name="phone" type="tel" value="{{ form.phone or '' }}" autocomplete="tel" maxlength="25" placeholder="11 5555-5555" required />
+                  <span class="field-hint">Te mandamos el recordatorio por WhatsApp.</span>
                 </label>
-              </fieldset>
+              </div>
+              <label class="field">
+                <span class="field-label">Email</span>
+                <input name="email" type="email" value="{{ form.email or '' }}" autocomplete="email" maxlength="255" required />
+                <span class="field-hint">Ahí te llega la confirmación del turno.</span>
+              </label>
+              <label class="field">
+                <span class="field-label">Motivo de la consulta <em>opcional</em></span>
+                <input name="reason" value="{{ form.reason or '' }}" maxlength="255" placeholder="Control, limpieza, dolor…" />
+              </label>
+              <label class="field">
+                <span class="field-label">Algo que el profesional deba saber <em>opcional</em></span>
+                <textarea name="observations" maxlength="1000" rows="3" placeholder="Alergias, medicación, embarazo…">{{ form.observations or '' }}</textarea>
+              </label>
+            </fieldset>
+          </div>
 
-              <fieldset class="booking-fieldset" {% if not available_slots %}disabled{% endif %}>
-                <legend class="step-title"><span class="step-number">4</span>{{ 'Seña y confirmación' if deposit_amount else 'Confirmación' }}</legend>
-                <div class="booking-summary" aria-live="polite">
-                  <div><span>Profesional</span><strong>{{ (selected_professional.first_name ~ ' ' ~ selected_professional.last_name) if selected_professional else '—' }}</strong></div>
-                  <div><span>Día</span><strong>{{ selected_date_label or '—' }}</strong></div>
-                  <div><span>Horario</span><strong data-summary-time>{{ form.starts_at[11:16] if form.starts_at else 'Elegí un horario' }}</strong></div>
-                  {% if deposit_amount %}<div><span>Seña</span><strong>{{ deposit_amount | money }}</strong></div>{% endif %}
+          <aside class="booking__aside">
+            <div class="summary" aria-live="polite">
+              <h2 class="summary__title">Tu turno</h2>
+              <dl class="summary__list">
+                <div>
+                  <dt>Profesional</dt>
+                  <dd>{{ (selected_professional.first_name ~ ' ' ~ selected_professional.last_name) if selected_professional else '—' }}</dd>
                 </div>
-                <label class="checkbox-row terms-row">
-                  <input type="checkbox" name="accept_terms" value="1" {% if form.accept_terms %}checked{% endif %} required />
-                  <span>Leí y acepto la <a href="#politica" class="inline-link">política de seña y cancelación</a>.</span>
-                </label>
-                <details id="politica" class="policy-box">
-                  <summary>Política de seña y cancelación</summary>
-                  <p>{{ settings.deposit_policy }}</p>
-                  <p>Podés cancelar desde el link que te enviamos o respondiendo el recordatorio de WhatsApp hasta {{ settings.cancellation_notice_hours }} horas antes del turno.</p>
-                </details>
-                <button type="submit" class="booking-submit" {% if not available_slots %}disabled{% endif %}>
-                  {% if deposit_amount %}Continuar al pago de la seña{% else %}Confirmar reserva{% endif %}
-                </button>
+                <div>
+                  <dt>Día</dt>
+                  <dd>{{ (selected_date_label | capitalize) if selected_date_label else '—' }}</dd>
+                </div>
+                <div>
+                  <dt>Horario</dt>
+                  <dd data-summary-time class="{{ 'is-empty' if not form.starts_at }}">{{ (form.starts_at[11:16] ~ ' h') if form.starts_at else 'Sin elegir' }}</dd>
+                </div>
                 {% if deposit_amount %}
-                <p class="muted small booking-note secure-note">Vas a pagar en Mercado Pago. No guardamos datos de tu tarjeta.</p>
+                <div class="summary__deposit">
+                  <dt>Seña para reservar</dt>
+                  <dd>{{ deposit_amount | money }}</dd>
+                </div>
                 {% endif %}
-              </fieldset>
-            </form>
-          </section>
-        </main>
-      </section>
+              </dl>
 
-      <section class="booking-section waitlist-section" data-reveal>
-        <div class="booking-section-head">
-          <div class="eyebrow">Lista de espera</div>
-          <h2>¿No hay horario que te sirva?</h2>
-          <p class="muted">
-            Anotate y te escribimos por email apenas se libere uno en los días que elijas.
-            No te reservamos el horario: te avisamos para que entres a tomarlo.
-          </p>
-        </div>
-        <form method="post" action="/reservar/lista-de-espera" class="panel waitlist-form">
-          <div class="waitlist-hp" aria-hidden="true">
-            <label>No completar<input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
-          </div>
-          <div class="two-cols">
-            <label class="field">
-              <span class="field-label">Profesional</span>
-              <select name="professional_id">
-                <option value="">Cualquiera</option>
-                {% for professional in professionals %}
-                <option value="{{ professional.id }}" {% if selected_professional and selected_professional.id == professional.id %}selected{% endif %}>
-                  {{ professional.first_name }} {{ professional.last_name }}
-                </option>
-                {% endfor %}
-              </select>
-            </label>
-            <label class="field">
-              <span class="field-label">Franja</span>
-              <select name="period">
-                <option value="any">Cualquier horario</option>
-                <option value="morning">Mañana</option>
-                <option value="afternoon">Tarde</option>
-              </select>
-            </label>
-          </div>
-          <div class="two-cols">
-            <label class="field"><span class="field-label">Desde</span><input type="date" name="date_from" required /></label>
-            <label class="field"><span class="field-label">Hasta</span><input type="date" name="date_to" required /></label>
-          </div>
-          <div class="two-cols">
-            <label class="field"><span class="field-label">DNI</span><input name="dni" inputmode="numeric" placeholder="Sin puntos" required /></label>
-            <label class="field"><span class="field-label">Celular</span><input name="phone" type="tel" placeholder="11 5555-5555" /></label>
-          </div>
-          <div class="two-cols">
-            <label class="field"><span class="field-label">Nombre</span><input name="first_name" required /></label>
-            <label class="field"><span class="field-label">Apellido</span><input name="last_name" required /></label>
-          </div>
-          <label class="field">
-            <span class="field-label">Email</span>
-            <input name="email" type="email" placeholder="Te avisamos acá" required />
-          </label>
-          <button type="submit">Avisame si se libera</button>
+              {% if deposit_amount %}
+              <p class="summary__note">
+                Se descuenta del valor de la consulta. Tenés {{ hold_minutes }} minutos para pagarla; si no, el horario se libera.
+              </p>
+              {% endif %}
+
+              <label class="check">
+                <input type="checkbox" name="accept_terms" value="1" {% if form.accept_terms %}checked{% endif %} required {% if not available_slots %}disabled{% endif %} />
+                <span>Acepto la <a href="#politica" class="text-link" data-open-policy>política de seña y cancelación</a></span>
+              </label>
+
+              <button type="submit" class="button button--block button--lg booking-submit" {% if not available_slots %}disabled{% endif %}>
+                {% if deposit_amount %}Continuar al pago{% else %}Confirmar turno{% endif %}
+              </button>
+              {% if deposit_amount %}
+              <p class="summary__secure">Pagás en Mercado Pago. No guardamos datos de tu tarjeta.</p>
+              {% endif %}
+
+              <details id="politica" class="summary__policy">
+                <summary>Política de seña y cancelación</summary>
+                <p>{{ settings.deposit_policy }}</p>
+                <p>Podés cancelar desde el link del email o respondiendo el recordatorio de WhatsApp hasta {{ settings.cancellation_notice_hours }} horas antes.</p>
+              </details>
+            </div>
+          </aside>
         </form>
+      </div>
+
+      <section class="waitlist" aria-labelledby="waitlist-title">
+        <div class="waitlist__copy">
+          <h2 id="waitlist-title">¿Ningún horario te sirve?</h2>
+          <p>Dejanos tus datos y los días que podés. Si alguien cancela, te avisamos por email para que lo tomes antes que nadie.</p>
+        </div>
+        <details class="waitlist__details">
+          <summary class="button button--secondary">Anotarme en la lista de espera</summary>
+          <form method="post" action="/reservar/lista-de-espera" class="waitlist__form">
+            <div class="hp-field" aria-hidden="true">
+              <label>No completar<input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+            </div>
+            <div class="field-row">
+              <label class="field">
+                <span class="field-label">Profesional</span>
+                <select name="professional_id">
+                  <option value="">Cualquiera</option>
+                  {% for professional in professionals %}
+                  <option value="{{ professional.id }}" {% if selected_professional and selected_professional.id == professional.id %}selected{% endif %}>{{ professional.first_name }} {{ professional.last_name }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">
+                <span class="field-label">Horario</span>
+                <select name="period">
+                  <option value="any">Me da igual</option>
+                  <option value="morning">A la mañana</option>
+                  <option value="afternoon">A la tarde</option>
+                </select>
+              </label>
+            </div>
+            <div class="field-row">
+              <label class="field"><span class="field-label">Desde</span><input type="date" name="date_from" required /></label>
+              <label class="field"><span class="field-label">Hasta</span><input type="date" name="date_to" required /></label>
+            </div>
+            <div class="field-row">
+              <label class="field"><span class="field-label">Nombre</span><input name="first_name" autocomplete="given-name" required /></label>
+              <label class="field"><span class="field-label">Apellido</span><input name="last_name" autocomplete="family-name" required /></label>
+            </div>
+            <div class="field-row">
+              <label class="field"><span class="field-label">DNI</span><input name="dni" inputmode="numeric" placeholder="Sin puntos" required /></label>
+              <label class="field"><span class="field-label">Celular <em>opcional</em></span><input name="phone" type="tel" autocomplete="tel" /></label>
+            </div>
+            <label class="field">
+              <span class="field-label">Email</span>
+              <input name="email" type="email" autocomplete="email" required />
+            </label>
+            <button type="submit" class="button">Avisame si se libera</button>
+          </form>
+        </details>
       </section>
-    </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>{{ settings.clinic_name }}</span>
+        <span>{% if settings.clinic_address %}{{ settings.clinic_address }} · {% endif %}{{ settings.clinic_city }}</span>
+      </div>
+    </footer>
+
     <script>
       document.addEventListener("DOMContentLoaded", () => {
-        const scrollButton = document.querySelector("[data-scroll-target]");
         const bookingSection = () => document.querySelector("#booking-flow");
+        const PATIENT_FIELDS = ["dni", "phone", "first_name", "last_name", "email", "reason", "observations"];
 
-        if (scrollButton) {
-          scrollButton.addEventListener("click", (event) => {
-            event.preventDefault();
-            bookingSection().scrollIntoView({ behavior: "smooth", block: "start" });
-          });
-        }
-        if (window.location.hash === "#booking-flow" || document.querySelector(".booking-feedback")) {
-          bookingSection().classList.add("is-visible");
+        if (window.location.hash === "#booking-flow" || document.querySelector("#booking-flow .notice")) {
           bookingSection().scrollIntoView({ block: "start" });
         }
 
-        const PATIENT_FIELDS = ["dni", "phone", "first_name", "last_name", "email", "reason", "observations"];
-
+        // Elegir profesional o día recarga solo el bloque de la reserva y conserva lo tipeado.
         async function refreshBooking(url) {
           const current = bookingSection();
-          const typed = {};
           const form = current.querySelector("#booking-form");
+          const typed = {};
           if (form) PATIENT_FIELDS.forEach((name) => (typed[name] = form.elements[name]?.value || ""));
           const scrollY = window.scrollY;
           current.setAttribute("aria-busy", "true");
@@ -314,7 +317,6 @@
             const parsed = new DOMParser().parseFromString(await response.text(), "text/html");
             const next = parsed.querySelector("#booking-flow");
             if (!next) throw new Error("booking-section-missing");
-            next.classList.add("is-visible");
             current.replaceWith(next);
             const nextForm = next.querySelector("#booking-form");
             if (nextForm) PATIENT_FIELDS.forEach((name) => { if (typed[name] && nextForm.elements[name]) nextForm.elements[name].value = typed[name]; });
@@ -325,30 +327,28 @@
           }
         }
 
-        document.addEventListener("change", (event) => {
-          const professionalSelect = event.target.closest("#availability-form select[name='professional_id']");
-          if (professionalSelect) {
-            const params = new URLSearchParams(new FormData(professionalSelect.form));
-            refreshBooking(`/reservar?${params.toString()}`);
+        document.addEventListener("click", (event) => {
+          const policyLink = event.target.closest("[data-open-policy]");
+          if (policyLink) {
+            event.preventDefault();
+            const policy = document.querySelector("#politica");
+            if (policy) { policy.open = true; policy.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
             return;
           }
-          const slot = event.target.closest("input[name='starts_at']");
-          if (slot) {
-            const summary = document.querySelector("[data-summary-time]");
-            if (summary) summary.textContent = slot.dataset.slotLabel;
-            const steps = document.querySelectorAll(".booking-steps li");
-            if (steps.length === 4) {
-              steps[1].className = "done";
-              steps[2].className = "current";
-            }
-          }
-        });
-
-        document.addEventListener("click", (event) => {
           const link = event.target.closest("a[data-refresh-booking]");
           if (!link || event.metaKey || event.ctrlKey) return;
           event.preventDefault();
           refreshBooking(link.getAttribute("href"));
+        });
+
+        document.addEventListener("change", (event) => {
+          const slot = event.target.closest("input[name='starts_at']");
+          if (!slot) return;
+          const summary = document.querySelector("[data-summary-time]");
+          if (summary) {
+            summary.textContent = `${slot.dataset.slotLabel} h`;
+            summary.classList.remove("is-empty");
+          }
         });
 
         document.addEventListener("submit", (event) => {
@@ -366,53 +366,27 @@
           }
         });
 
-        // Coming back from the payment page (bfcache) must not leave the button stuck.
+        // Volver desde la página de pago (bfcache) no puede dejar el botón trabado.
         window.addEventListener("pageshow", () => {
           const button = document.querySelector(".booking-submit");
           if (button && button.textContent.trim() === "Reservando…") window.location.reload();
         });
-
-        const revealItems = document.querySelectorAll("[data-reveal]:not(.is-visible)");
-        if (!revealItems.length || !("IntersectionObserver" in window)) {
-          revealItems.forEach((item) => item.classList.add("is-visible"));
-          return;
-        }
-        const observer = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting) {
-                entry.target.classList.add("is-visible");
-                observer.unobserve(entry.target);
-              }
-            });
-          },
-          { threshold: 0.12 }
-        );
-        revealItems.forEach((item) => observer.observe(item));
       });
 
-      // El fondo vira del crema al celeste pastel según cuánto se bajó. Se actualiza
-      // dentro de requestAnimationFrame para no hacer trabajo de más en cada scroll.
+      // El fondo vira del crema a un celeste pastel según cuánto se bajó.
       (() => {
-        const root = document.body;
         let pending = false;
-
         const paint = () => {
           pending = false;
           const scrollable = document.documentElement.scrollHeight - window.innerHeight;
           const progress = scrollable > 0 ? Math.min(window.scrollY / scrollable, 1) : 0;
-          root.style.setProperty("--scroll-tint", progress.toFixed(3));
+          document.body.style.setProperty("--scroll-tint", progress.toFixed(3));
         };
-
-        window.addEventListener(
-          "scroll",
-          () => {
-            if (pending) return;
-            pending = true;
-            window.requestAnimationFrame(paint);
-          },
-          { passive: true }
-        );
+        window.addEventListener("scroll", () => {
+          if (pending) return;
+          pending = true;
+          window.requestAnimationFrame(paint);
+        }, { passive: true });
         window.addEventListener("resize", paint, { passive: true });
         paint();
       })();

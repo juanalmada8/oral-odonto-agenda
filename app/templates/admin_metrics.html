@@ -19,6 +19,7 @@
   </form>
 </section>
 
+<h2 class="metrics-group-title">Agenda</h2>
 <section class="metrics-grid">
   <article class="metric-card">
     <span class="metric-label">Turnos del período</span>
@@ -31,15 +32,19 @@
     <span class="metric-foot">{{ (stats.booked_minutes / 60) | round(1) }} h de {{ (stats.published_minutes / 60) | round(1) }} h publicadas</span>
   </article>
   <article class="metric-card">
-    <span class="metric-label">Conversión de la seña</span>
-    <strong class="metric-value">{{ stats.deposit_conversion | percent }}</strong>
-    <span class="metric-foot">{{ stats.deposit_paid }} pagadas de {{ stats.deposit_bookings }} reservas con seña</span>
-  </article>
-  <article class="metric-card">
     <span class="metric-label">Ausentismo</span>
     <strong class="metric-value">{{ stats.no_show_rate | percent }}</strong>
     <span class="metric-foot">{{ stats.by_status['no_show'] }} ausentes · {{ stats.by_status['completed'] }} atendidos</span>
   </article>
+  <article class="metric-card">
+    <span class="metric-label">Cancelaciones</span>
+    <strong class="metric-value">{{ stats.cancellation_rate | percent }}</strong>
+    <span class="metric-foot">Anticipación media: {{ stats.average_lead_days if stats.average_lead_days is not none else '—' }} días</span>
+  </article>
+</section>
+
+<h2 class="metrics-group-title">Cobros</h2>
+<section class="metrics-grid">
   <article class="metric-card">
     <span class="metric-label">Facturado</span>
     <strong class="metric-value metric-value-sm">{{ stats.charged_total | money }}</strong>
@@ -54,34 +59,33 @@
     <span class="metric-foot">{% if stats.refunds_pending %}{{ stats.refunds_pending }} a devolver{% else %}sin devoluciones pendientes{% endif %}</span>
   </article>
   <article class="metric-card">
-    <span class="metric-label">Cancelaciones</span>
-    <strong class="metric-value">{{ stats.cancellation_rate | percent }}</strong>
-    <span class="metric-foot">Anticipación media: {{ stats.average_lead_days if stats.average_lead_days is not none else '—' }} días</span>
+    <span class="metric-label">Conversión de la seña</span>
+    <strong class="metric-value">{{ stats.deposit_conversion | percent }}</strong>
+    <span class="metric-foot">{{ stats.deposit_paid }} pagadas de {{ stats.deposit_bookings }} reservas con seña</span>
   </article>
 </section>
 
 <section class="surface surface-main">
   <div class="surface-head">
     <div>
-      <div class="eyebrow">Demanda</div>
       <h2>Turnos por día</h2>
     </div>
-    <span class="section-pill">{{ stats.attendance_confirmed }} confirmaron asistencia por WhatsApp</span>
+    <p class="meta">{{ stats.attendance_confirmed }} confirmaron asistencia por WhatsApp</p>
   </div>
-  <div class="day-bars" role="img" aria-label="Cantidad de turnos por día del período">
+  <div class="day-bars" role="img" aria-label="Turnos por día del {{ stats.date_from | short_date }} al {{ stats.date_to | short_date }}; máximo {{ stats.max_daily }} en un día">
     {% for day, count in stats.daily %}
-    <div class="day-bar" title="{{ day | short_date }}: {{ count }} turno(s)">
-      <span style="height: {{ ((count / stats.max_daily) * 100) | round(0) if stats.max_daily else 0 }}%"></span>
+    <div class="day-bar {{ 'is-empty' if not count }}" data-tip="{{ day | short_date }} · {{ count }} turno{{ 's' if count != 1 }}">
+      {% if count and count == stats.max_daily %}<span class="day-bar__value">{{ count }}</span>{% endif %}
+      <span class="day-bar__mark" style="height: {{ ((count / stats.max_daily) * 100) | round(0) if stats.max_daily and count else 0 }}%"></span>
     </div>
     {% endfor %}
   </div>
-  <div class="day-bars-axis muted small"><span>{{ stats.date_from | short_date }}</span><span>{{ stats.date_to | short_date }}</span></div>
+  <div class="day-bars-axis"><span>{{ stats.date_from | short_date }}</span><span>{{ stats.date_to | short_date }}</span></div>
 </section>
 
 <section class="surface surface-main">
   <div class="surface-head">
     <div>
-      <div class="eyebrow">Por profesional</div>
       <h2>Rendimiento de la agenda</h2>
     </div>
   </div>
