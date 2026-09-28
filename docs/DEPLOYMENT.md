@@ -84,18 +84,25 @@ Actions → **Deploy** → *Run workflow* → ref `main`, environment `productio
 El workflow construye la imagen, corre las migraciones como job, publica la revisión nueva y
 verifica `/health/ready`.
 
-Después, cargá los datos iniciales (una vez):
+Después, creá **tu** usuario administrador (una vez). No uses `seed_demo` en producción: carga
+profesionales y pacientes inventados que después hay que borrar a mano.
 
 ```bash
-gcloud run jobs update oral-migrate --region southamerica-east1 \
-  --command python --args="-m,app.tasks.seed_demo"
-gcloud run jobs execute oral-migrate --region southamerica-east1 --wait
-# volvé a dejarlo como job de migraciones
-gcloud run jobs update oral-migrate --region southamerica-east1 --command alembic --args="upgrade,head"
+REGION=southamerica-east1
+gcloud run jobs update oral-migrate --region $REGION \
+  --command python --args="-m,app.tasks.create_admin" \
+  --set-env-vars "ADMIN_USERNAME=maria,ADMIN_FULL_NAME=María Pérez,ADMIN_EMAIL=maria@tu-dominio.com,ADMIN_PASSWORD=<una-clave-larga>"
+gcloud run jobs execute oral-migrate --region $REGION --wait
+
+# Dejá el job como estaba y borrá las variables: la contraseña queda guardada en su configuración.
+gcloud run jobs update oral-migrate --region $REGION --command alembic --args="upgrade,head" \
+  --remove-env-vars ADMIN_USERNAME,ADMIN_FULL_NAME,ADMIN_EMAIL,ADMIN_PASSWORD
 ```
 
-**Cambiá las contraseñas demo** entrando a `/app/users` con `admin / demo12345`, o creá tu usuario
-admin y desactivá los de demo.
+El job es idempotente: si el usuario ya existe no lo toca ni le cambia la contraseña.
+
+Entrá a `/app/login` con ese usuario y desde el panel cargá **profesionales** y su **disponibilidad**;
+cada profesional puede tener su propio usuario (Usuarios → rol *Profesional*) y administrar su agenda.
 
 ## 5. Releases
 
