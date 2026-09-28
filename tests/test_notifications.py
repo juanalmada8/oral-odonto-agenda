@@ -620,3 +620,21 @@ def test_booking_the_offered_slot_closes_the_waitlist_entry(client, db_session, 
 
     db_session.expire_all()
     assert db_session.scalars(select(WaitlistEntry)).one().status == WaitlistStatus.BOOKED
+
+
+def test_sin_whatsapp_configurado_el_recordatorio_sale_solo_por_email(client, db_session, make_professional, outbox, frozen_clock):
+    """Perfil de lanzamiento del consultorio: email únicamente, WhatsApp se suma después."""
+    confirmed_booking(client, db_session, make_professional)
+    frozen_clock.set(datetime(2026, 3, 29, 10, 0))
+    outbox.sent.clear()
+    agent = followup(outbox)  # sin cliente de WhatsApp
+
+    assert agent.prepare_upcoming_reminders(db_session) == 1
+    agent.send_pending_notifications(db_session)
+
+    recordatorios = db_session.scalars(
+        select(Notification).where(Notification.type == NotificationType.REMINDER)
+    ).all()
+    assert [n.channel for n in recordatorios] == [NotificationChannel.EMAIL]
+    assert [n.status for n in recordatorios] == [NotificationStatus.SENT]
+    assert "Recordatorio" in outbox.sent[-1]["subject"]
