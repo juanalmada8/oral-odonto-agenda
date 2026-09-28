@@ -1,8 +1,46 @@
-# Optional custom domain: global HTTPS load balancer in front of Cloud Run with a Google-managed
-# certificate. Without it the site is served from the run.app URL.
+# Optional custom domain. Two ways in:
+#   - domain mapping: free, Cloud Run issues and renews the certificate, but only available in
+#     some regions (checked below, since a wrong region fails silently at apply time);
+#   - load balancer: works anywhere and costs about USD 18/month for the forwarding rule.
+# Without a custom domain the site is served from the run.app URL.
 
 locals {
-  use_load_balancer = var.custom_domain != ""
+  # https://cloud.google.com/run/docs/mapping-custom-domains
+  domain_mapping_regions = [
+    "asia-east1", "asia-northeast1", "asia-southeast1",
+    "europe-north1", "europe-west1", "europe-west4",
+    "us-central1", "us-east1", "us-east4", "us-west1",
+  ]
+
+  use_mapping       = var.custom_domain != "" && var.custom_domain_mode == "mapping"
+  use_load_balancer = var.custom_domain != "" && var.custom_domain_mode == "load_balancer"
+}
+
+resource "terraform_data" "domain_mapping_region_check" {
+  count = local.use_mapping ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = contains(local.domain_mapping_regions, var.region)
+      error_message = "Cloud Run domain mapping is not available in ${var.region}. Use one of ${join(", ", local.domain_mapping_regions)}, or set custom_domain_mode = \"load_balancer\"."
+    }
+  }
+}
+
+resource "google_cloud_run_domain_mapping" "web" {
+  count    = local.use_mapping ? 1 : 0
+  name     = var.custom_domain
+  location = var.region
+
+  metadata {
+    namespace = var.project_id
+  }
+
+  spec {
+    route_name = google_cloud_run_v2_service.web.name
+  }
+
+  depends_on = [terraform_data.domain_mapping_region_check]
 }
 
 resource "google_compute_region_network_endpoint_group" "web" {

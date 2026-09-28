@@ -13,6 +13,11 @@ output "load_balancer_ip" {
   value       = local.use_load_balancer ? google_compute_global_address.web[0].address : ""
 }
 
+output "domain_dns_records" {
+  description = "DNS records to create for the custom domain when using the free domain mapping."
+  value       = local.use_mapping ? google_cloud_run_domain_mapping.web[0].status[0].resource_records : []
+}
+
 output "sql_connection_name" {
   value = google_sql_database_instance.main.connection_name
 }
