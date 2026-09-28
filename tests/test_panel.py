@@ -655,3 +655,63 @@ def test_the_agenda_does_not_query_more_as_appointments_grow(client, db_session,
 
     # No tiene que crecer con la cantidad de filas; que baje alguna es indistinto.
     assert con_muchos <= con_dos, f"la agenda escala con la cantidad de turnos: {con_dos} -> {con_muchos}"
+
+
+# --------------------------------------------------------------- alta del primer admin
+
+
+def _run_create_admin(monkeypatch, **variables):
+    from app.tasks import create_admin
+
+    for nombre in ("ADMIN_USERNAME", "ADMIN_PASSWORD", "ADMIN_FULL_NAME", "ADMIN_EMAIL"):
+        monkeypatch.delenv(nombre, raising=False)
+    for nombre, valor in variables.items():
+        monkeypatch.setenv(nombre, valor)
+    return create_admin.main()
+
+
+def test_create_admin_crea_el_primer_administrador(db_session, monkeypatch):
+    """En producción el único camino era seed_demo, que carga pacientes y profesionales falsos."""
+    codigo = _run_create_admin(
+        monkeypatch,
+        ADMIN_USERNAME="Maria",
+        ADMIN_PASSWORD="una-clave-larga",
+        ADMIN_FULL_NAME="María Pérez",
+        ADMIN_EMAIL="maria@consultorio.com",
+    )
+
+    db_session.expire_all()
+    usuario = db_session.scalar(select(User).where(User.username == "maria"))
+    assert codigo == 0
+    assert usuario.role == UserRole.ADMIN and usuario.is_active
+    assert usuario.password_hash != "una-clave-larga"
+
+
+def test_create_admin_no_pisa_un_usuario_existente(db_session, monkeypatch):
+    """El job puede reintentarse: no debe cambiar la contraseña de alguien que ya entra."""
+    _run_create_admin(
+        monkeypatch, ADMIN_USERNAME="maria", ADMIN_PASSWORD="una-clave-larga",
+        ADMIN_FULL_NAME="María Pérez", ADMIN_EMAIL="maria@consultorio.com",
+    )
+    db_session.expire_all()
+    hash_original = db_session.scalar(select(User).where(User.username == "maria")).password_hash
+
+    codigo = _run_create_admin(
+        monkeypatch, ADMIN_USERNAME="maria", ADMIN_PASSWORD="otra-clave-distinta",
+        ADMIN_FULL_NAME="Otra Persona", ADMIN_EMAIL="otra@consultorio.com",
+    )
+
+    db_session.expire_all()
+    assert codigo == 0
+    assert db_session.scalar(select(User).where(User.username == "maria")).password_hash == hash_original
+
+
+def test_create_admin_rechaza_datos_incompletos_o_debiles(db_session, monkeypatch):
+    sin_variables = _run_create_admin(monkeypatch)
+    clave_corta = _run_create_admin(
+        monkeypatch, ADMIN_USERNAME="maria", ADMIN_PASSWORD="corta",
+        ADMIN_FULL_NAME="María Pérez", ADMIN_EMAIL="maria@consultorio.com",
+    )
+
+    assert (sin_variables, clave_corta) == (2, 2)
+    assert db_session.scalars(select(User)).all() == []

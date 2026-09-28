@@ -26,7 +26,7 @@ sensibles viven en Secret Manager. Referencia completa: `.env.production.example
 
 | Variable | Nota |
 | --- | --- |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM` | sin esto no salen emails |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM` | sin esto no salen emails. Usá una casilla del consultorio: `EMAIL_FROM` es el remitente que ve el paciente |
 | `WHATSAPP_*` | opcional; ver [WHATSAPP.md](WHATSAPP.md). O están todas o ninguna |
 
 ## Reglas de negocio
@@ -44,12 +44,34 @@ make prod-check
 Revisa configuración y conexión a la base, y marca como error (no advertencia) lo que rompe
 producción. Contraseñas y tokens nunca se imprimen.
 
+## Perfil de lanzamiento: sin seña y sin WhatsApp
+
+Se puede abrir al público cobrando en el consultorio y avisando solo por email. Mercado Pago y
+WhatsApp se suman después sin tocar código ni migrar nada.
+
+| Variable | Valor para arrancar |
+| --- | --- |
+| `DEPOSIT_DEFAULT_AMOUNT` | `0` — la reserva queda confirmada sin pago |
+| `MERCADOPAGO_ACCESS_TOKEN` / `MERCADOPAGO_WEBHOOK_SECRET` | vacías |
+| `WHATSAPP_*` | vacías: los recordatorios salen por email |
+
+La app se niega a arrancar si hay seña configurada sin token de Mercado Pago, y si WhatsApp está
+cargado a medias `make prod-check` lo marca como error.
+
+**Para sumar la seña más adelante:** cargá el token y el secreto en Secret Manager, agregalos a
+`optional_secrets` en `terraform.tfvars`, poné `deposit_default_amount` y aplicá. Desde ese momento las
+reservas nuevas piden seña; los profesionales pueden tener un monto propio (0 = sin seña).
+
+**Para sumar WhatsApp:** completá las cuatro variables `WHATSAPP_*` y el recordatorio pasa a salir
+también por ahí, además del email.
+
 ## Antes de abrir al público
 
 - [ ] `make prod-check` en verde
 - [ ] Migraciones aplicadas (`alembic upgrade head` vía job)
-- [ ] Usuarios demo desactivados o con contraseña cambiada
-- [ ] Prueba real: reservar un turno, pagar la seña y recibir el email
-- [ ] Webhook de Mercado Pago apuntando al dominio productivo
+- [ ] Tu usuario administrador creado con `odonto-create-admin` (nunca `seed_demo` en producción)
+- [ ] Profesionales, horarios de atención y disponibilidad cargados desde el panel
+- [ ] Prueba real: reservar un turno y recibir el email de confirmación (y el pago de la seña, si está activa)
+- [ ] Si hay seña: webhook de Mercado Pago apuntando al dominio productivo
 - [ ] Backups verificados ([BACKUPS.md](BACKUPS.md))
 - [ ] Alerta de caída configurada (`alert_email` en Terraform)

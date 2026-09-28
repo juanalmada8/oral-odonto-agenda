@@ -24,6 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
+odonto-create-admin = "app.tasks.create_admin:main"
 odonto-seed-demo = "app.tasks.seed_demo:main"
 odonto-send-reminders = "app.tasks.run_scheduled:main"
 odonto-run-scheduled = "app.tasks.run_scheduled:main"
