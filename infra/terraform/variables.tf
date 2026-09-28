@@ -4,9 +4,15 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "Region for Cloud Run, Cloud SQL and Artifact Registry (southamerica-east1 = São Paulo, closest to Buenos Aires)."
+  description = <<-EOT
+    Region for Cloud Run, Cloud SQL and Artifact Registry.
+      us-central1        – cheapest, and supports the free domain mapping. ~150 ms extra from
+                           Argentina, which for server-rendered pages is not noticeable.
+      southamerica-east1 – São Paulo, lowest latency and data closer to home, but pricier and
+                           it needs the load balancer for a custom domain.
+  EOT
   type        = string
-  default     = "southamerica-east1"
+  default     = "us-central1"
 }
 
 variable "service_name" {
@@ -28,9 +34,26 @@ variable "image" {
 }
 
 variable "custom_domain" {
-  description = "Custom domain (e.g. turnos.oral.com.ar). Empty = use the run.app URL. Setting it creates an HTTPS load balancer with a managed certificate (~USD 18/month)."
+  description = "Custom domain (e.g. turnos.oral.com.ar). Empty = use the run.app URL."
   type        = string
   default     = ""
+}
+
+variable "custom_domain_mode" {
+  description = <<-EOT
+    How the custom domain reaches Cloud Run:
+      mapping       – Cloud Run domain mapping. Free, but only in the regions listed in
+                      DOMAIN_MAPPING_REGIONS (São Paulo is not one of them).
+      load_balancer – Global HTTPS load balancer with a managed certificate. Works in every
+                      region and adds roughly USD 18/month for the forwarding rule.
+  EOT
+  type        = string
+  default     = "mapping"
+
+  validation {
+    condition     = contains(["mapping", "load_balancer"], var.custom_domain_mode)
+    error_message = "custom_domain_mode must be \"mapping\" or \"load_balancer\"."
+  }
 }
 
 # ----------------------------------------------------------------- database

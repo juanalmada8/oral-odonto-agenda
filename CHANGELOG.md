@@ -19,6 +19,10 @@ y versionado semántico.
   cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
 
 ### Changed
+- Dominio propio: se puede usar el **mapeo de Cloud Run, que es gratis**, en lugar del balanceador
+  (~USD 18/mes). Como el mapeo no existe en São Paulo, la región por defecto pasa a `us-central1`,
+  que además es más barata; Terraform corta con un mensaje claro si se pide mapeo en una región que
+  no lo soporta. `custom_domain_mode` permite volver al balanceador.
 - Documentación del primer deploy: se crea el admin con `odonto-create-admin` en lugar de correr
   `seed_demo` en producción; los profesionales y su disponibilidad se cargan desde el panel.
 - Checklist de producción con el perfil de lanzamiento sin seña y sin WhatsApp (recordatorios por
