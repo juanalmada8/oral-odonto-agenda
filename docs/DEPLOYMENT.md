@@ -123,15 +123,47 @@ la versión anterior (agregar columnas nullable, borrar en un release posterior)
 
 ## 6. Dominio propio
 
-Por defecto el sitio vive en la URL `*.run.app`. Para usar dominio propio:
+Por defecto el sitio vive en la URL `*.run.app`. Hay dos formas de usar un dominio propio, y la
+diferencia es plata:
+
+### Mapeo de dominio (gratis, el recomendado)
+
+Cloud Run atiende el dominio directamente y se encarga del certificado. **No cuesta nada**, pero
+solo funciona en algunas regiones: `us-central1`, `us-east1`, `us-east4`, `us-west1`, `europe-west1`,
+`europe-west4`, `europe-north1`, `asia-east1`, `asia-northeast1` y `asia-southeast1`.
+**São Paulo no está en la lista**, y por eso la región por defecto de este proyecto es `us-central1`.
 
 ```hcl
-custom_domain = "turnos.tu-dominio.com.ar"
+region             = "us-central1"
+custom_domain      = "turnos.tu-dominio.com.ar"
+custom_domain_mode = "mapping"
 ```
 
-`terraform apply` crea el balanceador y el certificado administrado; apuntá el registro **A** del
-dominio a la IP del output `load_balancer_ip`. El certificado tarda entre 10 y 60 minutos.
-Actualizá también `PUBLIC_BASE_URL` en las variables de GitHub y la URL del webhook en Mercado Pago.
+`terraform apply` devuelve en el output `domain_dns_records` los registros que hay que cargar en tu
+proveedor de DNS (normalmente un `CNAME` para un subdominio). Si la región no admite mapeo, Terraform
+corta antes de aplicar con un mensaje claro en lugar de fallar a mitad de camino.
+
+### Balanceador de carga (~USD 18/mes)
+
+Necesario si querés quedarte en São Paulo, o si más adelante hacen falta reglas por ruta, CDN o WAF:
+
+```hcl
+region             = "southamerica-east1"
+custom_domain      = "turnos.tu-dominio.com.ar"
+custom_domain_mode = "load_balancer"
+```
+
+Apuntá el registro **A** del dominio a la IP del output `load_balancer_ip`. El certificado tarda entre
+10 y 60 minutos.
+
+### En los dos casos
+
+Actualizá `PUBLIC_BASE_URL` en las variables de GitHub y, si activás la seña, la URL del webhook en
+Mercado Pago.
+
+> **Dónde quedan los datos.** `us-central1` guarda la base en Estados Unidos y `southamerica-east1`
+> en Brasil: ninguna de las dos es Argentina. Como el sistema guarda datos de salud, conviene que lo
+> converses con quien te asesora legalmente antes de abrir al público.
 
 ## 7. Operación
 
