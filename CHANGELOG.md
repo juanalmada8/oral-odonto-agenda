@@ -14,6 +14,17 @@ y versionado semántico.
 
 ## [Unreleased]
 
+### Added
+- `odonto-create-admin`: crea el primer usuario administrador a partir de variables de entorno, sin
+  cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
+
+### Changed
+- Documentación del primer deploy: se crea el admin con `odonto-create-admin` en lugar de correr
+  `seed_demo` en producción; los profesionales y su disponibilidad se cargan desde el panel.
+- Checklist de producción con el perfil de lanzamiento sin seña y sin WhatsApp (recordatorios por
+  email), y cómo sumar Mercado Pago y WhatsApp más adelante sin tocar código.
+
+
 ## [0.2.0] - 2026-09-17
 
 ### Added — Agenda del consultorio
