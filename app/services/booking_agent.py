@@ -84,7 +84,6 @@ class BookingAgent:
             contact_email=request.email,
             contact_phone=request.phone,
             reason=request.reason or "Reserva online",
-            notes=request.observations,
             created_by=PUBLIC_ACTOR,
             actor=PUBLIC_ACTOR,
             public_rules=True,

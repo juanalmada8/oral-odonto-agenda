@@ -1,0 +1,92 @@
+{% set brand_logo = asset_url('brand/oral-logo-blue-cropped.png') %}
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Cómo {{ settings.clinic_name }} trata los datos personales de quienes reservan turnos online." />
+    <title>Política de privacidad | {{ settings.clinic_name }}</title>
+    <link rel="icon" type="image/png" href="{{ brand_logo }}" />
+    <link rel="stylesheet" href="{{ asset_url('styles.css') }}" />
+  </head>
+  <body class="public-body">
+    <header class="status-header">
+      <a class="site-header__brand" href="/reservar" aria-label="{{ settings.clinic_name }}, reservar turno">
+        <img src="{{ brand_logo }}" alt="{{ settings.clinic_name }}" width="120" height="55" />
+      </a>
+    </header>
+
+    <main class="legal">
+      <h1>Política de privacidad</h1>
+      <p class="legal__intro">
+        Cómo tratamos los datos de quienes reservan un turno en {{ settings.clinic_name }}.
+        Última actualización: {{ updated_at }}.
+      </p>
+
+      <h2>Quién es responsable</h2>
+      <p>
+        {{ settings.clinic_name }}{% if settings.clinic_address %}, {{ settings.clinic_address }}{% endif %},
+        {{ settings.clinic_city }}. Para cualquier consulta sobre tus datos escribinos a
+        <a class="text-link" href="mailto:{{ settings.email_from }}">{{ settings.email_from }}</a>{% if settings.clinic_phone %}
+        o llamanos al {{ settings.clinic_phone }}{% endif %}.
+      </p>
+
+      <h2>Qué datos pedimos y para qué</h2>
+      <ul>
+        <li><strong>Nombre, apellido y DNI:</strong> para identificarte y no duplicar fichas.</li>
+        <li><strong>Email y celular:</strong> para confirmarte el turno y recordártelo antes de la fecha.</li>
+        <li><strong>Motivo de la consulta (opcional):</strong> para que el profesional sepa de qué se trata y prepare el turno.</li>
+        <li><strong>Día y horario elegidos:</strong> para reservar el lugar en la agenda.</li>
+      </ul>
+      <p>
+        <strong>No te pedimos información médica para reservar.</strong> Este sistema es una agenda de
+        turnos: no es una historia clínica y no guarda diagnósticos, tratamientos ni antecedentes de salud.
+        Lo que necesite saber el profesional se conversa en el consultorio.
+      </p>
+
+      <h2>Quién puede verlos</h2>
+      <p>
+        Solo el equipo del consultorio, con usuario y contraseña propios: administración, recepción y el
+        profesional que te atiende. Cada acceso y cada cambio quedan registrados. No vendemos ni cedemos
+        datos a terceros con fines comerciales.
+      </p>
+
+      <h2>Dónde se guardan</h2>
+      <p>
+        En servidores de Google Cloud fuera de la Argentina, con la base de datos cerrada a internet y
+        copias de respaldo cifradas. Esa transferencia internacional se hace con tu consentimiento y bajo
+        las cláusulas contractuales que exige la normativa argentina.
+      </p>
+      {% if payment_provider %}
+      <h2>Pagos</h2>
+      <p>
+        Si tu turno requiere seña, el pago se hace en {{ payment_provider }}. Nosotros no vemos ni
+        guardamos los datos de tu tarjeta: solo el monto, la fecha y si el pago fue aprobado.
+      </p>
+      {% endif %}
+
+      <h2>Cuánto tiempo los conservamos</h2>
+      <p>
+        Mientras seas paciente del consultorio y por el plazo que exigen las normas sanitarias y
+        contables. Si pedís la baja y no hay una obligación legal que lo impida, borramos tus datos.
+      </p>
+
+      <h2>Tus derechos</h2>
+      <p>
+        Podés pedirnos en cualquier momento acceder a tus datos, corregirlos o eliminarlos, escribiéndonos
+        a <a class="text-link" href="mailto:{{ settings.email_from }}">{{ settings.email_from }}</a>.
+        La Agencia de Acceso a la Información Pública, en su carácter de órgano de control de la Ley 25.326,
+        atiende las denuncias de quienes consideren afectado su derecho.
+      </p>
+
+      <p class="legal__back"><a class="text-link" href="/reservar">Volver a reservar un turno</a></p>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>{{ settings.clinic_name }}</span>
+        <span>{% if settings.clinic_address %}{{ settings.clinic_address }} · {% endif %}{{ settings.clinic_city }}</span>
+      </div>
+    </footer>
+  </body>
+</html>

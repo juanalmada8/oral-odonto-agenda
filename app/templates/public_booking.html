@@ -199,11 +199,7 @@
               </label>
               <label class="field">
                 <span class="field-label">Motivo de la consulta <em>opcional</em></span>
-                <input name="reason" value="{{ form.reason or '' }}" maxlength="255" placeholder="Control, limpieza, dolor…" />
-              </label>
-              <label class="field">
-                <span class="field-label">Algo que el profesional deba saber <em>opcional</em></span>
-                <textarea name="observations" maxlength="1000" rows="3" placeholder="Alergias, medicación, embarazo…">{{ form.observations or '' }}</textarea>
+                <input name="reason" value="{{ form.reason or '' }}" maxlength="255" placeholder="Control, limpieza, urgencia…" />
               </label>
             </fieldset>
           </div>
@@ -240,7 +236,11 @@
 
               <label class="check">
                 <input type="checkbox" name="accept_terms" value="1" {% if form.accept_terms %}checked{% endif %} required {% if not available_slots %}disabled{% endif %} />
-                <span>Acepto la <a href="#politica" class="text-link" data-open-policy>política de seña y cancelación</a></span>
+                <span>
+                  Acepto la <a href="#politica" class="text-link" data-open-policy>política de seña y cancelación</a>
+                  y que usen mis datos para gestionar el turno, según la
+                  <a href="/privacidad" class="text-link" target="_blank" rel="noopener">política de privacidad</a>.
+                </span>
               </label>
 
               <button type="submit" class="button button--block button--lg booking-submit" {% if not available_slots %}disabled{% endif %}>
@@ -306,6 +306,10 @@
               <span class="field-label">Email</span>
               <input name="email" type="email" autocomplete="email" required />
             </label>
+            <p class="field-hint">
+              Guardamos tus datos solo para avisarte. Ver la
+              <a href="/privacidad" class="text-link" target="_blank" rel="noopener">política de privacidad</a>.
+            </p>
             <button type="submit" class="button">Avisame si se libera</button>
           </form>
         </details>
@@ -316,13 +320,14 @@
       <div class="site-footer__inner">
         <span>{{ settings.clinic_name }}</span>
         <span>{% if settings.clinic_address %}{{ settings.clinic_address }} · {% endif %}{{ settings.clinic_city }}</span>
+        <a class="text-link" href="/privacidad">Política de privacidad</a>
       </div>
     </footer>
 
     <script>
       document.addEventListener("DOMContentLoaded", () => {
         const bookingSection = () => document.querySelector("#booking-flow");
-        const PATIENT_FIELDS = ["dni", "phone", "first_name", "last_name", "email", "reason", "observations"];
+        const PATIENT_FIELDS = ["dni", "phone", "first_name", "last_name", "email", "reason"];
 
         if (window.location.hash === "#booking-flow" || document.querySelector("#booking-flow .notice")) {
           bookingSection().scrollIntoView({ block: "start" });
