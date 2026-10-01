@@ -683,13 +683,19 @@ fieldset {
    izquierda, título con rótulo de localidad, botón coral y la tarjeta de marca con
    los acentos rosa y lima. Queda acotada a .landing para no pisar al resto. */
 
+/* El degradado se pinta a todo el ancho y el límite de 1480px se aplica al contenido:
+   cuando los dos vivían en el mismo elemento, en monitores más anchos se veía el corte
+   vertical del fondo a los costados. */
 .landing {
-  max-width: 1480px;
-  margin: 0 auto;
   padding: 28px 32px 0;
   background:
     radial-gradient(circle at top left, rgba(255, 94, 55, 0.08), transparent 32%),
     radial-gradient(circle at 80% 12%, rgba(150, 186, 218, 0.32), transparent 28%);
+}
+
+.landing > * {
+  max-width: 1416px; /* 1480 menos el padding lateral: el ancho de contenido de siempre */
+  margin-inline: auto;
 }
 
 .landing .public-topbar {
