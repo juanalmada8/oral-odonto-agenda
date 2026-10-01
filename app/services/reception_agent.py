@@ -191,7 +191,6 @@ class ReceptionAgent:
                 last_name=request.last_name,
                 email=request.email,
                 phone=request.phone,
-                observations=getattr(request, "observations", None),
             )
             db.add(patient)
             db.flush()
@@ -217,7 +216,7 @@ class ReceptionAgent:
                 status_code=409,
             )
         filled = {}
-        for field in ("email", "phone", "observations"):
+        for field in ("email", "phone"):
             value = getattr(request, field)
             if value and not getattr(patient, field):
                 setattr(patient, field, value)

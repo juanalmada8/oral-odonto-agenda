@@ -16,15 +16,15 @@ class Patient(TimestampMixin, Base):
     phone: Mapped[str | None] = mapped_column(String(40))
     observations: Mapped[str | None] = mapped_column(Text())
 
-    # Ficha que carga el mostrador cuando el paciente viene por primera vez: la reserva
-    # online solo pide lo mínimo para dar el turno.
+    # Ficha administrativa que carga el mostrador. A propósito no guarda información
+    # clínica: con datos de salud la base pasa a ser de datos sensibles y el sistema es
+    # una agenda, no una historia clínica.
     birth_date: Mapped[date | None] = mapped_column(Date())
     address: Mapped[str | None] = mapped_column(String(180))
     city: Mapped[str | None] = mapped_column(String(80))
     health_insurance: Mapped[str | None] = mapped_column(String(120))
     health_insurance_number: Mapped[str | None] = mapped_column(String(60))
     emergency_contact: Mapped[str | None] = mapped_column(String(160))
-    medical_notes: Mapped[str | None] = mapped_column(Text())
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
     appointments = relationship("Appointment", back_populates="patient")

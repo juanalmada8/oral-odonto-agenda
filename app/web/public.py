@@ -113,6 +113,19 @@ def booking_page_context(
     }
 
 
+@router.get("/privacidad", response_class=HTMLResponse)
+def privacy_page(request: Request, payment_service: PaymentService = Depends(get_payment_service)):
+    """Qué datos se guardan y para qué. Enlazada desde el formulario antes de reservar."""
+    return templates.TemplateResponse(
+        request,
+        "privacy.html",
+        {
+            "updated_at": format_long_date(clock.today()),
+            "payment_provider": "Mercado Pago" if payment_service.gateway else None,
+        },
+    )
+
+
 @router.get("/reservar", response_class=HTMLResponse)
 def public_booking_page(
     request: Request,
@@ -149,7 +162,6 @@ def create_public_booking(
     email: str = Form(""),
     phone: str = Form(""),
     reason: str = Form(""),
-    observations: str = Form(""),
     accept_terms: str = Form(""),
     website: str = Form(""),
     background_tasks: BackgroundTasks = BackgroundTasks(),
@@ -167,7 +179,6 @@ def create_public_booking(
         "email": email,
         "phone": phone,
         "reason": reason,
-        "observations": observations,
         "starts_at": starts_at,
         "accept_terms": bool(accept_terms),
     }
@@ -213,7 +224,6 @@ def create_public_booking(
             email=email.strip(),
             phone=phone,
             reason=reason,
-            observations=observations,
             accept_terms=bool(accept_terms),
         )
         result = booking_agent.book(db, booking_request)

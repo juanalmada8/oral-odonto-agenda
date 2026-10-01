@@ -20,7 +20,6 @@ class PatientBase(BaseModel):
     health_insurance: str | None = Field(default=None, max_length=120)
     health_insurance_number: str | None = Field(default=None, max_length=60)
     emergency_contact: str | None = Field(default=None, max_length=160)
-    medical_notes: str | None = Field(default=None, max_length=2000)
 
     @field_validator("dni")
     @classmethod
@@ -67,7 +66,6 @@ class PatientUpdate(BaseModel):
     health_insurance: str | None = Field(default=None, max_length=120)
     health_insurance_number: str | None = Field(default=None, max_length=60)
     emergency_contact: str | None = Field(default=None, max_length=160)
-    medical_notes: str | None = Field(default=None, max_length=2000)
 
 
     @field_validator("dni")
@@ -114,7 +112,6 @@ class PatientRead(TimestampedModel):
     health_insurance: str | None
     health_insurance_number: str | None
     emergency_contact: str | None
-    medical_notes: str | None
 
 
 class PatientIdentity(BaseModel):
