@@ -43,6 +43,15 @@ class PaymentService:
         self.followup_agent = followup_agent
 
     def deposit_for(self, professional: Professional) -> Decimal:
+        """Seña a pedir para una reserva online.
+
+        Sin pasarela configurada no hay forma de cobrarla: pedirla igual dejaría el turno
+        esperando un pago imposible y el horario bloqueado hasta que venza el hold. Mientras
+        los pagos estén apagados se reserva sin seña, aunque el profesional tenga un monto
+        cargado, para que vuelva a aplicarse solo al encender Mercado Pago.
+        """
+        if self.gateway is None:
+            return Decimal("0.00")
         amount = professional.deposit_amount
         if amount is None:
             amount = self.settings.deposit_default_amount

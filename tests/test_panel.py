@@ -728,3 +728,23 @@ def test_create_admin_rechaza_datos_incompletos_o_debiles(db_session, monkeypatc
 
     assert (sin_variables, clave_corta) == (2, 2)
     assert db_session.scalars(select(User)).all() == []
+
+
+def test_a_professional_name_is_validated_like_a_patient_name(client, db_session, clinic):
+    """El nombre se publica en /reservar: uno vacío dejaba una opción fantasma para elegir."""
+    login(client, "admin")
+    for first_name, last_name in (("X1", "Gómez"), ("   ", "   "), ("Laura", "G0mez")):
+        response = client.post(
+            "/app/professionals",
+            data={
+                "first_name": first_name,
+                "last_name": last_name,
+                "specialty": "",
+                "email": "",
+                "phone": "",
+                "default_appointment_duration": "30",
+                "deposit_amount": "",
+            },
+            follow_redirects=False,
+        )
+        assert "error=" in response.headers["location"], f"aceptó «{first_name} {last_name}»"

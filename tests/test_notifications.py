@@ -23,6 +23,7 @@ from app.core.enums import (
 from app.integrations.whatsapp import GRAPH_BASE_URL, WhatsAppClient, same_whatsapp_number
 from app.main import app
 from app.models.appointment import Appointment
+from app.models.patient import Patient
 from app.models.notification import Notification
 from app.models.waitlist_entry import WaitlistEntry
 from app.services.followup_agent import FollowUpAgent
@@ -638,3 +639,18 @@ def test_sin_whatsapp_configurado_el_recordatorio_sale_solo_por_email(client, db
     assert [n.channel for n in recordatorios] == [NotificationChannel.EMAIL]
     assert [n.status for n in recordatorios] == [NotificationStatus.SENT]
     assert "Recordatorio" in outbox.sent[-1]["subject"]
+
+
+def test_the_waitlist_validates_identity_like_the_booking_form(client, db_session, make_professional):
+    """La lista de espera arma PatientIdentity con el formulario crudo.
+
+    Sin validarla, un DNI o un nombre inventados creaban una ficha de paciente nueva
+    en cada intento, algo que /reservar sí rechazaba.
+    """
+    professional_id = make_professional()
+    for campo, valor in (("dni", "123"), ("first_name", "R0cío"), ("last_name", "P4z")):
+        campos = {"dni": "41777666", campo: valor}
+        response = _join_waitlist(client, professional_id, **campos)
+
+        assert "error=" in response.headers["location"], f"aceptó {campo}={valor!r}"
+    assert db_session.scalars(select(Patient)).all() == []
