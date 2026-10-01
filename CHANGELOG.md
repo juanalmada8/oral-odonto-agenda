@@ -14,7 +14,18 @@ y versionado semántico.
 
 ## [Unreleased]
 
+### Removed
+- **El sistema deja de guardar datos de salud.** Se saca el campo de antecedentes (alergias,
+  medicación) de la ficha del paciente y el campo libre del formulario público donde el paciente
+  podía escribir esa información. Guardar datos de salud convierte la base en una de *datos
+  sensibles* bajo la Ley 25.326, con obligaciones mucho más pesadas; el producto es una agenda de
+  turnos, no una historia clínica. Migración `20261001_11` borra la columna.
+
 ### Added
+- Página pública **/privacidad**: qué datos se piden y para qué, quién los ve, dónde se guardan,
+  cuánto se conservan y cómo ejercer los derechos de acceso, rectificación y supresión.
+- Consentimiento explícito al reservar: la casilla ahora cubre el tratamiento de los datos y enlaza
+  la política. La lista de espera también la enlaza.
 - `odonto-create-admin`: crea el primer usuario administrador a partir de variables de entorno, sin
   cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
 

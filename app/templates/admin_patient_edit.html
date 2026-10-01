@@ -18,7 +18,7 @@
       </div>
       <fieldset class="field-group">
         <legend>Ficha del consultorio</legend>
-        <p class="field-hint">Se completa a mano cuando el paciente viene por primera vez. La reserva online no pide nada de esto.</p>
+        <p class="field-hint">Datos administrativos, para contacto y facturación. No cargues información clínica acá: el sistema es una agenda y no reemplaza a la historia clínica.</p>
         <div class="two-cols">
           <label class="field"><span class="field-label">Fecha de nacimiento</span><input name="birth_date" type="date" value="{{ patient.birth_date.isoformat() if patient.birth_date else '' }}" /></label>
           <label class="field"><span class="field-label">Localidad</span><input name="city" value="{{ patient.city or '' }}" placeholder="General Belgrano" /></label>
@@ -32,12 +32,8 @@
           <span class="field-label">Contacto ante urgencia</span>
           <input name="emergency_contact" value="{{ patient.emergency_contact or '' }}" placeholder="Nombre y teléfono" />
         </label>
-        <label class="field">
-          <span class="field-label">Antecedentes</span>
-          <textarea name="medical_notes" placeholder="Alergias, medicación, condiciones a tener en cuenta…">{{ patient.medical_notes or '' }}</textarea>
-        </label>
       </fieldset>
-      <label class="field"><span class="field-label">Observaciones</span><textarea name="observations">{{ patient.observations or '' }}</textarea></label>
+      <label class="field"><span class="field-label">Notas administrativas</span><textarea name="observations" placeholder="Ej.: pide turnos a la tarde, paga en efectivo">{{ patient.observations or '' }}</textarea></label>
       <label class="checkbox-row">
         <input type="checkbox" name="is_active" value="true" {% if patient.is_active %}checked{% endif %} />
         Paciente activo (puede reservar online)

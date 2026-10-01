@@ -300,3 +300,26 @@ def test_payment_simulator_is_unavailable_in_production(client, db_session, make
 
     assert client.get(checkout_url).status_code == 404
     assert client.post(checkout_url, data={"decision": "approve"}).status_code == 404
+
+
+def test_la_reserva_publica_no_pide_datos_de_salud(client, make_professional):
+    """Pedir alergias o medicación convertiría la base en una de datos sensibles."""
+    make_professional()
+
+    pagina = client.get("/reservar").text
+
+    assert 'name="observations"' not in pagina
+    assert "Alergias" not in pagina and "medicación" not in pagina
+
+
+def test_la_politica_de_privacidad_esta_publicada_y_enlazada(client, make_professional):
+    """Hay que decirle al paciente qué se guarda y para qué antes de que reserve."""
+    make_professional()
+
+    politica = client.get("/privacidad")
+    reserva = client.get("/reservar").text
+
+    assert politica.status_code == 200
+    assert "ORAL odontología familiar" in politica.text
+    assert "no es una historia clínica" in politica.text
+    assert 'href="/privacidad"' in reserva

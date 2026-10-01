@@ -457,6 +457,20 @@ def test_manual_appointment_without_deposit_stays_reserved(client, db_session, c
     assert db_session.scalars(select(Payment).where(Payment.appointment_id == appointment.id)).all() == []
 
 
+def test_la_ficha_no_guarda_informacion_clinica(client, db_session, clinic):
+    """El sistema es una agenda: con datos de salud la base pasa a ser de datos sensibles."""
+    login(client, "admin")
+    paciente = Patient(dni="41999111", first_name="Vera", last_name="Luna")
+    db_session.add(paciente)
+    db_session.commit()
+
+    ficha = client.get(f"/app/patients/{paciente.id}/edit").text
+
+    assert "medical_notes" not in ficha
+    assert "Antecedentes" not in ficha
+    assert not hasattr(Patient, "medical_notes")
+
+
 def test_patient_record_fields_are_saved_by_hand(client, db_session, clinic):
     """Address, birth date and insurance are typed at the desk: online booking never asks for them."""
     patient = Patient(dni="41555666", first_name="Vera", last_name="Luna", email="vera@example.com")
@@ -471,7 +485,7 @@ def test_patient_record_fields_are_saved_by_hand(client, db_session, clinic):
             "email": "vera@example.com", "phone": "", "observations": "", "is_active": "true",
             "birth_date": "1990-07-15", "address": "Soloeta 443", "city": "General Belgrano",
             "health_insurance": "IOMA", "health_insurance_number": "12345/6",
-            "emergency_contact": "Juan Luna 2241-556677", "medical_notes": "Alérgica a la penicilina",
+            "emergency_contact": "Juan Luna 2241-556677",
         },
         follow_redirects=False,
     )
@@ -481,7 +495,6 @@ def test_patient_record_fields_are_saved_by_hand(client, db_session, clinic):
     assert saved.birth_date == date(1990, 7, 15)
     assert saved.address == "Soloeta 443"
     assert saved.health_insurance_number == "12345/6"
-    assert saved.medical_notes == "Alérgica a la penicilina"
 
 
 def test_editing_a_professional_deposit_does_not_break_the_audit_log(client, db_session, clinic):

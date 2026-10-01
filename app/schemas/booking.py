@@ -16,7 +16,6 @@ class PublicBookingRequest(BaseModel):
     email: EmailStr
     phone: str
     reason: str | None = Field(default=None, max_length=255)
-    observations: str | None = Field(default=None, max_length=1000)
     accept_terms: bool
 
     @field_validator("dni")
@@ -44,7 +43,7 @@ class PublicBookingRequest(BaseModel):
     def validate_phone(cls, value: str) -> str:
         return normalize_mobile_phone(value)
 
-    @field_validator("reason", "observations", mode="before")
+    @field_validator("reason", mode="before")
     @classmethod
     def blank_to_none(cls, value):
         if isinstance(value, str):
