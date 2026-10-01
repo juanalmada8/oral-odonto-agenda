@@ -119,6 +119,10 @@ class PatientIdentity(BaseModel):
 
     Lo usan la reserva y la lista de espera: ninguna de las dos confía en estos datos
     para escribir sobre una ficha existente, solo para encontrarla o crear una nueva.
+
+    Valida con el mismo rigor que el formulario de reserva porque con estos datos se
+    crea una ficha nueva: la lista de espera los toma del formulario sin pasar por
+    PublicBookingRequest, y sin estas reglas entraban DNI y nombres inventados.
     """
 
     dni: str
@@ -127,3 +131,23 @@ class PatientIdentity(BaseModel):
     email: str | None = None
     phone: str | None = None
     observations: str | None = None
+
+    @field_validator("dni")
+    @classmethod
+    def validate_dni(cls, value: str) -> str:
+        return normalize_dni(value, strict=True)
+
+    @field_validator("first_name")
+    @classmethod
+    def validate_first_name(cls, value: str) -> str:
+        return normalize_person_name(value, label="El nombre")
+
+    @field_validator("last_name")
+    @classmethod
+    def validate_last_name(cls, value: str) -> str:
+        return normalize_person_name(value, label="El apellido")
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str | None) -> str | None:
+        return normalize_mobile_phone(value) if value else None
