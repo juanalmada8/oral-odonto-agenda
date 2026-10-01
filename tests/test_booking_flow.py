@@ -346,3 +346,14 @@ def test_without_a_payment_gateway_a_deposit_does_not_block_the_booking(client, 
     assert appointment.hold_expires_at is None
     assert appointment.payments == []
     assert response.headers["location"] == f"/reservar/turno/{appointment.public_token}"
+
+
+def test_without_a_deposit_the_policy_does_not_talk_about_one(client, make_professional):
+    """Sin seña no se le puede hacer aceptar una política que explica cómo se le retiene la plata."""
+    sin_deposito = client.get(f"/reservar?professional_id={make_professional(deposit=Decimal('0'))}").text
+    con_deposito = client.get(f"/reservar?professional_id={make_professional(deposit=Decimal('9000'))}").text
+
+    assert "seña" not in sin_deposito.lower()
+    assert "Confirmar turno" in sin_deposito
+    assert "Política de seña y cancelación" in con_deposito
+    assert "Continuar al pago" in con_deposito
