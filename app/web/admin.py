@@ -699,7 +699,6 @@ def edit_patient_submit(
     health_insurance: str = Form(""),
     health_insurance_number: str = Form(""),
     emergency_contact: str = Form(""),
-    medical_notes: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     reception_agent: ReceptionAgent = Depends(get_reception_agent),
@@ -723,7 +722,6 @@ def edit_patient_submit(
                 health_insurance=health_insurance or None,
                 health_insurance_number=health_insurance_number or None,
                 emergency_contact=emergency_contact or None,
-                medical_notes=medical_notes or None,
             ),
             actor=current_user.username,
         )
