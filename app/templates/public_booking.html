@@ -237,7 +237,7 @@
               <label class="check">
                 <input type="checkbox" name="accept_terms" value="1" {% if form.accept_terms %}checked{% endif %} required {% if not available_slots %}disabled{% endif %} />
                 <span>
-                  Acepto la <a href="#politica" class="text-link" data-open-policy>política de seña y cancelación</a>
+                  Acepto la <a href="#politica" class="text-link" data-open-policy>política de {% if deposit_amount %}seña y {% endif %}cancelación</a>
                   y que usen mis datos para gestionar el turno, según la
                   <a href="/privacidad" class="text-link" target="_blank" rel="noopener">política de privacidad</a>.
                 </span>
@@ -250,10 +250,13 @@
               <p class="summary__secure">Pagás en Mercado Pago. No guardamos datos de tu tarjeta.</p>
               {% endif %}
 
+              {# Sin seña no se le puede hacer aceptar una política que explica cómo se le retiene la plata. #}
               <details id="politica" class="summary__policy">
-                <summary>Política de seña y cancelación</summary>
+                <summary>Política de {% if deposit_amount %}seña y {% endif %}cancelación</summary>
+                {% if deposit_amount %}
                 <p>{{ settings.deposit_policy }}</p>
-                <p>Podés cancelar desde el link del email o respondiendo el recordatorio de WhatsApp hasta {{ settings.cancellation_notice_hours }} horas antes.</p>
+                {% endif %}
+                <p>Podés cancelar desde el link del email hasta {{ settings.cancellation_notice_hours }} horas antes del turno.</p>
               </details>
             </div>
           </aside>
