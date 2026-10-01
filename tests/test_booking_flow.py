@@ -323,3 +323,26 @@ def test_la_politica_de_privacidad_esta_publicada_y_enlazada(client, make_profes
     assert "ORAL odontología familiar" in politica.text
     assert "no es una historia clínica" in politica.text
     assert 'href="/privacidad"' in reserva
+
+
+def test_without_a_payment_gateway_a_deposit_does_not_block_the_booking(client, db_session, make_professional):
+    """Perfil de lanzamiento: Mercado Pago apagado y un profesional con seña cargada.
+
+    Antes el turno quedaba en pending_payment esperando un pago que nadie podía hacer, con
+    el horario retenido hasta que vencía el hold.
+    """
+    from app.api.deps import get_payment_gateway
+    from app.main import app
+
+    professional_id = make_professional(deposit=Decimal("8000"))
+    app.dependency_overrides[get_payment_gateway] = lambda: None
+    try:
+        response = book(client, professional_id)
+    finally:
+        app.dependency_overrides.pop(get_payment_gateway, None)
+
+    appointment = only_appointment(db_session)
+    assert appointment.status == AppointmentStatus.RESERVED
+    assert appointment.hold_expires_at is None
+    assert appointment.payments == []
+    assert response.headers["location"] == f"/reservar/turno/{appointment.public_token}"

@@ -4,6 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.schemas.common import TimestampedModel
+from app.utils.validation import normalize_person_name
 
 
 class ProfessionalBase(BaseModel):
@@ -11,10 +12,23 @@ class ProfessionalBase(BaseModel):
     last_name: str = Field(..., max_length=80)
     specialty: str | None = Field(default=None, max_length=120)
     email: EmailStr | None = None
+    # El del consultorio: puede ser una línea fija, así que no se normaliza como celular.
     phone: str | None = Field(default=None, max_length=40)
     default_appointment_duration: int = Field(default=30, ge=10, le=240)
     # None uses DEPOSIT_DEFAULT_AMOUNT; 0 means no deposit for online bookings.
     deposit_amount: Decimal | None = Field(default=None, ge=0, le=10_000_000, decimal_places=2)
+
+    # El nombre se publica en la página de reserva: uno vacío o con números deja
+    # al paciente eligiendo entre opciones sin sentido.
+    @field_validator("first_name")
+    @classmethod
+    def validate_first_name(cls, value: str) -> str:
+        return normalize_person_name(value, label="El nombre")
+
+    @field_validator("last_name")
+    @classmethod
+    def validate_last_name(cls, value: str) -> str:
+        return normalize_person_name(value, label="El apellido")
 
 
 class ProfessionalCreate(ProfessionalBase):
@@ -30,6 +44,16 @@ class ProfessionalUpdate(BaseModel):
     default_appointment_duration: int | None = Field(default=None, ge=10, le=240)
     deposit_amount: Decimal | None = Field(default=None, ge=0, le=10_000_000, decimal_places=2)
     is_active: bool | None = None
+
+    @field_validator("first_name")
+    @classmethod
+    def validate_first_name(cls, value: str | None) -> str | None:
+        return normalize_person_name(value, label="El nombre") if value is not None else None
+
+    @field_validator("last_name")
+    @classmethod
+    def validate_last_name(cls, value: str | None) -> str | None:
+        return normalize_person_name(value, label="El apellido") if value is not None else None
 
 
 class ProfessionalRead(TimestampedModel):
