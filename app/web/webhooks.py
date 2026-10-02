@@ -8,13 +8,13 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_followup_agent, get_payment_service, get_whatsapp_bot
+from app.api.deps import get_followup_service, get_payment_service, get_whatsapp_bot
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
 from app.db.session import get_db
 from app.integrations.fake_payments import FakePaymentGateway
 from app.integrations.payments import PaymentGatewayError
-from app.services.followup_agent import FollowUpAgent
+from app.services.followup_service import FollowUpService
 from app.services.payment_service import PaymentService
 from app.services.whatsapp_bot import WhatsAppBot
 from app.tasks.notifications import dispatch_due_notifications
@@ -29,7 +29,7 @@ def mercadopago_webhook(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     payment_service: PaymentService = Depends(get_payment_service),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
     params = request.query_params
     topic = params.get("type") or params.get("topic")
@@ -58,7 +58,7 @@ def mercadopago_webhook(
     except DomainError as exc:
         db.rollback()
         logger.warning("Mercado Pago notification for payment %s ignored: %s", data_id, exc.detail)
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return Response(status_code=200)
 
 
@@ -78,7 +78,7 @@ async def whatsapp_webhook(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     bot: WhatsAppBot = Depends(get_whatsapp_bot),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
     raw_body = await request.body()
     if not bot.whatsapp.verify_signature(raw_body, request.headers.get("x-hub-signature-256")):
@@ -89,5 +89,5 @@ async def whatsapp_webhook(
     except ValueError:
         return Response(status_code=400)
     await run_in_threadpool(bot.handle_webhook, db, payload)
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return Response(status_code=200)

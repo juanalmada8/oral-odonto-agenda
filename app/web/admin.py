@@ -12,11 +12,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import (
     get_auth_service,
     get_current_user,
-    get_followup_agent,
+    get_followup_service,
     get_payment_service,
     get_professional_service,
-    get_reception_agent,
-    get_schedule_agent,
+    get_reception_service,
+    get_schedule_service,
 )
 from app.core import clock
 from app.core.enums import (
@@ -42,11 +42,11 @@ from app.schemas.patient import PatientCreate, PatientUpdate
 from app.schemas.professional import ProfessionalCreate, ProfessionalUpdate
 from app.services.analytics import AnalyticsService
 from app.services.auth_service import AuthService
-from app.services.followup_agent import FollowUpAgent
+from app.services.followup_service import FollowUpService
 from app.services.payment_service import PaymentService
 from app.services.professional_service import ProfessionalService
-from app.services.reception_agent import ReceptionAgent
-from app.services.schedule_agent import ALLOWED_TRANSITIONS, ScheduleAgent
+from app.services.reception_service import ReceptionService
+from app.services.schedule_service import ALLOWED_TRANSITIONS, ScheduleService
 from app.services.waitlist_service import WaitlistService
 from app.tasks.notifications import dispatch_due_notifications
 from app.utils.formatting import format_money
@@ -205,14 +205,14 @@ def dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     professional_service: ProfessionalService = Depends(get_professional_service),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
     payment_service: PaymentService = Depends(get_payment_service),
 ):
     agenda_date = _parse_date(selected_date, clock.today())
     unlinked_professional = current_user.role == UserRole.PROFESSIONAL and not current_user.professional_id
     scope = None if unlinked_professional else professional_scope(current_user)
     selected_professional_id = scope or _parse_int(professional_id)
-    appointments = [] if unlinked_professional else schedule_agent.get_daily_agenda(
+    appointments = [] if unlinked_professional else schedule_service.get_daily_agenda(
         db, day=agenda_date, professional_id=selected_professional_id
     )
     counts = serialize_status_counts(appointments)
@@ -233,7 +233,7 @@ def dashboard(
     if unlinked_professional:
         alerts.append({"text": "Tu usuario no está vinculado a un profesional. Pedíselo a administración.", "href": None})
 
-    week_ahead = [] if unlinked_professional else schedule_agent.list_appointments(
+    week_ahead = [] if unlinked_professional else schedule_service.list_appointments(
         db,
         professional_id=selected_professional_id,
         date_from=datetime.combine(clock.today(), datetime.min.time()),
@@ -279,14 +279,14 @@ def appointments_page(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     professional_service: ProfessionalService = Depends(get_professional_service),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    reception_service: ReceptionService = Depends(get_reception_service),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
     scope = professional_scope(current_user)
     agenda_date = _parse_date(selected_date, clock.today())
     professional_id_value = scope or _parse_int(professional_id)
     normalized_query = (patient_query or "").strip()
-    appointments = schedule_agent.get_daily_agenda(db, day=agenda_date, professional_id=professional_id_value)
+    appointments = schedule_service.get_daily_agenda(db, day=agenda_date, professional_id=professional_id_value)
     status_counts = serialize_status_counts(appointments)
 
     filtered = appointments
@@ -315,7 +315,7 @@ def appointments_page(
         for professional in professionals:
             manual_available_dates[str(professional.id)] = [
                 {"value": day.isoformat(), "label": format_short_date(day), "slots": count}
-                for day, count in schedule_agent.list_available_dates(db, professional_id=professional.id, limit=30)
+                for day, count in schedule_service.list_available_dates(db, professional_id=professional.id, limit=30)
             ]
 
     return render_admin(
@@ -326,7 +326,7 @@ def appointments_page(
         page_subtitle=None,
         active_page="appointments",
         professionals=[] if scope else professionals,
-        patients=reception_agent.list_patients(db) if scope is None else [],
+        patients=reception_service.list_patients(db) if scope is None else [],
         appointments=filtered,
         agenda_date=agenda_date.isoformat(),
         previous_date=(agenda_date - timedelta(days=1)).isoformat(),
@@ -359,15 +359,15 @@ def create_manual_appointment(
     cash_deposit: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    reception_service: ReceptionService = Depends(get_reception_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
     payment_service: PaymentService = Depends(get_payment_service),
 ):
     require_roles(current_user, *STAFF)
     try:
         selected_dt = datetime.fromisoformat(starts_at)
-        appointment = schedule_agent.create_appointment(
+        appointment = schedule_service.create_appointment(
             db,
             AppointmentCreate(
                 patient_id=patient_id,
@@ -378,8 +378,8 @@ def create_manual_appointment(
                 notes=notes or None,
                 created_by=current_user.username,
             ),
-            reception_agent=reception_agent,
-            followup_agent=followup_agent,
+            reception_service=reception_service,
+            followup_service=followup_service,
             actor=current_user.username,
         )
         deposit = parse_money(cash_deposit)
@@ -389,7 +389,7 @@ def create_manual_appointment(
     except Exception as exc:
         db.rollback()
         return redirect_with_message("/app/appointments", error=user_facing_message(exc))
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     message = "Turno creado. Le enviamos la confirmación al paciente."
     if deposit is not None:
         message = f"Turno creado con seña de {format_money(deposit)} en efectivo. Le enviamos la confirmación."
@@ -412,15 +412,15 @@ def create_appointment_series(
     notes: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    reception_service: ReceptionService = Depends(get_reception_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
     """Carga de una vez los controles de un tratamiento (ortodoncia, seguimientos)."""
     require_roles(current_user, *STAFF)
     try:
         selected_dt = datetime.fromisoformat(starts_at)
-        result = schedule_agent.create_series(
+        result = schedule_service.create_series(
             db,
             AppointmentSeriesCreate(
                 patient_id=patient_id,
@@ -433,14 +433,14 @@ def create_appointment_series(
                 notes=notes or None,
                 created_by=current_user.username,
             ),
-            reception_agent=reception_agent,
-            followup_agent=followup_agent,
+            reception_service=reception_service,
+            followup_service=followup_service,
             actor=current_user.username,
         )
     except Exception as exc:
         db.rollback()
         return redirect_with_message("/app/appointments", error=user_facing_message(exc))
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     message = f"Se cargaron {len(result.created)} turnos y le avisamos al paciente."
     if result.skipped:
         fechas = ", ".join(format_short_date(day) for day, _ in result.skipped)
@@ -458,27 +458,27 @@ def update_appointment_status(
     return_to: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
     # Only redirect back inside the panel.
     target = return_to if return_to.startswith("/app") else "/app/appointments"
     try:
-        appointment = schedule_agent.get_appointment(db, appointment_id)
+        appointment = schedule_service.get_appointment(db, appointment_id)
         ensure_can_touch_appointment(current_user, appointment)
         if action not in allowed_actions(current_user, appointment):
             raise DomainError("Esa acción no está disponible para este turno.", status_code=409)
-        schedule_agent.change_status(
+        schedule_service.change_status(
             db,
             appointment_id,
             ACTION_TARGETS[action],
-            followup_agent=followup_agent,
+            followup_service=followup_service,
             actor=current_user.username,
         )
     except Exception as exc:
         db.rollback()
         return redirect_with_message(target, error=user_facing_message(exc))
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return redirect_with_message(target, message="Estado del turno actualizado.")
 
 
@@ -488,10 +488,10 @@ def edit_appointment_page(
     appointment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
     require_roles(current_user, *STAFF)
-    appointment = schedule_agent.get_appointment(db, appointment_id)
+    appointment = schedule_service.get_appointment(db, appointment_id)
     return render_admin(
         request,
         template_name="admin_appointment_edit.html",
@@ -516,12 +516,12 @@ def edit_appointment_submit(
     charged_amount: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
     require_roles(current_user, *STAFF)
     try:
-        appointment = schedule_agent.update_appointment(
+        appointment = schedule_service.update_appointment(
             db,
             appointment_id,
             AppointmentUpdate(
@@ -532,13 +532,13 @@ def edit_appointment_submit(
                 notes=notes or None,
                 charged_amount=parse_money(charged_amount),
             ),
-            followup_agent=followup_agent,
+            followup_service=followup_service,
             actor=current_user.username,
         )
     except Exception as exc:
         db.rollback()
         return redirect_with_message(f"/app/appointments/{appointment_id}/edit", error=user_facing_message(exc))
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return redirect_with_message(
         f"/app/appointments?selected_date={appointment.starts_at.date().isoformat()}",
         message="Turno actualizado.",
@@ -596,10 +596,10 @@ def patients_page(
     query: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
+    reception_service: ReceptionService = Depends(get_reception_service),
 ):
     require_roles(current_user, *STAFF)
-    patients = filter_patients_collection(reception_agent.list_patients(db), query)
+    patients = filter_patients_collection(reception_service.list_patients(db), query)
     return render_admin(
         request,
         template_name="admin_patients.html",
@@ -622,11 +622,11 @@ def create_patient_from_admin(
     observations: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
+    reception_service: ReceptionService = Depends(get_reception_service),
 ):
     require_roles(current_user, *STAFF)
     try:
-        reception_agent.create_patient(
+        reception_service.create_patient(
             db,
             PatientCreate(
                 dni=dni,
@@ -649,11 +649,11 @@ def delete_patient_from_admin(
     patient_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
+    reception_service: ReceptionService = Depends(get_reception_service),
 ):
     require_roles(current_user, *STAFF)
     try:
-        reception_agent.delete_patient(db, patient_id, actor=current_user.username)
+        reception_service.delete_patient(db, patient_id, actor=current_user.username)
     except Exception as exc:
         db.rollback()
         return redirect_with_message("/app/patients", error=user_facing_message(exc))
@@ -666,10 +666,10 @@ def edit_patient_page(
     patient_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
+    reception_service: ReceptionService = Depends(get_reception_service),
 ):
     require_roles(current_user, *STAFF)
-    patient = reception_agent.get_patient(db, patient_id)
+    patient = reception_service.get_patient(db, patient_id)
     history = sorted(patient.appointments, key=lambda item: item.starts_at, reverse=True)[:20]
     return render_admin(
         request,
@@ -701,11 +701,11 @@ def edit_patient_submit(
     emergency_contact: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
+    reception_service: ReceptionService = Depends(get_reception_service),
 ):
     require_roles(current_user, *STAFF)
     try:
-        reception_agent.update_patient(
+        reception_service.update_patient(
             db,
             patient_id,
             PatientUpdate(
@@ -740,12 +740,12 @@ def professionals_page(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     professional_service: ProfessionalService = Depends(get_professional_service),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
     auth_service: AuthService = Depends(get_auth_service),
 ):
     require_roles(current_user, *ADMIN_ONLY)
     windows_count = defaultdict(int)
-    for row in schedule_agent.list_availability_windows(db, date_from=clock.today()):
+    for row in schedule_service.list_availability_windows(db, date_from=clock.today()):
         windows_count[row.professional_id] += 1
     logins = {user.professional_id: user for user in auth_service.list_users(db) if user.professional_id}
     return render_admin(
@@ -883,13 +883,13 @@ def availability_page(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     professional_service: ProfessionalService = Depends(get_professional_service),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
     require_roles(current_user, UserRole.ADMIN, UserRole.PROFESSIONAL)
     scope = professional_scope(current_user)
     professionals = [item for item in active_professionals(db, professional_service) if scope is None or item.id == scope]
     grouped_windows = defaultdict(list)
-    for row in schedule_agent.list_availability_windows(db, professional_id=scope, date_from=clock.today()):
+    for row in schedule_service.list_availability_windows(db, professional_id=scope, date_from=clock.today()):
         grouped_windows[row.professional_id].append(row)
     schedules = {pid: _summarize_availability(rows) for pid, rows in grouped_windows.items()}
     return render_admin(
@@ -917,11 +917,11 @@ def create_availability_window_from_admin(
     notes: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
     try:
         ensure_can_manage_professional(current_user, professional_id)
-        schedule_agent.create_availability_window(
+        schedule_service.create_availability_window(
             db,
             AvailabilityWindowCreate(
                 professional_id=professional_id,
@@ -951,11 +951,11 @@ def create_recurring_availability_from_admin(
     notes: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
     try:
         ensure_can_manage_professional(current_user, professional_id)
-        result = schedule_agent.create_recurring_windows(
+        result = schedule_service.create_recurring_windows(
             db,
             RecurringAvailabilityCreate(
                 professional_id=professional_id,
@@ -985,11 +985,11 @@ def clear_availability_from_admin(
     date_to: str = Form(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
     try:
         ensure_can_manage_professional(current_user, professional_id)
-        result = schedule_agent.clear_windows(
+        result = schedule_service.clear_windows(
             db,
             professional_id=professional_id,
             date_from=date.fromisoformat(date_from),
@@ -1011,12 +1011,12 @@ def delete_availability_window_from_admin(
     availability_window_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
     try:
-        window = schedule_agent.get_availability_window(db, availability_window_id)
+        window = schedule_service.get_availability_window(db, availability_window_id)
         ensure_can_manage_professional(current_user, window.professional_id)
-        schedule_agent.delete_availability_window(db, availability_window_id, actor=current_user.username)
+        schedule_service.delete_availability_window(db, availability_window_id, actor=current_user.username)
     except Exception as exc:
         db.rollback()
         return redirect_with_message("/app/availability", error=user_facing_message(exc))
@@ -1031,7 +1031,7 @@ def notifications_page(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
     require_roles(current_user, *ADMIN_ONLY)
     counts = dict(
@@ -1053,11 +1053,11 @@ def notifications_page(
         active_page="notifications",
         counts={status.value: counts.get(status, 0) for status in NotificationStatus},
         sent_by_channel={channel.value: channel_counts.get(channel, 0) for channel in NotificationChannel},
-        notifications=followup_agent.list_notifications(db, limit=100),
-        smtp_configured=followup_agent.email_client.is_configured(),
-        whatsapp_configured=followup_agent.whatsapp_client.is_configured(),
-        smtp_sender=followup_agent.settings.email_from,
-        reminder_hours_ahead=followup_agent.settings.reminder_hours_ahead,
+        notifications=followup_service.list_notifications(db, limit=100),
+        smtp_configured=followup_service.email_client.is_configured(),
+        whatsapp_configured=followup_service.whatsapp_client.is_configured(),
+        smtp_sender=followup_service.settings.email_from,
+        reminder_hours_ahead=followup_service.settings.reminder_hours_ahead,
     )
 
 
@@ -1065,10 +1065,10 @@ def notifications_page(
 def prepare_reminders_from_admin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
     require_roles(current_user, *ADMIN_ONLY)
-    prepared = followup_agent.prepare_upcoming_reminders(db, actor=current_user.username)
+    prepared = followup_service.prepare_upcoming_reminders(db, actor=current_user.username)
     return redirect_with_message("/app/notifications", message=f"Recordatorios preparados: {prepared}.")
 
 
@@ -1076,10 +1076,10 @@ def prepare_reminders_from_admin(
 def send_notifications_from_admin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
     require_roles(current_user, *ADMIN_ONLY)
-    result = followup_agent.send_pending_notifications(db, limit=200, actor=current_user.username)
+    result = followup_service.send_pending_notifications(db, limit=200, actor=current_user.username)
     return redirect_with_message(
         "/app/notifications",
         message=(

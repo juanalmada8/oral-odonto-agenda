@@ -1,4 +1,4 @@
-"""Booking agent: a patient's self-service booking from /reservar, deposit included."""
+"""Booking service: a patient's self-service booking from /reservar, deposit included."""
 
 from dataclasses import dataclass
 from datetime import timedelta
@@ -14,10 +14,10 @@ from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.professional import Professional
 from app.schemas.booking import PublicBookingRequest
-from app.services.followup_agent import FollowUpAgent
+from app.services.followup_service import FollowUpService
 from app.services.payment_service import PaymentService
-from app.services.reception_agent import ReceptionAgent
-from app.services.schedule_agent import SLOT_TAKEN_MESSAGE, ScheduleAgent
+from app.services.reception_service import ReceptionService
+from app.services.schedule_service import SLOT_TAKEN_MESSAGE, ScheduleService
 from app.services.waitlist_service import WaitlistService
 from app.utils.audit import create_audit_log
 from app.utils.datetime import ensure_local_naive
@@ -36,41 +36,41 @@ class BookingResult:
         return self.payment.checkout_url if self.payment else None
 
 
-class BookingAgent:
+class BookingService:
     def __init__(
         self,
         settings: Settings,
         *,
-        schedule_agent: ScheduleAgent,
-        reception_agent: ReceptionAgent,
-        followup_agent: FollowUpAgent,
+        schedule_service: ScheduleService,
+        reception_service: ReceptionService,
+        followup_service: FollowUpService,
         payment_service: PaymentService,
     ) -> None:
         self.settings = settings
-        self.schedule_agent = schedule_agent
-        self.reception_agent = reception_agent
-        self.followup_agent = followup_agent
+        self.schedule_service = schedule_service
+        self.reception_service = reception_service
+        self.followup_service = followup_service
         self.payment_service = payment_service
         self.waitlist = WaitlistService()
 
     def book(self, db: Session, request: PublicBookingRequest) -> BookingResult:
-        professional = self.schedule_agent.lock_professional(db, request.professional_id)
-        patient = self.reception_agent.resolve_patient_for_public_booking(db, request)
+        professional = self.schedule_service.lock_professional(db, request.professional_id)
+        patient = self.reception_service.resolve_patient_for_public_booking(db, request)
         starts_at = ensure_local_naive(request.starts_at, self.settings.app_timezone)
 
         existing_hold = self._take_over_pending_holds(db, patient, professional, starts_at)
         if existing_hold is not None:
-            self.schedule_agent.commit(db)
+            self.schedule_service.commit(db)
             return self._with_checkout(db, existing_hold)
 
-        duration = self.schedule_agent.published_slot_duration(db, professional=professional, starts_at=starts_at)
+        duration = self.schedule_service.published_slot_duration(db, professional=professional, starts_at=starts_at)
         if duration is None:
             raise DomainError(SLOT_TAKEN_MESSAGE, status_code=409)
         self._enforce_patient_limits(db, patient, professional, starts_at)
 
         deposit = self.payment_service.deposit_for(professional)
         requires_deposit = deposit > 0
-        appointment = self.schedule_agent.insert_appointment(
+        appointment = self.schedule_service.insert_appointment(
             db,
             professional=professional,
             patient_id=patient.id,
@@ -89,13 +89,13 @@ class BookingAgent:
             public_rules=True,
         )
         if not requires_deposit:
-            self.followup_agent.queue_confirmation(db, appointment, actor=PUBLIC_ACTOR)
+            self.followup_service.queue_confirmation(db, appointment, actor=PUBLIC_ACTOR)
         # Si venía esperando este horario, su anotación se cierra acá.
         self.waitlist.mark_booked_for(db, appointment.patient_id, appointment.starts_at)
         # Commit the hold before talking to the payment provider so the professional lock is not
         # kept during a network call; a provider failure leaves a retryable held slot.
-        self.schedule_agent.commit(db)
-        appointment = self.schedule_agent.get_appointment(db, appointment.id)
+        self.schedule_service.commit(db)
+        appointment = self.schedule_service.get_appointment(db, appointment.id)
         if not requires_deposit:
             return BookingResult(appointment=appointment)
         return self._with_checkout(db, appointment)
@@ -120,11 +120,11 @@ class BookingAgent:
                 f"cancelar online. Comunicate con el consultorio{phone}.",
                 status_code=409,
             )
-        self.schedule_agent.apply_transition(
+        self.schedule_service.apply_transition(
             db,
             appointment,
             AppointmentStatus.CANCELLED,
-            followup_agent=self.followup_agent,
+            followup_service=self.followup_service,
         )
         note = f"Cancelado por el paciente ({channel})."
         appointment.notes = f"{appointment.notes}\n{note}" if appointment.notes else note
@@ -136,7 +136,7 @@ class BookingAgent:
             actor=f"patient:{channel}",
             description="Appointment cancelled by the patient",
         )
-        self.schedule_agent.commit(db)
+        self.schedule_service.commit(db)
         return appointment
 
     def _with_checkout(self, db: Session, appointment: Appointment) -> BookingResult:
@@ -163,13 +163,13 @@ class BookingAgent:
         choosing a different slot releases the previous one.
         """
         same_slot = None
-        for appointment in self.schedule_agent.upcoming_for_patient(db, patient.id):
+        for appointment in self.schedule_service.upcoming_for_patient(db, patient.id):
             if appointment.status != AppointmentStatus.PENDING_PAYMENT:
                 continue
             if appointment.professional_id == professional.id and appointment.starts_at == starts_at:
                 same_slot = appointment
                 continue
-            self.schedule_agent.apply_transition(db, appointment, AppointmentStatus.CANCELLED)
+            self.schedule_service.apply_transition(db, appointment, AppointmentStatus.CANCELLED)
             appointment.notes = "Liberado automáticamente: el paciente inició otra reserva."
             create_audit_log(
                 db,
@@ -182,7 +182,7 @@ class BookingAgent:
         return same_slot
 
     def _enforce_patient_limits(self, db: Session, patient: Patient, professional: Professional, starts_at) -> None:
-        upcoming = self.schedule_agent.upcoming_for_patient(db, patient.id)
+        upcoming = self.schedule_service.upcoming_for_patient(db, patient.id)
         if any(item.professional_id == professional.id and item.starts_at.date() == starts_at.date() for item in upcoming):
             raise DomainError(
                 "Ya tenés un turno con este profesional ese día. Si necesitás cambiarlo, comunicate con el consultorio.",

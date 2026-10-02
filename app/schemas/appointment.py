@@ -17,7 +17,7 @@ class AppointmentCreate(BaseModel):
     duration_minutes: int | None = Field(default=None, ge=10, le=240)
     reason: str | None = Field(default=None, max_length=255)
     notes: str | None = None
-    created_by: str = Field(default="reception_agent", max_length=80)
+    created_by: str = Field(default="reception_service", max_length=80)
 
     @model_validator(mode="after")
     def validate_patient_source(self):
@@ -93,4 +93,4 @@ class AppointmentSeriesCreate(BaseModel):
     occurrences: int = Field(default=6, ge=2, le=24)
     reason: str | None = Field(default=None, max_length=255)
     notes: str | None = None
-    created_by: str = Field(default="reception_agent", max_length=80)
+    created_by: str = Field(default="reception_service", max_length=80)

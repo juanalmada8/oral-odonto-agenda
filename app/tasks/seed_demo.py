@@ -21,10 +21,10 @@ from app.schemas.availability import AvailabilityWindowCreate
 from app.schemas.patient import PatientCreate
 from app.schemas.professional import ProfessionalCreate
 from app.services.auth_service import AuthService
-from app.services.followup_agent import FollowUpAgent
+from app.services.followup_service import FollowUpService
 from app.services.professional_service import ProfessionalService
-from app.services.reception_agent import ReceptionAgent
-from app.services.schedule_agent import ScheduleAgent
+from app.services.reception_service import ReceptionService
+from app.services.schedule_service import ScheduleService
 
 DEMO_PASSWORD = "demo12345"
 BUSINESS_DAYS = 10
@@ -65,10 +65,10 @@ def main() -> None:
     settings = get_settings()
     _ensure_schema_ready(db)
     auth_service = AuthService(settings)
-    reception_agent = ReceptionAgent()
+    reception_service = ReceptionService()
     professional_service = ProfessionalService()
-    schedule_agent = ScheduleAgent(settings)
-    followup_agent = FollowUpAgent(settings=settings, email_client=EmailClient(settings))
+    schedule_service = ScheduleService(settings)
+    followup_service = FollowUpService(settings=settings, email_client=EmailClient(settings))
 
     try:
         for username, full_name, role in (
@@ -139,7 +139,7 @@ def main() -> None:
                     start, end, note = time(14, 0), time(18, 30), "Tarde"
                 else:
                     continue
-                schedule_agent.create_availability_window(
+                schedule_service.create_availability_window(
                     db,
                     AvailabilityWindowCreate(
                         professional_id=professional.id,
@@ -152,13 +152,13 @@ def main() -> None:
                     actor="seed_demo",
                 )
 
-        patients = reception_agent.list_patients(db)
+        patients = reception_service.list_patients(db)
         if not patients:
             for dni, first_name, last_name, email, phone, observations in (
                 ("30111222", "Ana", "Pérez", "ana@example.com", "11 4444-4444", "Control anual"),
                 ("28999888", "Mateo", "López", "mateo@example.com", "11 5555-5555", "Consulta por dolor"),
             ):
-                reception_agent.create_patient(
+                reception_service.create_patient(
                     db,
                     PatientCreate(
                         dni=dni,
@@ -169,10 +169,10 @@ def main() -> None:
                         observations=observations,
                     ),
                 )
-            patients = reception_agent.list_patients(db)
+            patients = reception_service.list_patients(db)
 
         if not db.scalar(select(Appointment.id)) and professionals and patients and days:
-            schedule_agent.create_appointment(
+            schedule_service.create_appointment(
                 db,
                 AppointmentCreate(
                     professional_id=professionals[0].id,
@@ -183,8 +183,8 @@ def main() -> None:
                     notes="Turno demo",
                     created_by="seed_demo",
                 ),
-                reception_agent=reception_agent,
-                followup_agent=followup_agent,
+                reception_service=reception_service,
+                followup_service=followup_service,
                 actor="seed_demo",
             )
 

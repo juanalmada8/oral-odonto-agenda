@@ -1,4 +1,4 @@
-"""Follow-up agent: patient notifications (email + WhatsApp) through a retrying outbox.
+"""Follow-up service: patient notifications (email + WhatsApp) through a retrying outbox.
 
 Messages are stored as `Notification` rows and sent by `send_pending_notifications`, which runs
 right after the request that queued them (background task) and periodically from the scheduled
@@ -29,7 +29,7 @@ INACTIVE_STATUSES = (AppointmentStatus.CANCELLED, AppointmentStatus.EXPIRED)
 RETRY_BASE_MINUTES = 5
 
 
-class FollowUpAgent:
+class FollowUpService:
     def __init__(
         self,
         settings: Settings,
@@ -49,7 +49,7 @@ class FollowUpAgent:
 
     # ------------------------------------------------------------------ queueing
 
-    def queue_confirmation(self, db: Session, appointment: Appointment, actor: str = "followup_agent") -> Notification | None:
+    def queue_confirmation(self, db: Session, appointment: Appointment, actor: str = "followup_service") -> Notification | None:
         """One confirmation email per appointment; a pending one is refreshed instead of duplicated."""
         recipient = appointment.notification_email
         if not recipient:
@@ -82,7 +82,7 @@ class FollowUpAgent:
             actor=actor,
         )
 
-    def queue_cancellation(self, db: Session, appointment: Appointment, actor: str = "followup_agent") -> Notification | None:
+    def queue_cancellation(self, db: Session, appointment: Appointment, actor: str = "followup_service") -> Notification | None:
         recipient = appointment.notification_email
         if not recipient:
             return None
@@ -104,7 +104,7 @@ class FollowUpAgent:
         db: Session,
         appointment: Appointment,
         previous_when: str | None = None,
-        actor: str = "followup_agent",
+        actor: str = "followup_service",
     ) -> Notification | None:
         """Tell the patient their appointment moved: otherwise they show up at the old time."""
         recipient = appointment.notification_email
@@ -123,7 +123,7 @@ class FollowUpAgent:
             actor=actor,
         )
 
-    def queue_waitlist_offer(self, db: Session, entry, appointment: Appointment, actor: str = "followup_agent"):
+    def queue_waitlist_offer(self, db: Session, entry, appointment: Appointment, actor: str = "followup_service"):
         """Le ofrece a alguien de la lista de espera un horario que se liberó.
 
         La notificación se cuelga del turno liberado solo como referencia: el horario no
@@ -145,7 +145,7 @@ class FollowUpAgent:
             actor=actor,
         )
 
-    def queue_series(self, db: Session, appointments: list[Appointment], actor: str = "followup_agent") -> Notification | None:
+    def queue_series(self, db: Session, appointments: list[Appointment], actor: str = "followup_service") -> Notification | None:
         """Confirma una serie completa en un mensaje, colgado del primer turno."""
         first = appointments[0]
         recipient = first.notification_email
@@ -169,7 +169,7 @@ class FollowUpAgent:
         db: Session,
         *,
         hours_ahead: int | None = None,
-        actor: str = "followup_agent",
+        actor: str = "followup_service",
     ) -> int:
         """Queue email and WhatsApp reminders for appointments starting within `hours_ahead`."""
         hours = hours_ahead or self.settings.reminder_hours_ahead
@@ -246,7 +246,7 @@ class FollowUpAgent:
 
     # ------------------------------------------------------------------ sending
 
-    def send_pending_notifications(self, db: Session, *, limit: int = 50, actor: str = "followup_agent") -> dict[str, int]:
+    def send_pending_notifications(self, db: Session, *, limit: int = 50, actor: str = "followup_service") -> dict[str, int]:
         due_ids = list(
             db.scalars(
                 select(Notification.id)

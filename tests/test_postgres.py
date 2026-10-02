@@ -19,9 +19,9 @@ from app.models.availability_window import AvailabilityWindow
 from app.models.patient import Patient
 from app.models.professional import Professional
 from app.schemas.appointment import AppointmentCreate
-from app.services.followup_agent import FollowUpAgent
-from app.services.reception_agent import ReceptionAgent
-from app.services.schedule_agent import ScheduleAgent
+from app.services.followup_service import FollowUpService
+from app.services.reception_service import ReceptionService
+from app.services.schedule_service import ScheduleService
 
 pytestmark = pytest.mark.skipif(
     get_settings().database_url.startswith("sqlite"),
@@ -88,10 +88,10 @@ def test_concurrent_bookings_of_the_same_slot_only_one_wins(db_session):
 
     def attempt(patient_id: int) -> None:
         session = db_session_module.SessionLocal()
-        schedule_agent = ScheduleAgent(settings)
+        schedule_service = ScheduleService(settings)
         try:
             barrier.wait()
-            schedule_agent.create_appointment(
+            schedule_service.create_appointment(
                 session,
                 AppointmentCreate(
                     professional_id=professional_id,
@@ -100,8 +100,8 @@ def test_concurrent_bookings_of_the_same_slot_only_one_wins(db_session):
                     duration_minutes=30,
                     created_by="test",
                 ),
-                reception_agent=ReceptionAgent(),
-                followup_agent=FollowUpAgent(settings, EmailClient(settings)),
+                reception_service=ReceptionService(),
+                followup_service=FollowUpService(settings, EmailClient(settings)),
                 actor="test",
             )
             outcomes.append("booked")

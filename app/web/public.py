@@ -8,12 +8,12 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
-    get_booking_agent,
-    get_followup_agent,
+    get_booking_service,
+    get_followup_service,
     get_payment_service,
     get_professional_service,
-    get_reception_agent,
-    get_schedule_agent,
+    get_reception_service,
+    get_schedule_service,
 )
 from app.core import clock
 from app.core.config import get_settings
@@ -28,12 +28,12 @@ from app.models.appointment import Appointment
 from app.schemas.booking import PublicBookingRequest
 from app.schemas.patient import PatientIdentity
 from app.schemas.waitlist import WaitlistJoin
-from app.services.booking_agent import BookingAgent
-from app.services.followup_agent import FollowUpAgent
+from app.services.booking_service import BookingService
+from app.services.followup_service import FollowUpService
 from app.services.payment_service import PaymentService, hold_seconds_left
 from app.services.professional_service import ProfessionalService
-from app.services.reception_agent import ReceptionAgent
-from app.services.schedule_agent import ScheduleAgent
+from app.services.reception_service import ReceptionService
+from app.services.schedule_service import ScheduleService
 from app.services.waitlist_service import WaitlistService
 from app.tasks.notifications import dispatch_due_notifications
 from app.web.common import active_professionals, format_long_date, format_short_date, redirect_with_message, templates
@@ -59,7 +59,7 @@ def booking_page_context(
     db: Session,
     *,
     professional_service: ProfessionalService,
-    schedule_agent: ScheduleAgent,
+    schedule_service: ScheduleService,
     payment_service: PaymentService,
     professional_id: int | None,
     selected_date: date | None,
@@ -71,8 +71,8 @@ def booking_page_context(
     agenda_date = selected_date
 
     if selected_professional:
-        earliest_start, last_date = schedule_agent.public_booking_bounds()
-        dates = schedule_agent.list_available_dates(
+        earliest_start, last_date = schedule_service.public_booking_bounds()
+        dates = schedule_service.list_available_dates(
             db,
             professional_id=selected_professional.id,
             date_from=earliest_start.date(),
@@ -93,7 +93,7 @@ def booking_page_context(
         if available_dates and (agenda_date is None or agenda_date.isoformat() not in values):
             agenda_date = date.fromisoformat(available_dates[0]["value"])
         if agenda_date and agenda_date.isoformat() in values:
-            available_slots = schedule_agent.get_daily_availability(
+            available_slots = schedule_service.get_daily_availability(
                 db,
                 professional_id=selected_professional.id,
                 day=agenda_date,
@@ -133,13 +133,13 @@ def public_booking_page(
     selected_date: str | None = None,
     db: Session = Depends(get_db),
     professional_service: ProfessionalService = Depends(get_professional_service),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
     payment_service: PaymentService = Depends(get_payment_service),
 ):
     context = booking_page_context(
         db,
         professional_service=professional_service,
-        schedule_agent=schedule_agent,
+        schedule_service=schedule_service,
         payment_service=payment_service,
         professional_id=_parse_int(professional_id),
         selected_date=_parse_date(selected_date),
@@ -167,10 +167,10 @@ def create_public_booking(
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     professional_service: ProfessionalService = Depends(get_professional_service),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
     payment_service: PaymentService = Depends(get_payment_service),
-    booking_agent: BookingAgent = Depends(get_booking_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    booking_service: BookingService = Depends(get_booking_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
     form = {
         "dni": dni,
@@ -192,7 +192,7 @@ def create_public_booking(
         context = booking_page_context(
             db,
             professional_service=professional_service,
-            schedule_agent=schedule_agent,
+            schedule_service=schedule_service,
             payment_service=payment_service,
             professional_id=_parse_int(professional_id),
             selected_date=selected_day,
@@ -226,12 +226,12 @@ def create_public_booking(
             reason=reason,
             accept_terms=bool(accept_terms),
         )
-        result = booking_agent.book(db, booking_request)
+        result = booking_service.book(db, booking_request)
     except Exception as exc:
         db.rollback()
         return render_error(user_facing_message(exc))
 
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     status_url = f"/reservar/turno/{result.appointment.public_token}"
     if result.checkout_url:
         return RedirectResponse(result.checkout_url, status_code=303)
@@ -255,7 +255,7 @@ def join_waitlist(
     notes: str = Form(""),
     website: str = Form(""),
     db: Session = Depends(get_db),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
+    reception_service: ReceptionService = Depends(get_reception_service),
 ):
     """Anotarse para que avisen si se libera un horario antes."""
     settings = get_settings()
@@ -270,7 +270,7 @@ def join_waitlist(
     try:
         # Se reutiliza la misma resolución de identidad que la reserva: el DNI del
         # formulario no alcanza para escribir sobre la ficha de otro paciente.
-        patient = reception_agent.resolve_patient_for_public_booking(
+        patient = reception_service.resolve_patient_for_public_booking(
             db,
             PatientIdentity(
                 dni=dni,
@@ -299,10 +299,10 @@ def join_waitlist(
     )
 
 
-def _booking_view(appointment: Appointment, payment_service: PaymentService, booking_agent: BookingAgent) -> dict:
+def _booking_view(appointment: Appointment, payment_service: PaymentService, booking_service: BookingService) -> dict:
     payment = appointment.latest_payment
     return {
-        "can_cancel": booking_agent.can_cancel_online(appointment),
+        "can_cancel": booking_service.can_cancel_online(appointment),
         "is_upcoming": appointment.status in {AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED},
         "appointment": appointment,
         "payment": payment,
@@ -325,12 +325,12 @@ def booking_status_page(
     payment_id: str | None = None,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
     payment_service: PaymentService = Depends(get_payment_service),
-    booking_agent: BookingAgent = Depends(get_booking_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    booking_service: BookingService = Depends(get_booking_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
-    appointment = _get_public_appointment(db, schedule_agent, public_token)
+    appointment = _get_public_appointment(db, schedule_service, public_token)
     if appointment is None:
         return templates.TemplateResponse(request, "public_booking_missing.html", {}, status_code=404)
 
@@ -341,7 +341,7 @@ def booking_status_page(
         except (DomainError, PaymentGatewayError) as exc:
             db.rollback()
             logger.warning("Could not sync payment %s on return: %s", payment_id, exc)
-        background_tasks.add_task(dispatch_due_notifications, followup_agent)
+        background_tasks.add_task(dispatch_due_notifications, followup_service)
         return RedirectResponse(f"/reservar/turno/{public_token}", status_code=303)
 
     payment_service.expire_unpaid(db)
@@ -350,7 +350,7 @@ def booking_status_page(
         request,
         "public_booking_status.html",
         {
-            **_booking_view(appointment, payment_service, booking_agent),
+            **_booking_view(appointment, payment_service, booking_service),
             "message": request.query_params.get("message"),
             "error": request.query_params.get("error"),
         },
@@ -361,9 +361,9 @@ def booking_status_page(
 def booking_status_json(
     public_token: str,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
-    appointment = _get_public_appointment(db, schedule_agent, public_token)
+    appointment = _get_public_appointment(db, schedule_service, public_token)
     if appointment is None:
         return JSONResponse({"detail": "not found"}, status_code=404)
     payment = appointment.latest_payment
@@ -378,15 +378,15 @@ def booking_status_json(
 def retry_booking_payment(
     public_token: str,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    booking_agent: BookingAgent = Depends(get_booking_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    booking_service: BookingService = Depends(get_booking_service),
 ):
     status_url = f"/reservar/turno/{public_token}"
-    appointment = _get_public_appointment(db, schedule_agent, public_token)
+    appointment = _get_public_appointment(db, schedule_service, public_token)
     if appointment is None:
         return RedirectResponse("/reservar", status_code=303)
     try:
-        result = booking_agent.retry_checkout(db, appointment)
+        result = booking_service.retry_checkout(db, appointment)
     except DomainError as exc:
         db.rollback()
         return redirect_with_message(status_url, error=exc.detail)
@@ -400,20 +400,20 @@ def cancel_booking_by_patient(
     public_token: str,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    booking_agent: BookingAgent = Depends(get_booking_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    booking_service: BookingService = Depends(get_booking_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
     status_url = f"/reservar/turno/{public_token}"
-    appointment = _get_public_appointment(db, schedule_agent, public_token)
+    appointment = _get_public_appointment(db, schedule_service, public_token)
     if appointment is None:
         return RedirectResponse("/reservar", status_code=303)
     try:
-        booking_agent.cancel_by_patient(db, appointment, channel="link")
+        booking_service.cancel_by_patient(db, appointment, channel="link")
     except DomainError as exc:
         db.rollback()
         return redirect_with_message(status_url, error=exc.detail)
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return redirect_with_message(status_url, message="Cancelamos tu turno. Te enviamos la confirmación por email.")
 
 
@@ -421,9 +421,9 @@ def cancel_booking_by_patient(
 def booking_calendar_file(
     public_token: str,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
-    appointment = _get_public_appointment(db, schedule_agent, public_token)
+    appointment = _get_public_appointment(db, schedule_service, public_token)
     if appointment is None or appointment.status not in {AppointmentStatus.CONFIRMED, AppointmentStatus.RESERVED}:
         return Response(status_code=404)
     return Response(
@@ -463,11 +463,11 @@ def build_ics(appointment: Appointment) -> str:
     return "\r\n".join(lines)
 
 
-def _get_public_appointment(db: Session, schedule_agent: ScheduleAgent, public_token: str) -> Appointment | None:
+def _get_public_appointment(db: Session, schedule_service: ScheduleService, public_token: str) -> Appointment | None:
     if len(public_token) > 64:
         return None
     try:
-        return schedule_agent.get_appointment_by_token(db, public_token)
+        return schedule_service.get_appointment_by_token(db, public_token)
     except DomainError:
         return None
 
@@ -502,7 +502,7 @@ def payment_simulator_submit(
     decision: str = Form(...),
     db: Session = Depends(get_db),
     payment_service: PaymentService = Depends(get_payment_service),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ):
     if not _simulator_enabled(payment_service):
         return Response(status_code=404)
@@ -525,5 +525,5 @@ def payment_simulator_submit(
     except DomainError:
         db.rollback()
         return Response(status_code=404)
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return RedirectResponse(f"/reservar/turno/{token}", status_code=303)

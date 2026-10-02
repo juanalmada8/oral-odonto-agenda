@@ -12,7 +12,7 @@ from app.core.exceptions import DomainError
 from app.models.appointment import Appointment
 from app.models.waitlist_entry import WaitlistEntry
 from app.schemas.waitlist import WaitlistJoin
-from app.services.followup_agent import FollowUpAgent
+from app.services.followup_service import FollowUpService
 from app.utils.audit import create_audit_log
 
 logger = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ class WaitlistService:
         db: Session,
         appointment: Appointment,
         *,
-        followup_agent: FollowUpAgent | None = None,
+        followup_service: FollowUpService | None = None,
         limit: int = 3,
     ) -> list[WaitlistEntry]:
         """Ofrece el horario liberado a los primeros de la lista que le sirva.
@@ -102,7 +102,7 @@ class WaitlistService:
         Se avisa a unos pocos y no a uno solo: si el primero no contesta el hueco se
         pierde igual. Nadie queda con el horario reservado, reservan por la web como todos.
         """
-        if followup_agent is None or appointment.starts_at <= clock.now():
+        if followup_service is None or appointment.starts_at <= clock.now():
             return []
 
         candidates = db.scalars(
@@ -126,7 +126,7 @@ class WaitlistService:
                 break
             if not entry.covers(appointment.starts_at):
                 continue
-            if followup_agent.queue_waitlist_offer(db, entry, appointment) is None:
+            if followup_service.queue_waitlist_offer(db, entry, appointment) is None:
                 continue
             entry.status = WaitlistStatus.NOTIFIED
             entry.notified_at = clock.now()
