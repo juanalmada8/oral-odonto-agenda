@@ -14,5 +14,6 @@ Una decisión no se edita cuando cambia: se escribe una nueva que la reemplaza y
 | [0004](0004-google-cloud-run.md) | Cloud Run + Cloud SQL en `us-central1`, con dominio por mapeo | Vigente |
 | [0005](0005-huella-de-estaticos.md) | La URL de los estáticos lleva el hash de su contenido | Vigente |
 | [0006](0006-mulish-como-unica-tipografia.md) | Mulish como única tipografía | Vigente |
+| [0007](0007-titularidad-de-repositorio-y-nube.md) | El negocio es del consultorio; repositorio y nube los administra quien desarrolla | Vigente |
 
 Para agregar una: copiá el formato de cualquiera, numerala en orden y sumala a esta tabla.

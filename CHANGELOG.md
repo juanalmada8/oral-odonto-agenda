@@ -49,6 +49,8 @@ y versionado semántico.
   turnos, no una historia clínica. Migración `20261001_11` borra la columna.
 
 ### Added
+- ADR 0007: titularidad. El repositorio y el proyecto de Google Cloud siguen en las cuentas de quien
+  desarrolla y administra; se documenta el riesgo de depender de una sola persona y las medidas pendientes.
 - `ops/create_admin.sh`: alta de administradores en producción con la clave por teclado, que siempre
   restaura el job y borra las credenciales de su configuración.
 - `AGENTS.md`, `docs/decisions/` (6 decisiones de arquitectura) y `docs/specs/` (proceso, plantilla y
