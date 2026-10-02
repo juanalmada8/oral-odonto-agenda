@@ -6,7 +6,7 @@
 app/
 ├── web/            páginas server-side: public.py (pacientes), admin.py (panel), webhooks.py
 ├── api/            API REST /api/v1 (routes + dependencias)
-├── services/       reglas de negocio ("agentes")
+├── services/       reglas de negocio (clases comunes: los nombres *_agent no implican IA)
 ├── integrations/   proveedores externos: Mercado Pago, WhatsApp Cloud API, SMTP
 ├── models/         tablas (SQLAlchemy 2)
 ├── schemas/        validación de entrada/salida (Pydantic 2)
@@ -25,6 +25,7 @@ app/
 | `FollowUpAgent` | outbox de notificaciones (email + WhatsApp) con reintentos |
 | `WhatsAppBot` | respuestas del paciente por WhatsApp (confirmar asistencia, cancelar) |
 | `ReceptionAgent` | pacientes; identidad por DNI en la reserva pública |
+| `WaitlistService` | lista de espera: anotarse, avisar cuando se libera un horario y cerrar la entrada al reservar |
 | `ProfessionalService`, `AuthService` | staff, usuarios, roles y sesiones |
 | `AnalyticsService` | métricas: ocupación, conversión de seña, ausentismo, ingresos |
 
@@ -78,8 +79,11 @@ ese reloj.
 ## Datos
 
 `user` · `patient` · `professional` · `availability_window` · `appointment` · `payment` ·
-`notification` · `audit_log` (+ `working_hours` y `holiday_block`, reservados para agenda recurrente
-persistente).
+`notification` · `waitlist_entry` · `audit_log` (+ `working_hours` y `holiday_block`, reservados para
+agenda recurrente persistente).
+
+**No hay datos de salud**: la ficha del paciente es administrativa
+([ADR 0002](decisions/0002-sin-datos-de-salud.md)).
 
 Decisiones:
 
@@ -89,8 +93,22 @@ Decisiones:
 - Los turnos tienen un **token público** impredecible para los links del paciente; nunca se expone el id.
 - Toda operación relevante deja registro en `audit_log`.
 
+## Páginas y estáticos
+
+Las páginas se renderizan en el servidor. La URL de cada estático lleva el hash de su contenido
+(`?v=…`), así un cambio de CSS llega a todos sin forzar recargas
+([ADR 0005](decisions/0005-huella-de-estaticos.md)). La tipografía es Mulish
+([ADR 0006](decisions/0006-mulish-como-unica-tipografia.md)).
+
+## Funciones que se encienden por configuración
+
+La seña (Mercado Pago) y WhatsApp están completas pero apagadas en el lanzamiento
+([ADR 0003](decisions/0003-lanzamiento-sin-sena-ni-whatsapp.md)). Sin pasarela de pago no se pide
+seña, y sin WhatsApp el recordatorio sale por email.
+
 ## Entrega
 
 - Una imagen Docker sirve para los tres roles: web, job de migraciones y job programado.
 - Cloud Run + Cloud SQL, con Cloud Scheduler disparando la tarea periódica cada 10 minutos.
-- Detalle en [DEPLOYMENT.md](DEPLOYMENT.md).
+- Detalle en [DEPLOYMENT.md](DEPLOYMENT.md); el porqué de estas elecciones, en
+  [decisions/0004-google-cloud-run.md](decisions/0004-google-cloud-run.md).

@@ -6,7 +6,7 @@
 | --- | --- |
 | Se libera el horario de una seña impaga | al vencer el bloqueo (20 min) |
 | Email de confirmación | al acreditarse la seña o al crear un turno desde el panel |
-| Recordatorio (email + WhatsApp) | `REMINDER_HOURS_AHEAD` antes del turno (24 h por defecto) |
+| Recordatorio por email (y por WhatsApp, si está activado) | `REMINDER_HOURS_AHEAD` antes del turno (24 h por defecto) |
 | Reintento de un envío que falló | a los 5, 10 y 20 minutos; después queda como *fallida* |
 | Email de cancelación | cuando se cancela un turno reservado o confirmado |
 
@@ -20,7 +20,7 @@ devolver, notificaciones fallidas) y marcar los turnos como **atendido** o **aus
 
 **Cada mañana (recepción)**
 
-1. `/app` → agenda del día. Los turnos con ✓ ya confirmaron asistencia por WhatsApp.
+1. `/app` → agenda del día. Con WhatsApp activado, los turnos con ✓ ya confirmaron asistencia.
 2. Atender los avisos que aparezcan arriba.
 3. Al cerrar el día, marcar atendidos y ausentes (de ahí sale la métrica de ausentismo).
 
@@ -56,11 +56,16 @@ el panel (queda registrado quién y cuándo).
 **Alguien se olvidó la contraseña.**
 `/app/users` → columna *Contraseña* → cambiarla y pasársela por un canal seguro.
 
+**Se perdió la contraseña del único administrador.**
+No hay recuperación por email. Desde una computadora con acceso a Google Cloud se crea otro
+administrador con un usuario **nuevo** (`ops/create_admin.sh`; con un usuario existente no hace nada)
+y desde ahí se cambian las demás claves. Por eso conviene tener siempre **dos** administradores.
+
 ## Diagnóstico
 
 | Síntoma | Dónde mirar |
 | --- | --- |
-| No salen emails | `/app/notifications`: estado SMTP y error de cada mensaje |
+| No salen emails | `/app/notifications`: estado SMTP y error de cada mensaje. Sin `SMTP_HOST` y `EMAIL_FROM` configurados no se envía nada |
 | No salen WhatsApp | `/app/notifications` + [WHATSAPP.md](WHATSAPP.md) |
 | El paciente no ve horarios | `/app/availability`: que haya bloques futuros; la reserva online exige anticipación mínima |
 | Falla un pago | [MERCADOPAGO.md](MERCADOPAGO.md) |
@@ -77,5 +82,5 @@ make migrate       # aplicar migraciones
 En producción, la tarea programada a mano:
 
 ```bash
-gcloud run jobs execute oral-scheduled --region southamerica-east1 --wait
+gcloud run jobs execute oral-scheduled --region us-central1 --wait
 ```

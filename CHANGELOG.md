@@ -14,7 +14,34 @@ y versionado semántico.
 
 ## [Unreleased]
 
+### Security
+- **Se versionaron por error planes de Terraform (`tfplan`, `tfplan2`) que contenían, en texto plano,
+  la contraseña de Cloud SQL, la cadena de conexión y el `SECRET_KEY` de la aplicación**, y el
+  repositorio es público. Se rotaron la contraseña de la base (de la que deriva la cadena de conexión) y el `SECRET_KEY`, se redesplegó, se purgó el historial de
+  `main` y se dejó de rastrear el archivo. GitHub conserva los commits de pull requests cerrados, así
+  que hay que pedirle a soporte que los elimine; las credenciales expuestas ya no funcionan.
+- Control en CI que falla si se versiona un plan o estado de Terraform, un `terraform.tfvars` o un
+  `.env`, aunque se fuerce con `git add -f`.
+
+### Fixed
+- **Con Mercado Pago apagado, una seña cargada en un profesional dejaba la reserva online sin
+  salida**: el turno quedaba esperando un pago imposible con el horario bloqueado. Sin pasarela de pago
+  ya no se pide seña; el monto se aplica solo al activar los pagos.
+- El texto de política y el consentimiento hablaban de "seña" aunque no se cobrara ninguna.
+- La lista de espera no validaba DNI ni nombres y creaba una ficha de paciente por cada intento.
+- El alta de profesionales aceptaba nombres vacíos o con números, que se publican en `/reservar`.
+- La política de privacidad mostraba "escribinos a" con el enlace vacío cuando no había casilla de
+  correo configurada; ahora cae al teléfono del consultorio.
+- El degradado de la portada se cortaba en monitores anchos (más de 1480 px).
+- Los cambios de CSS desplegados entre dos releases no se veían en los navegadores con la hoja en
+  caché: la huella de los estáticos salía de la versión de la app y no del contenido
+  ([ADR 0005](docs/decisions/0005-huella-de-estaticos.md)). Las fuentes se servían como
+  `application/octet-stream`.
+- Mulish no era la primera tipografía: en Mac se veía Avenir Next y en el resto otra
+  ([ADR 0006](docs/decisions/0006-mulish-como-unica-tipografia.md)).
+
 ### Removed
+- 12 imágenes de diseño sin uso en `app/static/brand/` (~4 MB) y los respaldos temporales de Terraform.
 - **El sistema deja de guardar datos de salud.** Se saca el campo de antecedentes (alergias,
   medicación) de la ficha del paciente y el campo libre del formulario público donde el paciente
   podía escribir esa información. Guardar datos de salud convierte la base en una de *datos
@@ -22,6 +49,10 @@ y versionado semántico.
   turnos, no una historia clínica. Migración `20261001_11` borra la columna.
 
 ### Added
+- `ops/create_admin.sh`: alta de administradores en producción con la clave por teclado, que siempre
+  restaura el job y borra las credenciales de su configuración.
+- `AGENTS.md`, `docs/decisions/` (6 decisiones de arquitectura) y `docs/specs/` (proceso, plantilla y
+  la especificación de la reserva online, con cada criterio atado a su test).
 - Página pública **/privacidad**: qué datos se piden y para qué, quién los ve, dónde se guardan,
   cuánto se conservan y cómo ejercer los derechos de acceso, rectificación y supresión.
 - Consentimiento explícito al reservar: la casilla ahora cubre el tratamiento de los datos y enlaza
@@ -30,6 +61,12 @@ y versionado semántico.
   cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
 
 ### Changed
+- El paquete pasa a llamarse `oral-turnos` (antes `odonto-agenda-ai`). Solo cambia el nombre del
+  metadato: el código sigue en `app/`.
+- Documentación reescrita con el procedimiento real de despliegue: proyecto, estado, infraestructura,
+  variables de GitHub, dominio con Cloudflare, rotación de secretos y cómo desplegar una funcionalidad.
+  README y CONTRIBUTING reflejan el flujo (especificación, test, PR) y se corrigen datos vencidos
+  (región, "historia clínica" en el roadmap, referencias a datos de salud).
 - Dominio propio: se puede usar el **mapeo de Cloud Run, que es gratis**, en lugar del balanceador
   (~USD 18/mes). Como el mapeo no existe en São Paulo, la región por defecto pasa a `us-central1`,
   que además es más barata; Terraform corta con un mensaje claro si se pide mapeo en una región que

@@ -55,7 +55,9 @@ WhatsApp se suman después sin tocar código ni migrar nada.
 | `MERCADOPAGO_ACCESS_TOKEN` / `MERCADOPAGO_WEBHOOK_SECRET` | vacías |
 | `WHATSAPP_*` | vacías: los recordatorios salen por email |
 
-La app se niega a arrancar si hay seña configurada sin token de Mercado Pago, y si WhatsApp está
+Mientras no haya pasarela configurada **no se pide seña**, aunque un profesional tenga un monto
+cargado; el monto queda guardado y se aplica solo al activar Mercado Pago. La app se niega a arrancar
+si hay seña global configurada sin token, y si WhatsApp está
 cargado a medias `make prod-check` lo marca como error.
 
 **Para sumar la seña más adelante:** cargá el token y el secreto en Secret Manager, agregalos a
@@ -69,7 +71,7 @@ también por ahí, además del email.
 
 - [ ] `make prod-check` en verde
 - [ ] Migraciones aplicadas (`alembic upgrade head` vía job)
-- [ ] Tu usuario administrador creado con `odonto-create-admin` (nunca `seed_demo` en producción)
+- [ ] **Al menos dos** administradores creados con `ops/create_admin.sh` (nunca `seed_demo` en producción)
 - [ ] Profesionales, horarios de atención y disponibilidad cargados desde el panel
 - [ ] Prueba real: reservar un turno y recibir el email de confirmación (y el pago de la seña, si está activa)
 - [ ] Si hay seña: webhook de Mercado Pago apuntando al dominio productivo
