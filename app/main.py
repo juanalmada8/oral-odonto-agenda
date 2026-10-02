@@ -2,6 +2,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 import logging
+import mimetypes
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -93,4 +94,10 @@ def readiness():
 
 app.include_router(api_router, prefix=settings.api_prefix)
 app.include_router(web_router)
+
+# La imagen de producción no trae la base de tipos del sistema, así que las fuentes
+# salían como application/octet-stream. Se registran a mano para no depender del SO.
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("font/woff", ".woff")
+
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
