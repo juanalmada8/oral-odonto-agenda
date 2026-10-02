@@ -748,3 +748,35 @@ def test_a_professional_name_is_validated_like_a_patient_name(client, db_session
             follow_redirects=False,
         )
         assert "error=" in response.headers["location"], f"aceptó «{first_name} {last_name}»"
+
+
+def test_the_static_url_changes_when_the_file_changes(monkeypatch, tmp_path):
+    """En producción la huella salía de la versión de la app, que solo cambia al publicar
+    un release: los arreglos de CSS desplegados entre dos releases conservaban la URL y
+    los navegadores seguían sirviendo la copia vieja."""
+    from app.web import common
+
+    archivo = tmp_path / "prueba.css"
+    archivo.write_text("a{color:red}")
+    monkeypatch.setattr(common, "STATIC_DIR", tmp_path)
+    monkeypatch.setattr(common.get_settings(), "app_env", "production")
+    common._asset_fingerprint.cache_clear()
+
+    primera = common.asset_url("prueba.css")
+    archivo.write_text("a{color:blue}")
+    common._asset_fingerprint.cache_clear()
+    segunda = common.asset_url("prueba.css")
+
+    assert primera != segunda, "la URL no cambió al cambiar el archivo"
+    assert "?v=" in primera
+
+
+def test_web_fonts_are_served_with_their_real_media_type():
+    """La imagen de producción no trae la base de tipos del sistema y las fuentes salían
+    como application/octet-stream."""
+    import mimetypes
+
+    import app.main  # noqa: F401  (al importarse registra los tipos)
+
+    assert mimetypes.guess_type("x.woff2")[0] == "font/woff2"
+    assert mimetypes.guess_type("x.woff")[0] == "font/woff"
