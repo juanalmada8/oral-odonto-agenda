@@ -780,3 +780,22 @@ def test_web_fonts_are_served_with_their_real_media_type():
 
     assert mimetypes.guess_type("x.woff2")[0] == "font/woff2"
     assert mimetypes.guess_type("x.woff")[0] == "font/woff"
+
+
+def test_the_privacy_policy_never_shows_an_empty_contact(client, monkeypatch):
+    """Sin EMAIL_FROM la política mostraba «escribinos a» con el enlace vacío.
+
+    Una política de privacidad tiene que decir a quién reclamar: si no hay casilla,
+    cae al teléfono del consultorio.
+    """
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "email_from", None)
+    monkeypatch.setattr(settings, "clinic_phone", "+54 9 2243 40-7958")
+
+    cuerpo = client.get("/privacidad").text
+
+    assert "mailto:</a>" not in cuerpo
+    assert 'href="mailto:"' not in cuerpo
+    assert "+54 9 2243 40-7958" in cuerpo

@@ -26,9 +26,14 @@
       <h2>Quién es responsable</h2>
       <p>
         {{ settings.clinic_name }}{% if settings.clinic_address %}, {{ settings.clinic_address }}{% endif %},
-        {{ settings.clinic_city }}. Para cualquier consulta sobre tus datos escribinos a
+        {{ settings.clinic_city }}. Para cualquier consulta sobre tus datos
+        {# Sin casilla configurada no se puede dejar un «escribinos a» con el enlace vacío:
+           una política de privacidad tiene que decir a quién reclamar. #}
+        {% if settings.email_from %}escribinos a
         <a class="text-link" href="mailto:{{ settings.email_from }}">{{ settings.email_from }}</a>{% if settings.clinic_phone %}
-        o llamanos al {{ settings.clinic_phone }}{% endif %}.
+        o llamanos al {{ settings.clinic_phone }}{% endif %}{% elif settings.clinic_phone %}
+        llamanos al {{ settings.clinic_phone }}{% else %}
+        acercate al consultorio{% endif %}.
       </p>
 
       <h2>Qué datos pedimos y para qué</h2>
@@ -73,8 +78,11 @@
 
       <h2>Tus derechos</h2>
       <p>
-        Podés pedirnos en cualquier momento acceder a tus datos, corregirlos o eliminarlos, escribiéndonos
-        a <a class="text-link" href="mailto:{{ settings.email_from }}">{{ settings.email_from }}</a>.
+        Podés pedirnos en cualquier momento acceder a tus datos, corregirlos o eliminarlos,
+        {% if settings.email_from %}escribiéndonos a
+        <a class="text-link" href="mailto:{{ settings.email_from }}">{{ settings.email_from }}</a>{% elif settings.clinic_phone %}
+        llamándonos al {{ settings.clinic_phone }}{% else %}
+        acercándote al consultorio{% endif %}.
         La Agencia de Acceso a la Información Pública, en su carácter de órgano de control de la Ley 25.326,
         atiende las denuncias de quienes consideren afectado su derecho.
       </p>

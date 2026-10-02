@@ -26,4 +26,10 @@ infra/terraform/.terraform/
 *.tfstate
 *.tfstate.*
 infra/terraform/terraform.tfvars
+infra/terraform/terraform.tfvars.*
+!infra/terraform/terraform.tfvars.example
 crash.log
+
+# Planes de Terraform: traen los valores de los secretos en texto plano.
+infra/terraform/tfplan*
+infra/terraform/*.tfplan
