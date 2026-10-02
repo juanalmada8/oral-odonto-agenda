@@ -1,5 +1,7 @@
 """Shared helpers for server-rendered pages: templates, filters, flash redirects."""
 
+import hashlib
+from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -29,10 +31,25 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
+@lru_cache(maxsize=128)
+def _asset_fingerprint(path: str) -> str:
+    """Huella del contenido del archivo. Se cachea: en producción la imagen es inmutable."""
+    file = STATIC_DIR / path
+    if not file.exists():
+        return __version__
+    return hashlib.sha256(file.read_bytes()).hexdigest()[:12]
+
+
 def asset_url(path: str) -> str:
-    """Static URL with a cache-busting suffix: app version in production, file mtime while developing."""
+    """URL del estático con una huella que cambia cuando cambia el archivo.
+
+    Antes en producción se usaba la versión de la app, que solo cambia al publicar un
+    release: cualquier arreglo de CSS desplegado entre dos releases conservaba la misma
+    URL y los navegadores seguían sirviendo la copia vieja de su caché.
+    """
     if get_settings().is_production:
-        return f"/static/{path}?v={__version__}"
+        return f"/static/{path}?v={_asset_fingerprint(path)}"
+    # Al desarrollar interesa que cambie en cada edición, sin cachear la huella.
     file = STATIC_DIR / path
     return f"/static/{path}?v={int(file.stat().st_mtime) if file.exists() else 0}"
 
