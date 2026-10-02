@@ -16,8 +16,8 @@ from app.integrations.payments import CheckoutRequest, PaymentGateway, PaymentGa
 from app.models.appointment import Appointment
 from app.models.payment import Payment
 from app.models.professional import Professional
-from app.services.followup_agent import FollowUpAgent
-from app.services.schedule_agent import ScheduleAgent
+from app.services.followup_service import FollowUpService
+from app.services.schedule_service import ScheduleService
 from app.utils.audit import create_audit_log
 
 logger = logging.getLogger(__name__)
@@ -34,13 +34,13 @@ class PaymentService:
         self,
         settings: Settings,
         gateway: PaymentGateway | None,
-        schedule_agent: ScheduleAgent,
-        followup_agent: FollowUpAgent,
+        schedule_service: ScheduleService,
+        followup_service: FollowUpService,
     ) -> None:
         self.settings = settings
         self.gateway = gateway
-        self.schedule_agent = schedule_agent
-        self.followup_agent = followup_agent
+        self.schedule_service = schedule_service
+        self.followup_service = followup_service
 
     def deposit_for(self, professional: Professional) -> Decimal:
         """Seña a pedir para una reserva online.
@@ -188,12 +188,12 @@ class PaymentService:
         )
         if next_status == PaymentStatus.APPROVED and previous_status != PaymentStatus.APPROVED:
             self._confirm_paid_appointment(db, payment)
-        self.schedule_agent.commit(db)
+        self.schedule_service.commit(db)
         return payment
 
     def expire_unpaid(self, db: Session) -> int:
         """Release holds whose payment window closed and close their pending payments."""
-        expired = self.schedule_agent.release_expired_holds(db, followup_agent=self.followup_agent)
+        expired = self.schedule_service.release_expired_holds(db, followup_service=self.followup_service)
         for appointment in expired:
             for payment in appointment.payments:
                 if payment.status in {PaymentStatus.PENDING, PaymentStatus.IN_PROCESS, PaymentStatus.REJECTED}:
@@ -273,21 +273,21 @@ class PaymentService:
             description="Seña marcada como devuelta a mano desde el panel",
             details={"amount": str(payment.amount), "appointment_id": payment.appointment_id},
         )
-        self.schedule_agent.commit(db)
+        self.schedule_service.commit(db)
         return payment
 
     def _confirm_paid_appointment(self, db: Session, payment: Payment) -> None:
-        appointment = self.schedule_agent.get_appointment(db, payment.appointment_id)
+        appointment = self.schedule_service.get_appointment(db, payment.appointment_id)
         if appointment.status == AppointmentStatus.CONFIRMED:
             return
         if appointment.status in {AppointmentStatus.COMPLETED, AppointmentStatus.NO_SHOW}:
             return
         try:
-            self.schedule_agent.apply_transition(
+            self.schedule_service.apply_transition(
                 db,
                 appointment,
                 AppointmentStatus.CONFIRMED,
-                followup_agent=self.followup_agent,
+                followup_service=self.followup_service,
             )
         except DomainError as exc:
             # Paid after the hold lapsed and someone else took the slot (or it was cancelled):

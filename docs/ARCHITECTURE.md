@@ -6,7 +6,7 @@
 app/
 ├── web/            páginas server-side: public.py (pacientes), admin.py (panel), webhooks.py
 ├── api/            API REST /api/v1 (routes + dependencias)
-├── services/       reglas de negocio (clases comunes: los nombres *_agent no implican IA)
+├── services/       reglas de negocio, un servicio por área
 ├── integrations/   proveedores externos: Mercado Pago, WhatsApp Cloud API, SMTP
 ├── models/         tablas (SQLAlchemy 2)
 ├── schemas/        validación de entrada/salida (Pydantic 2)
@@ -19,12 +19,12 @@ app/
 
 | Servicio | Responsabilidad |
 | --- | --- |
-| `BookingAgent` | reserva pública: valida, bloquea el horario, crea el checkout y cancela por pedido del paciente |
-| `ScheduleAgent` | disponibilidad, alta de turnos, transiciones de estado y protección del calendario |
+| `BookingService` | reserva pública: valida, bloquea el horario, crea el checkout y cancela por pedido del paciente |
+| `ScheduleService` | disponibilidad, alta de turnos, transiciones de estado y protección del calendario |
 | `PaymentService` | seña: checkout, aplicación idempotente de resultados, vencimientos y devoluciones a revisar |
-| `FollowUpAgent` | outbox de notificaciones (email + WhatsApp) con reintentos |
+| `FollowUpService` | outbox de notificaciones (email + WhatsApp) con reintentos |
 | `WhatsAppBot` | respuestas del paciente por WhatsApp (confirmar asistencia, cancelar) |
-| `ReceptionAgent` | pacientes; identidad por DNI en la reserva pública |
+| `ReceptionService` | pacientes; identidad por DNI en la reserva pública |
 | `WaitlistService` | lista de espera: anotarse, avisar cuando se libera un horario y cerrar la entrada al reservar |
 | `ProfessionalService`, `AuthService` | staff, usuarios, roles y sesiones |
 | `AnalyticsService` | métricas: ocupación, conversión de seña, ausentismo, ingresos |
@@ -42,7 +42,7 @@ pending_payment ──paga──► confirmed ──► completed / no_show
 
 - **Ocupan agenda**: `pending_payment` (mientras el bloqueo no venció), `reserved`, `confirmed`,
   `completed` y `no_show`.
-- Las transiciones válidas están en `ALLOWED_TRANSITIONS` (`app/services/schedule_agent.py`) y se
+- Las transiciones válidas están en `ALLOWED_TRANSITIONS` (`app/services/schedule_service.py`) y se
   validan siempre, venga el pedido del panel, de la API o del bot.
 
 ## Reglas de negocio

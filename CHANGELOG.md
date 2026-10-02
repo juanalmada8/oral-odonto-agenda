@@ -61,6 +61,11 @@ y versionado semántico.
   cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
 
 ### Changed
+- Los servicios dejan de llamarse `*Agent` y pasan a `*Service` (`BookingService`, `FollowUpService`,
+  `ReceptionService`, `ScheduleService`), con sus archivos en `app/services/`. Eran clases comunes de
+  Python, sin IA, pero el nombre sugería lo contrario. Cambio puramente de nombres: verificado con la
+  suite completa y el barrido QA de 243 comprobaciones. Las entradas anteriores de este archivo
+  conservan los nombres con los que se publicaron.
 - El paquete pasa a llamarse `oral-turnos` (antes `odonto-agenda-ai`). Solo cambia el nombre del
   metadato: el código sigue en `app/`.
 - Documentación reescrita con el procedimiento real de despliegue: proyecto, estado, infraestructura,

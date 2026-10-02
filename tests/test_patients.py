@@ -7,7 +7,7 @@ from app.core.exceptions import DomainError
 from app.models.appointment import Appointment
 from app.models.patient import Patient
 from app.models.professional import Professional
-from app.services.reception_agent import ReceptionAgent
+from app.services.reception_service import ReceptionService
 
 
 def test_create_patient(client, auth_headers):
@@ -33,7 +33,7 @@ def test_create_patient(client, auth_headers):
 
 
 def test_delete_patient_blocks_when_has_active_appointments(db_session):
-    reception_agent = ReceptionAgent()
+    reception_service = ReceptionService()
     patient = Patient(dni="30000001", first_name="Ana", last_name="Perez", email="ana@test.com", is_active=True)
     professional = Professional(
         first_name="Laura",
@@ -62,13 +62,13 @@ def test_delete_patient_blocks_when_has_active_appointments(db_session):
     db_session.commit()
 
     with pytest.raises(DomainError) as exc:
-        reception_agent.delete_patient(db_session, patient.id, actor="test")
+        reception_service.delete_patient(db_session, patient.id, actor="test")
 
     assert "turnos activos" in str(exc.value)
 
 
 def test_delete_patient_allows_when_only_history_without_active(db_session):
-    reception_agent = ReceptionAgent()
+    reception_service = ReceptionService()
     patient = Patient(dni="30000002", first_name="Juan", last_name="Lopez", email="juan@test.com", is_active=True)
     professional = Professional(
         first_name="Martin",
@@ -96,7 +96,7 @@ def test_delete_patient_allows_when_only_history_without_active(db_session):
     db_session.add(historical_appointment)
     db_session.commit()
 
-    reception_agent.delete_patient(db_session, patient.id, actor="test")
+    reception_service.delete_patient(db_session, patient.id, actor="test")
 
     assert db_session.get(Patient, patient.id) is None
     assert db_session.get(Appointment, historical_appointment.id) is None

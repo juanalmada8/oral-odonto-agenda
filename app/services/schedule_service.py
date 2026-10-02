@@ -1,4 +1,4 @@
-"""Schedule agent: manages availability and protects the clinic calendar."""
+"""Schedule service: manages availability and protects the clinic calendar."""
 
 from collections import defaultdict
 from dataclasses import dataclass
@@ -29,8 +29,8 @@ from app.schemas.availability import (
     AvailabilityWindowUpdate,
     RecurringAvailabilityCreate,
 )
-from app.services.followup_agent import FollowUpAgent
-from app.services.reception_agent import ReceptionAgent
+from app.services.followup_service import FollowUpService
+from app.services.reception_service import ReceptionService
 from app.services.waitlist_service import WaitlistService
 from app.utils.audit import create_audit_log
 from app.utils.formatting import format_long_date
@@ -73,7 +73,7 @@ class SeriesResult:
     skipped: list[tuple[datetime, str]]
 
 
-class ScheduleAgent:
+class ScheduleService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.timezone_name = settings.app_timezone
@@ -154,13 +154,13 @@ class ScheduleAgent:
         db: Session,
         payload: AppointmentCreate,
         *,
-        reception_agent: ReceptionAgent,
-        followup_agent: FollowUpAgent,
-        actor: str = "schedule_agent",
+        reception_service: ReceptionService,
+        followup_service: FollowUpService,
+        actor: str = "schedule_service",
     ) -> Appointment:
         """Staff/API booking: no deposit, lands directly as reserved."""
         professional = self.lock_professional(db, payload.professional_id)
-        patient = reception_agent.resolve_patient(
+        patient = reception_service.resolve_patient(
             db,
             patient_id=payload.patient_id,
             patient_payload=payload.patient,
@@ -180,7 +180,7 @@ class ScheduleAgent:
             created_by=payload.created_by,
             actor=actor,
         )
-        followup_agent.queue_confirmation(db, appointment, actor=actor)
+        followup_service.queue_confirmation(db, appointment, actor=actor)
         self.commit(db)
         return self.get_appointment(db, appointment.id)
 
@@ -190,9 +190,9 @@ class ScheduleAgent:
         db: Session,
         payload: AppointmentSeriesCreate,
         *,
-        reception_agent: ReceptionAgent,
-        followup_agent: FollowUpAgent,
-        actor: str = "schedule_agent",
+        reception_service: ReceptionService,
+        followup_service: FollowUpService,
+        actor: str = "schedule_service",
     ) -> SeriesResult:
         """Carga de una vez los turnos de un tratamiento que repite.
 
@@ -200,7 +200,7 @@ class ScheduleAgent:
         horario ya tomado: esas se saltean y se informan, en vez de hacer fallar todo.
         """
         professional = self.lock_professional(db, payload.professional_id)
-        patient = reception_agent.resolve_patient(db, patient_id=payload.patient_id, actor=actor)
+        patient = reception_service.resolve_patient(db, patient_id=payload.patient_id, actor=actor)
         duration = payload.duration_minutes or professional.default_appointment_duration
         first = ensure_local_naive(payload.starts_at, self.timezone_name)
 
@@ -239,7 +239,7 @@ class ScheduleAgent:
                 status_code=409,
             )
         # Un solo email con todas las fechas: doce confirmaciones seguidas son spam.
-        followup_agent.queue_series(db, created, actor=actor)
+        followup_service.queue_series(db, created, actor=actor)
         self.commit(db)
         return SeriesResult(created=created, skipped=skipped)
 
@@ -314,8 +314,8 @@ class ScheduleAgent:
         appointment_id: int,
         payload: AppointmentUpdate,
         *,
-        followup_agent: FollowUpAgent | None = None,
-        actor: str = "schedule_agent",
+        followup_service: FollowUpService | None = None,
+        actor: str = "schedule_service",
     ) -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
         changes = payload.model_dump(exclude_unset=True)
@@ -342,18 +342,18 @@ class ScheduleAgent:
                 appointment.starts_at = starts_at
                 appointment.ends_at = ends_at
                 appointment.duration_minutes = duration
-                if followup_agent:
-                    followup_agent.discard_pending_reminders(db, appointment)
+                if followup_service:
+                    followup_service.discard_pending_reminders(db, appointment)
                     # Sin este aviso el paciente se presenta en el horario viejo.
                     if appointment.status in UPCOMING_APPOINTMENT_STATUSES:
-                        followup_agent.queue_reschedule(db, appointment, previous_when=previous_when, actor=actor)
+                        followup_service.queue_reschedule(db, appointment, previous_when=previous_when, actor=actor)
 
         for field in ("reason", "notes", "charged_amount"):
             if field in changes:
                 setattr(appointment, field, changes[field])
 
         if new_status:
-            self.apply_transition(db, appointment, new_status, followup_agent=followup_agent)
+            self.apply_transition(db, appointment, new_status, followup_service=followup_service)
 
         create_audit_log(
             db,
@@ -373,14 +373,14 @@ class ScheduleAgent:
         appointment_id: int,
         payload: AppointmentReschedule,
         *,
-        followup_agent: FollowUpAgent | None = None,
-        actor: str = "schedule_agent",
+        followup_service: FollowUpService | None = None,
+        actor: str = "schedule_service",
     ) -> Appointment:
         return self.update_appointment(
             db,
             appointment_id,
             AppointmentUpdate(starts_at=payload.starts_at, duration_minutes=payload.duration_minutes),
-            followup_agent=followup_agent,
+            followup_service=followup_service,
             actor=actor,
         )
 
@@ -390,14 +390,14 @@ class ScheduleAgent:
         appointment_id: int,
         new_status: AppointmentStatus,
         *,
-        followup_agent: FollowUpAgent | None = None,
+        followup_service: FollowUpService | None = None,
         notes: str | None = None,
-        actor: str = "schedule_agent",
+        actor: str = "schedule_service",
     ) -> Appointment:
         appointment = self.get_appointment(db, appointment_id)
         if appointment.status == new_status:
             raise DomainError("El turno ya está en ese estado.", status_code=409)
-        self.apply_transition(db, appointment, new_status, followup_agent=followup_agent)
+        self.apply_transition(db, appointment, new_status, followup_service=followup_service)
         if notes:
             appointment.notes = notes
         create_audit_log(
@@ -411,19 +411,19 @@ class ScheduleAgent:
         self.commit(db)
         return self.get_appointment(db, appointment.id)
 
-    def confirm_appointment(self, db: Session, appointment_id: int, *, followup_agent: FollowUpAgent | None = None, actor: str = "schedule_agent") -> Appointment:
-        return self.change_status(db, appointment_id, AppointmentStatus.CONFIRMED, followup_agent=followup_agent, actor=actor)
+    def confirm_appointment(self, db: Session, appointment_id: int, *, followup_service: FollowUpService | None = None, actor: str = "schedule_service") -> Appointment:
+        return self.change_status(db, appointment_id, AppointmentStatus.CONFIRMED, followup_service=followup_service, actor=actor)
 
-    def cancel_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, followup_agent: FollowUpAgent | None = None, actor: str = "schedule_agent") -> Appointment:
-        return self.change_status(db, appointment_id, AppointmentStatus.CANCELLED, followup_agent=followup_agent, notes=notes, actor=actor)
+    def cancel_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, followup_service: FollowUpService | None = None, actor: str = "schedule_service") -> Appointment:
+        return self.change_status(db, appointment_id, AppointmentStatus.CANCELLED, followup_service=followup_service, notes=notes, actor=actor)
 
-    def complete_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, actor: str = "schedule_agent") -> Appointment:
+    def complete_appointment(self, db: Session, appointment_id: int, *, notes: str | None = None, actor: str = "schedule_service") -> Appointment:
         return self.change_status(db, appointment_id, AppointmentStatus.COMPLETED, notes=notes, actor=actor)
 
-    def mark_no_show(self, db: Session, appointment_id: int, *, actor: str = "schedule_agent") -> Appointment:
+    def mark_no_show(self, db: Session, appointment_id: int, *, actor: str = "schedule_service") -> Appointment:
         return self.change_status(db, appointment_id, AppointmentStatus.NO_SHOW, actor=actor)
 
-    def reserve_appointment(self, db: Session, appointment_id: int, *, actor: str = "schedule_agent") -> Appointment:
+    def reserve_appointment(self, db: Session, appointment_id: int, *, actor: str = "schedule_service") -> Appointment:
         return self.change_status(db, appointment_id, AppointmentStatus.RESERVED, actor=actor)
 
     def release_expired_holds(
@@ -431,7 +431,7 @@ class ScheduleAgent:
         db: Session,
         *,
         professional_id: int | None = None,
-        followup_agent: FollowUpAgent | None = None,
+        followup_service: FollowUpService | None = None,
     ) -> list[Appointment]:
         """Mark unpaid holds whose deadline passed as expired so their slots become bookable."""
         query = (
@@ -450,11 +450,11 @@ class ScheduleAgent:
                 action="appointment.expired",
                 entity_name="appointment",
                 entity_id=str(appointment.id),
-                actor="schedule_agent",
+                actor="schedule_service",
                 description="Unpaid hold expired",
             )
             # El horario vuelve a estar libre: también se ofrece a la lista de espera.
-            self.waitlist.notify_freed_slot(db, appointment, followup_agent=followup_agent)
+            self.waitlist.notify_freed_slot(db, appointment, followup_service=followup_service)
         if expired:
             db.flush()
         return expired
@@ -465,7 +465,7 @@ class ScheduleAgent:
         appointment: Appointment,
         new_status: AppointmentStatus,
         *,
-        followup_agent: FollowUpAgent | None = None,
+        followup_service: FollowUpService | None = None,
     ) -> None:
         current = appointment.status
         if new_status not in ALLOWED_TRANSITIONS.get(current, set()):
@@ -497,17 +497,17 @@ class ScheduleAgent:
         elif new_status == AppointmentStatus.CONFIRMED:
             appointment.confirmed_at = now
             appointment.cancelled_at = None
-            if followup_agent:
-                followup_agent.queue_confirmation(db, appointment)
+            if followup_service:
+                followup_service.queue_confirmation(db, appointment)
         elif new_status == AppointmentStatus.CANCELLED:
             appointment.cancelled_at = now
-            if followup_agent:
-                followup_agent.discard_pending_reminders(db, appointment)
+            if followup_service:
+                followup_service.discard_pending_reminders(db, appointment)
                 # An abandoned unpaid hold was never a real booking for the patient: no email.
                 if current in (AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED):
-                    followup_agent.queue_cancellation(db, appointment)
+                    followup_service.queue_cancellation(db, appointment)
                 # El horario quedó libre: se lo ofrecemos a quien esté esperando.
-                self.waitlist.notify_freed_slot(db, appointment, followup_agent=followup_agent)
+                self.waitlist.notify_freed_slot(db, appointment, followup_service=followup_service)
         self.flush(db)
 
     # ------------------------------------------------------------ availability

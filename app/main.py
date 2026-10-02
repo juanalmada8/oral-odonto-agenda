@@ -33,7 +33,7 @@ app = FastAPI(
     title=settings.app_name,
     description=(
         "API para gestion de turnos de un consultorio odontologico. "
-        "La logica esta separada por agentes internos de recepcion, agenda y seguimiento."
+        "La logica esta separada en servicios de recepcion, agenda y seguimiento."
     ),
     version=__version__,
     docs_url="/docs" if settings.docs_enabled else None,

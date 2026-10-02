@@ -26,7 +26,7 @@ from app.models.appointment import Appointment
 from app.models.patient import Patient
 from app.models.notification import Notification
 from app.models.waitlist_entry import WaitlistEntry
-from app.services.followup_agent import FollowUpAgent
+from app.services.followup_service import FollowUpService
 from app.tasks import run_scheduled
 
 settings = get_settings()
@@ -85,13 +85,13 @@ def whatsapp(monkeypatch):
     app.dependency_overrides.pop(get_whatsapp_client, None)
 
 
-def followup(email_client, whatsapp_api: FakeWhatsAppAPI | None = None) -> FollowUpAgent:
+def followup(email_client, whatsapp_api: FakeWhatsAppAPI | None = None) -> FollowUpService:
     whatsapp_client = None
     if whatsapp_api:
         whatsapp_client = WhatsAppClient(
             settings, client=httpx.Client(base_url=GRAPH_BASE_URL, transport=httpx.MockTransport(whatsapp_api.handler))
         )
-    return FollowUpAgent(settings, email_client, whatsapp_client)
+    return FollowUpService(settings, email_client, whatsapp_client)
 
 
 def book(client, professional_id, starts_at="2026-03-30T09:00:00", **overrides):
@@ -171,10 +171,10 @@ def test_failed_email_is_retried_with_backoff_then_marked_failed(client, db_sess
     assert notification.attempts == 1
     assert notification.scheduled_for == frozen_clock.now() + timedelta(minutes=5)
 
-    agent = followup(outbox)
+    service = followup(outbox)
     for _ in range(settings.notification_max_attempts):
         frozen_clock.advance(hours=2)
-        agent.send_pending_notifications(db_session)
+        service.send_pending_notifications(db_session)
 
     db_session.expire_all()
     assert notification.status == NotificationStatus.FAILED
@@ -226,11 +226,11 @@ def test_abandoned_hold_does_not_email_the_patient(client, db_session, make_prof
 def test_reminders_are_queued_once_per_channel(client, db_session, make_professional, outbox, whatsapp, frozen_clock):
     confirmed_booking(client, db_session, make_professional)
     frozen_clock.set(datetime(2026, 3, 29, 10, 0))
-    agent = followup(outbox, whatsapp)
+    service = followup(outbox, whatsapp)
 
-    assert agent.prepare_upcoming_reminders(db_session) == 2
-    assert agent.prepare_upcoming_reminders(db_session) == 0
-    agent.send_pending_notifications(db_session)
+    assert service.prepare_upcoming_reminders(db_session) == 2
+    assert service.prepare_upcoming_reminders(db_session) == 0
+    service.send_pending_notifications(db_session)
 
     template = whatsapp.messages[0]
     assert template["to"] == "5491155555555"
@@ -392,9 +392,9 @@ def test_free_text_gets_the_help_message(client, whatsapp):
 def test_failed_delivery_status_marks_the_notification(client, db_session, make_professional, outbox, whatsapp, frozen_clock):
     confirmed_booking(client, db_session, make_professional)
     frozen_clock.set(datetime(2026, 3, 29, 10, 0))
-    agent = followup(outbox, whatsapp)
-    agent.prepare_upcoming_reminders(db_session)
-    agent.send_pending_notifications(db_session)
+    service = followup(outbox, whatsapp)
+    service.prepare_upcoming_reminders(db_session)
+    service.send_pending_notifications(db_session)
 
     webhook(
         client,
@@ -628,10 +628,10 @@ def test_sin_whatsapp_configurado_el_recordatorio_sale_solo_por_email(client, db
     confirmed_booking(client, db_session, make_professional)
     frozen_clock.set(datetime(2026, 3, 29, 10, 0))
     outbox.sent.clear()
-    agent = followup(outbox)  # sin cliente de WhatsApp
+    service = followup(outbox)  # sin cliente de WhatsApp
 
-    assert agent.prepare_upcoming_reminders(db_session) == 1
-    agent.send_pending_notifications(db_session)
+    assert service.prepare_upcoming_reminders(db_session) == 1
+    service.send_pending_notifications(db_session)
 
     recordatorios = db_session.scalars(
         select(Notification).where(Notification.type == NotificationType.REMINDER)

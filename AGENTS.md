@@ -30,7 +30,7 @@ migración, también `make test-pg`. CI repite todo eso y además prueba las mig
 | --- | --- |
 | `app/web/` | páginas HTML: `public.py` (pacientes), `admin.py` (panel), `webhooks.py` |
 | `app/api/` | API REST `/api/v1` |
-| `app/services/` | reglas de negocio. Los `*_agent.py` son **servicios comunes, no IA** |
+| `app/services/` | reglas de negocio, un servicio por área |
 | `app/models/`, `alembic/` | tablas y migraciones |
 | `app/integrations/` | Mercado Pago, WhatsApp, SMTP |
 | `app/templates/`, `app/static/` | Jinja2 y estáticos (la fuente es Mulish) |

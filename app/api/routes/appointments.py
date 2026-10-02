@@ -3,7 +3,7 @@ from datetime import date, datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_followup_agent, get_reception_agent, get_schedule_agent, require_roles
+from app.api.deps import get_current_user, get_followup_service, get_reception_service, get_schedule_service, require_roles
 from app.core.enums import AppointmentStatus, UserRole
 from app.db.session import get_db
 from app.models.user import User
@@ -15,9 +15,9 @@ from app.schemas.appointment import (
     AppointmentStatusUpdate,
     AppointmentUpdate,
 )
-from app.services.followup_agent import FollowUpAgent
-from app.services.reception_agent import ReceptionAgent
-from app.services.schedule_agent import ScheduleAgent
+from app.services.followup_service import FollowUpService
+from app.services.reception_service import ReceptionService
+from app.services.schedule_service import ScheduleService
 from app.tasks.notifications import dispatch_due_notifications
 
 router = APIRouter(
@@ -34,9 +34,9 @@ def list_appointments(
     date_to: datetime | None = None,
     status_filter: AppointmentStatus | None = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
-    return schedule_agent.list_appointments(
+    return schedule_service.list_appointments(
         db,
         professional_id=professional_id,
         date_from=date_from,
@@ -50,9 +50,9 @@ def daily_agenda(
     agenda_date: date = Query(..., alias="date"),
     professional_id: int | None = None,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
-    return schedule_agent.get_daily_agenda(db, day=agenda_date, professional_id=professional_id)
+    return schedule_service.get_daily_agenda(db, day=agenda_date, professional_id=professional_id)
 
 
 @router.get("/weekly", response_model=list[AppointmentRead])
@@ -60,18 +60,18 @@ def weekly_agenda(
     week_start: date,
     professional_id: int | None = None,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
-    return schedule_agent.get_weekly_agenda(db, week_start=week_start, professional_id=professional_id)
+    return schedule_service.get_weekly_agenda(db, week_start=week_start, professional_id=professional_id)
 
 
 @router.get("/{appointment_id}", response_model=AppointmentRead)
 def get_appointment(
     appointment_id: int,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
-    return schedule_agent.get_appointment(db, appointment_id)
+    return schedule_service.get_appointment(db, appointment_id)
 
 
 @router.post("/", response_model=AppointmentRead, status_code=status.HTTP_201_CREATED)
@@ -79,19 +79,19 @@ def create_appointment(
     payload: AppointmentCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    reception_service: ReceptionService = Depends(get_reception_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
     current_user: User = Depends(get_current_user),
 ):
-    appointment = schedule_agent.create_appointment(
+    appointment = schedule_service.create_appointment(
         db,
         payload,
-        reception_agent=reception_agent,
-        followup_agent=followup_agent,
+        reception_service=reception_service,
+        followup_service=followup_service,
         actor=current_user.username,
     )
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return appointment
 
 
@@ -100,20 +100,20 @@ def create_appointment_series(
     payload: AppointmentSeriesCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    reception_service: ReceptionService = Depends(get_reception_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
     current_user: User = Depends(get_current_user),
 ):
     """Los turnos de un tratamiento que repite. Las fechas sin lugar se saltean."""
-    result = schedule_agent.create_series(
+    result = schedule_service.create_series(
         db,
         payload,
-        reception_agent=reception_agent,
-        followup_agent=followup_agent,
+        reception_service=reception_service,
+        followup_service=followup_service,
         actor=current_user.username,
     )
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return result.created
 @router.put("/{appointment_id}", response_model=AppointmentRead)
 def update_appointment(
@@ -121,18 +121,18 @@ def update_appointment(
     payload: AppointmentUpdate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
     current_user: User = Depends(get_current_user),
 ):
-    appointment = schedule_agent.update_appointment(
+    appointment = schedule_service.update_appointment(
         db,
         appointment_id,
         payload,
-        followup_agent=followup_agent,
+        followup_service=followup_service,
         actor=current_user.username,
     )
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return appointment
 
 
@@ -142,18 +142,18 @@ def reschedule_appointment(
     payload: AppointmentReschedule,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
     current_user: User = Depends(get_current_user),
 ):
-    appointment = schedule_agent.reschedule_appointment(
+    appointment = schedule_service.reschedule_appointment(
         db,
         appointment_id,
         payload,
-        followup_agent=followup_agent,
+        followup_service=followup_service,
         actor=current_user.username,
     )
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return appointment
 
 
@@ -163,18 +163,18 @@ def cancel_appointment(
     payload: AppointmentStatusUpdate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
     current_user: User = Depends(get_current_user),
 ):
-    appointment = schedule_agent.cancel_appointment(
+    appointment = schedule_service.cancel_appointment(
         db,
         appointment_id,
         notes=payload.notes,
-        followup_agent=followup_agent,
+        followup_service=followup_service,
         actor=current_user.username,
     )
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return appointment
 
 
@@ -183,17 +183,17 @@ def confirm_appointment(
     appointment_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
     current_user: User = Depends(get_current_user),
 ):
-    appointment = schedule_agent.confirm_appointment(
+    appointment = schedule_service.confirm_appointment(
         db,
         appointment_id,
-        followup_agent=followup_agent,
+        followup_service=followup_service,
         actor=current_user.username,
     )
-    background_tasks.add_task(dispatch_due_notifications, followup_agent)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
     return appointment
 
 
@@ -202,7 +202,7 @@ def complete_appointment(
     appointment_id: int,
     payload: AppointmentStatusUpdate,
     db: Session = Depends(get_db),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
     current_user: User = Depends(get_current_user),
 ):
-    return schedule_agent.complete_appointment(db, appointment_id, notes=payload.notes, actor=current_user.username)
+    return schedule_service.complete_appointment(db, appointment_id, notes=payload.notes, actor=current_user.username)

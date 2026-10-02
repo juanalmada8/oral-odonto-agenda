@@ -15,27 +15,27 @@ from app.integrations.payments import PaymentGateway
 from app.integrations.whatsapp import WhatsAppClient
 from app.models.user import User
 from app.services.auth_service import AuthService
-from app.services.booking_agent import BookingAgent
-from app.services.followup_agent import FollowUpAgent
+from app.services.booking_service import BookingService
+from app.services.followup_service import FollowUpService
 from app.services.payment_service import PaymentService
 from app.services.professional_service import ProfessionalService
-from app.services.reception_agent import ReceptionAgent
-from app.services.schedule_agent import ScheduleAgent
+from app.services.reception_service import ReceptionService
+from app.services.schedule_service import ScheduleService
 from app.services.whatsapp_bot import WhatsAppBot
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
-def get_reception_agent() -> ReceptionAgent:
-    return ReceptionAgent()
+def get_reception_service() -> ReceptionService:
+    return ReceptionService()
 
 
 def get_professional_service() -> ProfessionalService:
     return ProfessionalService()
 
 
-def get_schedule_agent() -> ScheduleAgent:
-    return ScheduleAgent(get_settings())
+def get_schedule_service() -> ScheduleService:
+    return ScheduleService(get_settings())
 
 
 def get_email_client() -> EmailClient:
@@ -46,11 +46,11 @@ def get_whatsapp_client() -> WhatsAppClient:
     return WhatsAppClient(get_settings())
 
 
-def get_followup_agent(
+def get_followup_service(
     email_client: EmailClient = Depends(get_email_client),
     whatsapp_client: WhatsAppClient = Depends(get_whatsapp_client),
-) -> FollowUpAgent:
-    return FollowUpAgent(get_settings(), email_client, whatsapp_client)
+) -> FollowUpService:
+    return FollowUpService(get_settings(), email_client, whatsapp_client)
 
 
 def get_payment_gateway() -> PaymentGateway | None:
@@ -64,37 +64,37 @@ def get_payment_gateway() -> PaymentGateway | None:
 
 def get_payment_service(
     gateway: PaymentGateway | None = Depends(get_payment_gateway),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
 ) -> PaymentService:
-    return PaymentService(get_settings(), gateway, schedule_agent, followup_agent)
+    return PaymentService(get_settings(), gateway, schedule_service, followup_service)
 
 
-def get_booking_agent(
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
-    reception_agent: ReceptionAgent = Depends(get_reception_agent),
-    followup_agent: FollowUpAgent = Depends(get_followup_agent),
+def get_booking_service(
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    reception_service: ReceptionService = Depends(get_reception_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
     payment_service: PaymentService = Depends(get_payment_service),
-) -> BookingAgent:
-    return BookingAgent(
+) -> BookingService:
+    return BookingService(
         get_settings(),
-        schedule_agent=schedule_agent,
-        reception_agent=reception_agent,
-        followup_agent=followup_agent,
+        schedule_service=schedule_service,
+        reception_service=reception_service,
+        followup_service=followup_service,
         payment_service=payment_service,
     )
 
 
 def get_whatsapp_bot(
     whatsapp_client: WhatsAppClient = Depends(get_whatsapp_client),
-    booking_agent: BookingAgent = Depends(get_booking_agent),
-    schedule_agent: ScheduleAgent = Depends(get_schedule_agent),
+    booking_service: BookingService = Depends(get_booking_service),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
 ) -> WhatsAppBot:
     return WhatsAppBot(
         get_settings(),
         whatsapp_client=whatsapp_client,
-        booking_agent=booking_agent,
-        schedule_agent=schedule_agent,
+        booking_service=booking_service,
+        schedule_service=schedule_service,
     )
 
 

@@ -12,7 +12,7 @@ class AppointmentStatus(str, Enum):
 
 
 # States that occupy the professional's calendar. A pending_payment appointment only blocks
-# its slot while its hold has not expired (see ScheduleAgent._blocking_filter).
+# its slot while its hold has not expired (see ScheduleService._blocking_filter).
 BLOCKING_APPOINTMENT_STATUSES = (
     AppointmentStatus.PENDING_PAYMENT,
     AppointmentStatus.RESERVED,

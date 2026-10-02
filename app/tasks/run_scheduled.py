@@ -13,25 +13,25 @@ from app.core.logging import configure_logging
 from app.db import session as db_session
 from app.integrations.email import EmailClient
 from app.integrations.whatsapp import WhatsAppClient
-from app.services.followup_agent import FollowUpAgent
+from app.services.followup_service import FollowUpService
 from app.services.payment_service import PaymentService
-from app.services.schedule_agent import ScheduleAgent
+from app.services.schedule_service import ScheduleService
 
 logger = logging.getLogger(__name__)
 
 
-def run(followup_agent: FollowUpAgent | None = None) -> dict:
+def run(followup_service: FollowUpService | None = None) -> dict:
     settings = get_settings()
-    followup_agent = followup_agent or FollowUpAgent(settings, EmailClient(settings), WhatsAppClient(settings))
-    schedule_agent = ScheduleAgent(settings)
+    followup_service = followup_service or FollowUpService(settings, EmailClient(settings), WhatsAppClient(settings))
+    schedule_service = ScheduleService(settings)
     # Expiring holds never talks to the payment provider, so no gateway is needed here.
-    payment_service = PaymentService(settings, None, schedule_agent, followup_agent)
+    payment_service = PaymentService(settings, None, schedule_service, followup_service)
 
     db = db_session.SessionLocal()
     try:
         expired = payment_service.expire_unpaid(db)
-        prepared = followup_agent.prepare_upcoming_reminders(db, actor="scheduler")
-        dispatched = followup_agent.send_pending_notifications(db, limit=500, actor="scheduler")
+        prepared = followup_service.prepare_upcoming_reminders(db, actor="scheduler")
+        dispatched = followup_service.send_pending_notifications(db, limit=500, actor="scheduler")
     finally:
         db.close()
     return {"expired_holds": expired, "reminders_prepared": prepared, **dispatched}

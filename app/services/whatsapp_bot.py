@@ -18,9 +18,9 @@ from app.integrations.whatsapp import WhatsAppClient, WhatsAppError, same_whatsa
 from app.models.appointment import Appointment
 from app.models.audit_log import AuditLog
 from app.models.notification import Notification
-from app.services.booking_agent import BookingAgent
+from app.services.booking_service import BookingService
 from app.services.messages import MessageComposer
-from app.services.schedule_agent import ScheduleAgent
+from app.services.schedule_service import ScheduleService
 from app.utils.audit import create_audit_log
 
 logger = logging.getLogger(__name__)
@@ -34,13 +34,13 @@ class WhatsAppBot:
         settings: Settings,
         *,
         whatsapp_client: WhatsAppClient,
-        booking_agent: BookingAgent,
-        schedule_agent: ScheduleAgent,
+        booking_service: BookingService,
+        schedule_service: ScheduleService,
     ) -> None:
         self.settings = settings
         self.whatsapp = whatsapp_client
-        self.booking_agent = booking_agent
-        self.schedule_agent = schedule_agent
+        self.booking_service = booking_service
+        self.schedule_service = schedule_service
         self.composer = MessageComposer(settings)
 
     def handle_webhook(self, db: Session, payload: dict) -> None:
@@ -124,7 +124,7 @@ class WhatsAppBot:
             )
         elif action == "CANCEL_OK":
             try:
-                self.booking_agent.cancel_by_patient(db, appointment, channel="whatsapp")
+                self.booking_service.cancel_by_patient(db, appointment, channel="whatsapp")
             except DomainError as exc:
                 db.rollback()
                 self._reply(sender, exc.detail)

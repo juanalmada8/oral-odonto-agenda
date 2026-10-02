@@ -1,1 +1,1 @@
-"""Business services implemented as small internal agents."""
+"""Business rules, one service per area (booking, scheduling, reception, follow-up, payments...)."""

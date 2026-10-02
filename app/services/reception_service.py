@@ -1,4 +1,4 @@
-"""Reception agent: validates incoming requests and resolves patient identity."""
+"""Reception service: validates incoming requests and resolves patient identity."""
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
@@ -15,7 +15,7 @@ from app.utils.audit import create_audit_log
 from app.utils.validation import names_match
 
 
-class ReceptionAgent:
+class ReceptionService:
     def list_patients(self, db: Session) -> list[Patient]:
         return list(db.scalars(select(Patient).order_by(Patient.last_name, Patient.first_name)))
 
@@ -25,7 +25,7 @@ class ReceptionAgent:
             raise DomainError("No encontramos el paciente.", status_code=404)
         return patient
 
-    def create_patient(self, db: Session, payload: PatientCreate, actor: str = "reception_agent") -> Patient:
+    def create_patient(self, db: Session, payload: PatientCreate, actor: str = "reception_service") -> Patient:
         self._assert_unique_dni(db, dni=payload.dni)
         patient = Patient(**payload.model_dump())
         db.add(patient)
@@ -42,7 +42,7 @@ class ReceptionAgent:
         db.refresh(patient)
         return patient
 
-    def update_patient(self, db: Session, patient_id: int, payload: PatientUpdate, actor: str = "reception_agent") -> Patient:
+    def update_patient(self, db: Session, patient_id: int, payload: PatientUpdate, actor: str = "reception_service") -> Patient:
         patient = self.get_patient(db, patient_id)
         changes = payload.model_dump(exclude_unset=True)
         if "dni" in changes:
@@ -66,7 +66,7 @@ class ReceptionAgent:
         db.refresh(patient)
         return patient
 
-    def deactivate_patient(self, db: Session, patient_id: int, actor: str = "reception_agent") -> Patient:
+    def deactivate_patient(self, db: Session, patient_id: int, actor: str = "reception_service") -> Patient:
         patient = self.get_patient(db, patient_id)
         patient.is_active = False
         create_audit_log(
@@ -81,7 +81,7 @@ class ReceptionAgent:
         db.refresh(patient)
         return patient
 
-    def delete_patient(self, db: Session, patient_id: int, actor: str = "reception_agent") -> None:
+    def delete_patient(self, db: Session, patient_id: int, actor: str = "reception_service") -> None:
         patient = self.get_patient(db, patient_id)
         has_active_appointments = db.scalar(
             select(Appointment.id)
@@ -132,7 +132,7 @@ class ReceptionAgent:
         *,
         patient_id: int | None = None,
         patient_payload: PatientUpsert | None = None,
-        actor: str = "reception_agent",
+        actor: str = "reception_service",
     ) -> Patient:
         if patient_id is not None:
             patient = self.get_patient(db, patient_id)
