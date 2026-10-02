@@ -70,7 +70,10 @@
   --shadow-float: 0 12px 32px rgba(18, 36, 49, 0.14), 0 2px 6px rgba(18, 36, 49, 0.06);
   --focus-ring: 0 0 0 3px rgba(0, 80, 117, 0.25);
 
-  --font: "Avenir Next", "Mulish", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+  /* Mulish primero y siempre: es la fuente de la marca y viaja con el sitio, así que
+     se ve igual en Mac, Windows y Android. Lo que sigue solo cubre el instante previo
+     a que termine de cargar. */
+  --font: "Mulish", "Helvetica Neue", Arial, sans-serif;
 }
 
 /* ---------------------------------------------------------------- base */
