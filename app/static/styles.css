@@ -744,9 +744,12 @@ fieldset {
 .landing .hero-copy h1 {
   margin-bottom: 16px;
   font-size: clamp(2.75rem, 4.6vw, 4.7rem);
-  font-weight: 800;
+  /* Mulish es variable hasta 1000: el peso máximo le devuelve al título la contundencia
+     que tenía con Avenir Next, que solo se veía en Mac. El espaciado se afloja a -0.02em
+     porque a este tamaño el apretado anterior cerraba los huecos de las letras. */
+  font-weight: 1000;
   line-height: 0.92;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.02em;
 }
 
 .landing .hero-lead {
