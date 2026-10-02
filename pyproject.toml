@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "odonto-agenda-ai"
+name = "oral-turnos"
 version = "0.2.0"
 description = "Agenda odontológica full-stack con FastAPI, panel admin y reserva pública."
 readme = "README.md"
