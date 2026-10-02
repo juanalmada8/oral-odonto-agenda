@@ -18,6 +18,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Sin secretos ni estado de Terraform versionados
+        # Los planes (tfplan), el estado y los .env traen credenciales en texto plano y este
+        # repositorio es público. .gitignore los tapa, pero un `git add -f` o un archivo con otro
+        # nombre se escapa: acá se corta aunque alguien lo fuerce.
+        run: |
+          prohibidos=$(git ls-files | grep -E '(^|/)(tfplan[^/]*|[^/]*\.tfplan|[^/]*\.tfstate[^/]*|terraform\.tfvars[^/]*|\.env[^/]*)$' | grep -vE '\.example$' || true)
+          if [ -n "$prohibidos" ]; then
+            echo "::error::Archivos que no deben estar en el repositorio:"
+            echo "$prohibidos"
+            exit 1
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

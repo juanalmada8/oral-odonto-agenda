@@ -16,7 +16,7 @@ COPY pyproject.toml README.md ./
 RUN mkdir app && touch app/__init__.py \
     && pip install --upgrade pip \
     && pip install . \
-    && pip uninstall -y odonto-agenda-ai
+    && pip uninstall -y oral-turnos
 
 # ---------------------------------------------------------------- runtime
 FROM python:3.12-slim AS runtime

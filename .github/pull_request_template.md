@@ -10,5 +10,6 @@
 ## Checklist
 
 - [ ] Migración de Alembic si cambian los modelos (el test de desvío en CI la exige)
+- [ ] Especificación (`docs/specs/`) o decisión (`docs/decisions/`) actualizada si cambia el comportamiento o una decisión de fondo
 - [ ] Nota en `CHANGELOG.md` bajo `[Unreleased]`
-- [ ] Sin secretos ni datos de pacientes reales en el diff
+- [ ] Sin secretos, `.env`, planes de Terraform (`tfplan*`) ni datos de pacientes reales en el diff
