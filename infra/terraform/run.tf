@@ -82,8 +82,10 @@ resource "google_cloud_run_v2_service" "web" {
   }
 
   lifecycle {
-    # The image is rolled out by the Deploy workflow.
-    ignore_changes = [template[0].containers[0].image, client, client_version]
+    # The image and the revision name are set by the Deploy workflow (--revision-suffix <sha>).
+    # Without ignoring the name, every plan proposes to clear it and never says "No changes",
+    # which hides the changes that matter.
+    ignore_changes = [template[0].containers[0].image, template[0].revision, client, client_version]
   }
 
   depends_on = [
