@@ -15,6 +15,11 @@ y versionado semántico.
 ## [Unreleased]
 
 ### Security
+- **Terraform configuraba `TRUSTED_PROXY_COUNT=2` apenas había un dominio propio**, valor que solo
+  corresponde al balanceador de carga. Con el mapeo de dominio gratuito hay un único salto, y con `2` la
+  app habría tomado la entrada de `X-Forwarded-For` que manda el propio cliente: un atacante podía
+  falsificarla y saltearse los límites de intentos de login y de reservas. Ahora vale `2` solo con
+  `custom_domain_mode = "load_balancer"`. No llegó a producción: el dominio aún no estaba activado.
 - **Se versionaron por error planes de Terraform (`tfplan`, `tfplan2`) que contenían, en texto plano,
   la contraseña de Cloud SQL, la cadena de conexión y el `SECRET_KEY` de la aplicación**, y el
   repositorio es público. Se rotaron la contraseña de la base (de la que deriva la cadena de conexión) y el `SECRET_KEY`, se redesplegó, se purgó el historial de

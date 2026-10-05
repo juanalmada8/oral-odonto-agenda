@@ -6,8 +6,10 @@ locals {
   public_url     = var.custom_domain != "" ? "https://${var.custom_domain}" : local.run_url
   image_registry = "${var.region}-docker.pkg.dev/${var.project_id}/${var.service_name}"
 
-  # Behind the load balancer the client IP is one hop earlier in X-Forwarded-For.
-  trusted_proxy_count = var.custom_domain != "" ? 2 : 1
+  # Only the load balancer adds a second hop. Domain mapping goes straight to Cloud Run, so it stays at 1:
+  # with 2 and a single real hop the app would take the client-supplied X-Forwarded-For entry, and the
+  # login and booking rate limits could be bypassed by forging it.
+  trusted_proxy_count = var.custom_domain != "" && var.custom_domain_mode == "load_balancer" ? 2 : 1
 
   app_env = {
     APP_ENV                  = "production"
