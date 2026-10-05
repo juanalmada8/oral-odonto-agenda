@@ -98,6 +98,7 @@ make tf-validate   # validar Terraform sin credenciales
 | [docs/decisions/](docs/decisions/) | por qué el sistema es como es (decisiones de arquitectura) |
 | [docs/specs/](docs/specs/) | qué debe hacer cada funcionalidad, con el test que lo comprueba |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | infraestructura, despliegues, dominio y rotación de secretos |
+| [docs/PRIMEROS_PASOS.md](docs/PRIMEROS_PASOS.md) | guía para el consultorio: cargar profesionales y horarios, y el día a día |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | día a día del consultorio y resolución de problemas |
 | [docs/PROD_ENV_CHECKLIST.md](docs/PROD_ENV_CHECKLIST.md) | configuración de producción y cómo activar seña y WhatsApp |
 | [docs/BACKUPS.md](docs/BACKUPS.md) | backups y restauración |
