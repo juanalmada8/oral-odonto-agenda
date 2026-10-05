@@ -46,7 +46,7 @@ jobs:
       MIGRATE_JOB: ${{ vars.CLOUD_RUN_MIGRATE_JOB }}
       SCHEDULED_JOB: ${{ vars.CLOUD_RUN_SCHEDULED_JOB }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
 

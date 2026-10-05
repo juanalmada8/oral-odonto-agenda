@@ -17,7 +17,7 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Bump version and changelog
         env:
           VERSION: ${{ inputs.version }}
