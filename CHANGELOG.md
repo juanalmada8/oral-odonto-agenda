@@ -24,6 +24,9 @@ y versionado semántico.
   `.env`, aunque se fuerce con `git add -f`.
 
 ### Fixed
+- `terraform plan` siempre proponía un cambio falso (borrar el nombre de la revisión de Cloud Run, que
+  pone el despliegue con el SHA del commit) y nunca decía «sin cambios», escondiendo los cambios
+  reales. Ahora ese campo se ignora, igual que la imagen.
 - **Con Mercado Pago apagado, una seña cargada en un profesional dejaba la reserva online sin
   salida**: el turno quedaba esperando un pago imposible con el horario bloqueado. Sin pasarela de pago
   ya no se pide seña; el monto se aplica solo al activar los pagos.
@@ -63,6 +66,10 @@ y versionado semántico.
   cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
 
 ### Changed
+- Dependencias actualizadas: `actions/checkout` 7, `actions/setup-python` 7, `actions/upload-artifact` 7,
+  `google-github-actions/setup-gcloud` 3, `hashicorp/setup-terraform` 4 y el proveedor de Google de Terraform
+  8.4. Se verificaron con CI, con un despliegue real a producción y con un `terraform plan` contra la
+  infraestructura existente, que dio idéntico al del proveedor anterior.
 - Los servicios dejan de llamarse `*Agent` y pasan a `*Service` (`BookingService`, `FollowUpService`,
   `ReceptionService`, `ScheduleService`), con sus archivos en `app/services/`. Eran clases comunes de
   Python, sin IA, pero el nombre sugería lo contrario. Cambio puramente de nombres: verificado con la
