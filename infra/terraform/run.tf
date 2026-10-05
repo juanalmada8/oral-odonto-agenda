@@ -82,10 +82,13 @@ resource "google_cloud_run_v2_service" "web" {
   }
 
   lifecycle {
-    # The image and the revision name are set by the Deploy workflow (--revision-suffix <sha>).
-    # Without ignoring the name, every plan proposes to clear it and never says "No changes",
-    # which hides the changes that matter.
-    ignore_changes = [template[0].containers[0].image, template[0].revision, client, client_version]
+    # The image is rolled out by the Deploy workflow.
+    #
+    # Do NOT add template[0].revision here. The workflow names each revision (--revision-suffix <sha>),
+    # so every plan shows "revision -> null": that is expected noise. Ignoring it makes Terraform resend the
+    # current revision name on every update, and Cloud Run answers 409 ("Revision ... with different
+    # configuration already exists") as soon as the template really changes, blocking real changes.
+    ignore_changes = [template[0].containers[0].image, client, client_version]
   }
 
   depends_on = [

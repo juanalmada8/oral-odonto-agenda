@@ -29,9 +29,12 @@ y versionado semántico.
   `.env`, aunque se fuerce con `git add -f`.
 
 ### Fixed
-- `terraform plan` siempre proponía un cambio falso (borrar el nombre de la revisión de Cloud Run, que
-  pone el despliegue con el SHA del commit) y nunca decía «sin cambios», escondiendo los cambios
-  reales. Ahora ese campo se ignora, igual que la imagen.
+- Terraform no podía aplicar cambios al servicio web. Un ajuste hecho el mismo día para silenciar un cambio
+  falso en `terraform plan` (el nombre de la revisión) hacía que Cloud Run respondiera 409 en cuanto el
+  servicio cambiaba de verdad; se revierte y se documenta por qué no hay que ignorar ese campo. No
+  llegó a producción: el apply falló sin tocar el servicio.
+- El chequeo de caída no se podía reemplazar al cambiar de dominio (Google exige borrar antes la alerta
+  que lo usa); ahora el nuevo se crea antes de destruir el viejo.
 - **Con Mercado Pago apagado, una seña cargada en un profesional dejaba la reserva online sin
   salida**: el turno quedaba esperando un pago imposible con el horario bloqueado. Sin pasarela de pago
   ya no se pide seña; el monto se aplica solo al activar los pagos.
