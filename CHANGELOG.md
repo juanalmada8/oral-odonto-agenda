@@ -60,6 +60,8 @@ y versionado semántico.
   turnos, no una historia clínica. Migración `20261001_11` borra la columna.
 
 ### Added
+- `docs/PRIMEROS_PASOS.md`: guía para el consultorio, sin jerga técnica, para cargar profesionales y horarios,
+  probar una reserva como paciente y usar la agenda a diario.
 - Correo propio: `turnos@oral.com.ar` recibe con Cloudflare Email Routing y envía con Brevo por SMTP, con SPF,
   DKIM y DMARC en `PASS` verificados con un envío real desde producción. ADR 0008, con el límite de 300
   emails por día y el riesgo de la cabecera de baja que Brevo agrega a todos sus mensajes, más la revisión
