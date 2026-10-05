@@ -37,6 +37,12 @@ resource "google_monitoring_uptime_check_config" "web" {
     }
   }
 
+  # The host cannot be edited in place. Google refuses to delete a check that an alert policy still
+  # references, so the new one is created first and the policy is repointed before the old one goes.
+  lifecycle {
+    create_before_destroy = true
+  }
+
   depends_on = [google_project_service.enabled]
 }
 
