@@ -30,10 +30,9 @@
             <a class="hero-secondary" href="https://wa.me/{{ settings.clinic_whatsapp | replace('+', '') }}" target="_blank" rel="noopener">Escribinos por WhatsApp</a>
             {% endif %}
           </div>
-          {% if settings.clinic_hours or settings.clinic_phone %}
+          {% if settings.clinic_hours %}
           <dl class="hero-facts">
-            {% if settings.clinic_hours %}<div><dt>Atención</dt><dd>{{ settings.clinic_hours }}</dd></div>{% endif %}
-            {% if settings.clinic_phone %}<div><dt>Teléfono</dt><dd>{{ settings.clinic_phone }}</dd></div>{% endif %}
+            <div><dt>Atención</dt><dd>{{ settings.clinic_hours }}</dd></div>
           </dl>
           {% endif %}
         </div>

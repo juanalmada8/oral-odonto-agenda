@@ -78,6 +78,8 @@ y versionado semántico.
   cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
 
 ### Changed
+- El teléfono del consultorio deja de mostrarse en la portada de reservas. Sigue en los emails, en la
+  página del turno y en la política de privacidad.
 - Dependencias actualizadas: `actions/checkout` 7, `actions/setup-python` 7, `actions/upload-artifact` 7,
   `google-github-actions/setup-gcloud` 3, `hashicorp/setup-terraform` 4 y el proveedor de Google de Terraform
   8.4. Se verificaron con CI, con un despliegue real a producción y con un `terraform plan` contra la
