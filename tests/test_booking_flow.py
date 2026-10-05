@@ -357,3 +357,14 @@ def test_without_a_deposit_the_policy_does_not_talk_about_one(client, make_profe
     assert "Confirmar turno" in sin_deposito
     assert "Política de seña y cancelación" in con_deposito
     assert "Continuar al pago" in con_deposito
+
+
+def test_the_landing_page_does_not_show_the_clinic_phone(client, monkeypatch):
+    """El teléfono se saca de la portada de reservas; sigue en la política de privacidad."""
+    monkeypatch.setattr(settings, "clinic_phone", "+54 9 2243 40-7958")
+
+    portada = client.get("/reservar").text
+    privacidad = client.get("/privacidad").text
+
+    assert "+54 9 2243 40-7958" not in portada
+    assert "+54 9 2243 40-7958" in privacidad
