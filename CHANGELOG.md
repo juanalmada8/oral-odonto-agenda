@@ -60,6 +60,10 @@ y versionado semántico.
   turnos, no una historia clínica. Migración `20261001_11` borra la columna.
 
 ### Added
+- Correo propio: `turnos@oral.com.ar` recibe con Cloudflare Email Routing y envía con Brevo por SMTP, con SPF,
+  DKIM y DMARC en `PASS` verificados con un envío real desde producción. ADR 0008, con el límite de 300
+  emails por día y el riesgo de la cabecera de baja que Brevo agrega a todos sus mensajes, más la revisión
+  periódica para mitigarlo en `docs/OPERATIONS.md`.
 - ADR 0007: titularidad. El repositorio y el proyecto de Google Cloud siguen en las cuentas de quien
   desarrolla y administra; se documenta el riesgo de depender de una sola persona y las medidas pendientes.
 - `ops/create_admin.sh`: alta de administradores en producción con la clave por teclado, que siempre

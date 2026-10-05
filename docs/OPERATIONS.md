@@ -61,11 +61,25 @@ No hay recuperación por email. Desde una computadora con acceso a Google Cloud 
 administrador con un usuario **nuevo** (`ops/create_admin.sh`; con un usuario existente no hace nada)
 y desde ahí se cambian las demás claves. Por eso conviene tener siempre **dos** administradores.
 
+**Un paciente dice que no le llegan los emails.**
+Primero `/app/notifications`: si hay notificaciones *fallidas* con ese email, el error está ahí. Si no
+hay ninguna y el paciente jura que no recibe nada, puede haber tocado «Anular la suscripción» en un
+email anterior: Brevo agrega ese link a todos sus mensajes, incluso a los de turnos, y desde ese momento
+lo bloquea ([ADR 0008](decisions/0008-correo-cloudflare-y-brevo.md)). En Brevo, buscá el email en la
+lista de contactos bloqueados de *Transactional* (el nombre exacto del menú puede variar) y desbloquealo.
+
+**Revisión mensual del correo (5 minutos).** En Brevo, mirá los contactos bloqueados de *Transactional*
+y el uso del mes: el plan gratuito permite 300 emails por día. Un bloqueo que no esperabas es un
+paciente que dejó de recibir recordatorios sin que nadie lo sepa.
+
+**Nunca activar** en Brevo el bloqueo de IP no autorizadas para las claves SMTP: Cloud Run no tiene IP
+de salida fija y los envíos dejarían de salir.
+
 ## Diagnóstico
 
 | Síntoma | Dónde mirar |
 | --- | --- |
-| No salen emails | `/app/notifications`: estado SMTP y error de cada mensaje. Sin `SMTP_HOST` y `EMAIL_FROM` configurados no se envía nada |
+| No salen emails | `/app/notifications`: estado SMTP y error de cada mensaje. Sin `SMTP_HOST` y `EMAIL_FROM` configurados no se envía nada. Si solo le falla a un paciente, ver *Un paciente dice que no le llegan los emails* |
 | No salen WhatsApp | `/app/notifications` + [WHATSAPP.md](WHATSAPP.md) |
 | El paciente no ve horarios | `/app/availability`: que haya bloques futuros; la reserva online exige anticipación mínima |
 | Falla un pago | [MERCADOPAGO.md](MERCADOPAGO.md) |

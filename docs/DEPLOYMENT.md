@@ -118,6 +118,15 @@ email_from       = "turnos@ejemplo.com.ar"
 ```
 
 > **Sin `email_from` y `smtp_host` el sistema reserva turnos pero no envía ningún email.**
+>
+> La configuración vigente (Cloudflare Email Routing para recibir y Brevo para enviar) y sus límites están en
+> el [ADR 0008](decisions/0008-correo-cloudflare-y-brevo.md). La clave SMTP se carga sin pasar por el
+> historial de la terminal:
+>
+> ```bash
+> printf 'Clave: '; stty -echo; IFS= read -r K; stty echo; echo; \
+>   printf '%s' "$K" | gcloud secrets versions add oral-smtp-password --data-file=-; unset K
+> ```
 
 ## 5. Primer despliegue
 
