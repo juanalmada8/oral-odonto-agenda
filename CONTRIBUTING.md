@@ -74,6 +74,9 @@ Se pueden usar, con las mismas reglas que para cualquier persona:
 
 ## Pull requests
 
+`main` está protegida: no acepta pushes directos ni forzados (tampoco de administradores) y solo se
+mergea un pull request con los seis checks de CI en verde.
+
 Usá la plantilla. CI corre lint, tests (SQLite y PostgreSQL), migraciones de ida y vuelta, build de
 la imagen Docker con prueba de humo, validación de Terraform y el control de secretos.
 

@@ -267,7 +267,9 @@ Después comprobar `/health/ready` (confirma que la base conecta con la contrase
 
 1. **Rotar primero.** Sacarlo del historial no lo des-expone: pudo haberse copiado.
 2. Dejar de rastrear el archivo y sumarlo a `.gitignore`.
-3. Purgar el historial (`git filter-branch` o `git filter-repo`) y publicar con `git push --force`.
+3. Purgar el historial (`git filter-branch` o `git filter-repo`) y publicar con `git push --force`. `main`
+   está protegida y rechaza el push forzado aun para administradores: hay que desactivar la protección
+   (Settings → Branches), publicar y volver a activarla enseguida.
 4. GitHub conserva los commits de pull requests cerrados bajo `refs/pull/N/head`: para quitarlos hay que
    pedírselo a soporte de GitHub indicando el repositorio y los identificadores de commit.
 
