@@ -15,6 +15,10 @@ y versionado semántico.
 ## [Unreleased]
 
 ### Security
+- **Protección contra eliminación** activada en Cloud SQL (además de la de Terraform).
+- **Acceso manual a la base con la cuenta de Google** (autenticación IAM), sin compartir la contraseña de la
+  app: permisos de datos pero no de estructura. `ops/grant_db_access.sh` y `docs/DATABASE_ACCESS.md`.
+  ADR 0009 registra además por qué no se activan alta disponibilidad ni réplica en otra región.
 - **Cambiar una contraseña cierra todas las sesiones abiertas con la anterior.** Antes, una sesión robada
   seguía valiendo hasta vencer (8 horas) aunque se cambiara la contraseña. Cada usuario tiene una versión
   de sesión que viaja en el token (migración `20261006_12`). Quien cambia su propia contraseña sigue

@@ -28,5 +28,6 @@ optional_secrets = [
 # whatsapp_phone_number_id = "123456789012345"
 # custom_domain            = "turnos.tu-dominio.com.ar"
 # custom_domain_mode       = "mapping"  # gratis; "load_balancer" (~USD 18/mes) si la región no lo soporta
+# db_iam_users             = ["vos@gmail.com"]  # acceso a la base con tu cuenta de Google (sin contraseña)
 # alert_email              = "vos@tu-dominio.com.ar"
 # min_instances            = 1   # sin cold start (~USD 10/mes extra)

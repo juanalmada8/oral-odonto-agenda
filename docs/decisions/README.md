@@ -16,5 +16,6 @@ Una decisión no se edita cuando cambia: se escribe una nueva que la reemplaza y
 | [0006](0006-mulish-como-unica-tipografia.md) | Mulish como única tipografía | Vigente |
 | [0007](0007-titularidad-de-repositorio-y-nube.md) | El negocio es del consultorio; repositorio y nube los administra quien desarrolla | Vigente |
 | [0008](0008-correo-cloudflare-y-brevo.md) | Correo: recepción con Cloudflare Email Routing y envío con Brevo | Vigente |
+| [0009](0009-disponibilidad-y-acceso-a-la-base.md) | Disponibilidad, protección y acceso manual a la base | Vigente |
 
 Para agregar una: copiá el formato de cualquiera, numerala en orden y sumala a esta tabla.
