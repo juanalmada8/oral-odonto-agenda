@@ -102,6 +102,7 @@ make tf-validate   # validar Terraform sin credenciales
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | día a día del consultorio y resolución de problemas |
 | [docs/PROD_ENV_CHECKLIST.md](docs/PROD_ENV_CHECKLIST.md) | configuración de producción y cómo activar seña y WhatsApp |
 | [docs/BACKUPS.md](docs/BACKUPS.md) | backups y restauración |
+| [docs/DATABASE_ACCESS.md](docs/DATABASE_ACCESS.md) | conectarse a la base a mano (DBeaver, psql) con tu cuenta de Google |
 | [docs/MERCADOPAGO.md](docs/MERCADOPAGO.md), [docs/WHATSAPP.md](docs/WHATSAPP.md) | integraciones opcionales |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | flujo de trabajo, revisión y releases |
 | [CHANGELOG.md](CHANGELOG.md) | historial de cambios |

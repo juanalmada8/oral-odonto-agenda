@@ -13,6 +13,17 @@ resource "google_sql_database_instance" "main" {
     disk_size         = 10
     disk_autoresize   = true
 
+    # Google-side guard: the instance cannot be deleted from the console, gcloud or the API until this is
+    # turned off. deletion_protection above only stops Terraform.
+    deletion_protection_enabled = true
+
+    # Lets people log in with their Google account (IAM database authentication) instead of sharing the
+    # app's password. Does not require a restart.
+    database_flags {
+      name  = "cloudsql.iam_authentication"
+      value = "on"
+    }
+
     backup_configuration {
       enabled                        = true
       start_time                     = var.db_backup_start_time
@@ -58,4 +69,20 @@ resource "google_sql_user" "app" {
   name     = var.service_name
   instance = google_sql_database_instance.main.name
   password = random_password.db.result
+}
+
+# People who connect by hand (DBeaver, psql, Cloud SQL Studio) with their own Google account. There is no
+# password to leak or rotate: access ends when the account is removed here or loses the IAM role below.
+resource "google_sql_user" "people" {
+  for_each = toset(var.db_iam_users)
+  name     = each.value
+  instance = google_sql_database_instance.main.name
+  type     = "CLOUD_IAM_USER"
+}
+
+resource "google_project_iam_member" "db_people_login" {
+  for_each = toset(var.db_iam_users)
+  project  = var.project_id
+  role     = "roles/cloudsql.instanceUser"
+  member   = "user:${each.value}"
 }

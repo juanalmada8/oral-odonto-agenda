@@ -64,6 +64,12 @@ variable "db_tier" {
   default     = "db-f1-micro"
 }
 
+variable "db_iam_users" {
+  description = "Google accounts allowed to log into the database by hand with IAM authentication (no password)."
+  type        = list(string)
+  default     = []
+}
+
 variable "db_deletion_protection" {
   description = "Refuse to delete the database instance."
   type        = bool
