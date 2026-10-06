@@ -96,6 +96,7 @@ class AuthService:
         if len(password) < 8:
             raise DomainError("La contraseña debe tener al menos 8 caracteres.", status_code=422)
         user.password_hash = hash_password(password)
+        user.session_version += 1  # every session opened with the old password stops working
         create_audit_log(
             db,
             action="user.password_reset",
@@ -149,6 +150,7 @@ class AuthService:
             subject=str(user.id),
             secret_key=self.settings.secret_key,
             expires_minutes=self.settings.access_token_expire_minutes,
+            session_version=user.session_version,
         )
 
     def set_session_cookie(self, response: Response, token: str) -> None:
@@ -173,6 +175,9 @@ class AuthService:
         user = self.get_user_by_id(db, int(subject))
         if not user or not user.is_active:
             raise DomainError("Usuario no disponible.", status_code=401)
+        # Tokens issued before the last password change. Tokens without the claim predate it: version 0.
+        if payload.get("ver", 0) != user.session_version:
+            raise DomainError("La sesión expiró. Ingresá de nuevo.", status_code=401)
         return user
 
     def ensure_has_role(self, user: User, allowed_roles: tuple[UserRole, ...]) -> User:

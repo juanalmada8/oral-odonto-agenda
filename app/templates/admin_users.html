@@ -87,7 +87,7 @@
     </table>
   </div>
 </section>
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
   (() => {
     const roleSelect = document.querySelector("[data-role-select]");
     const professionalField = document.querySelector("[data-professional-field]");

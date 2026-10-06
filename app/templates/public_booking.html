@@ -326,7 +326,7 @@
       </div>
     </footer>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
       document.addEventListener("DOMContentLoaded", () => {
         const bookingSection = () => document.querySelector("#booking-flow");
         const PATIENT_FIELDS = ["dni", "phone", "first_name", "last_name", "email", "reason"];

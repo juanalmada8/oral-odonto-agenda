@@ -35,6 +35,8 @@ jobs:
           cache: pip
       - run: pip install -e ".[dev]"
       - run: ruff check .
+      - name: Dependencias sin vulnerabilidades conocidas
+        run: pip install pip-audit && pip-audit --skip-editable
 
   test:
     name: Tests (${{ matrix.database }})

@@ -209,7 +209,7 @@
 </section>
 
 {% if not is_professional %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
   document.addEventListener("DOMContentLoaded", () => {
     const manualAvailableDates = {{ manual_available_dates | tojson }};
     const professionalSelect = document.getElementById("manual-professional");
