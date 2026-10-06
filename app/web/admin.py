@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from itertools import groupby
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
@@ -69,6 +70,9 @@ ADMIN_ONLY = (UserRole.ADMIN,)
 # What each role may do from the agenda table.
 STAFF_ACTIONS = {"confirm", "reserve", "complete", "no_show", "cancel"}
 PROFESSIONAL_ACTIONS = {"complete", "no_show"}
+# Appointments still ahead that the clinic has to attend.
+UPCOMING_STATUSES = (AppointmentStatus.PENDING_PAYMENT, AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED)
+
 ACTION_TARGETS = {
     "confirm": AppointmentStatus.CONFIRMED,
     "reserve": AppointmentStatus.RESERVED,
@@ -233,22 +237,36 @@ def dashboard(
     if unlinked_professional:
         alerts.append({"text": "Tu usuario no está vinculado a un profesional. Pedíselo a administración.", "href": None})
 
-    week_ahead = [] if unlinked_professional else schedule_service.list_appointments(
-        db,
-        professional_id=selected_professional_id,
-        date_from=datetime.combine(clock.today(), datetime.min.time()),
-        date_to=datetime.combine(clock.today() + timedelta(days=7), datetime.max.time()),
-    )
+    today = clock.today()
+    # The overview looks past today: what is coming in the next seven days, grouped by day.
+    upcoming = [] if unlinked_professional else [
+        item
+        for item in schedule_service.list_appointments(
+            db,
+            professional_id=selected_professional_id,
+            date_from=datetime.combine(today + timedelta(days=1), datetime.min.time()),
+            date_to=datetime.combine(today + timedelta(days=7), datetime.max.time()),
+        )
+        if item.status in UPCOMING_STATUSES
+    ]
+    upcoming.sort(key=lambda item: item.starts_at)
+    upcoming_days = [
+        {"label": format_long_date(day).capitalize(), "appointments": list(items)}
+        for day, items in groupby(upcoming, key=lambda item: item.starts_at.date())
+    ]
     return render_admin(
         request,
         template_name="admin_dashboard.html",
         current_user=current_user,
-        page_title="Mi agenda" if scope else "Hoy",
-        page_subtitle=format_long_date(agenda_date).capitalize(),
+        page_title="Mi agenda" if scope else "Resumen",
+        page_subtitle=f"{format_long_date(today).capitalize()} · hoy y los próximos 7 días",
         active_page="dashboard",
         professionals=[] if scope else active_professionals(db, professional_service),
         appointments=appointments,
         agenda_date=agenda_date.isoformat(),
+        agenda_is_today=agenda_date == today,
+        agenda_label=format_long_date(agenda_date),
+        upcoming_days=upcoming_days,
         selected_professional_id=selected_professional_id,
         is_professional=scope is not None,
         summary={
@@ -259,7 +277,8 @@ def dashboard(
             "completed": counts["completed"],
             "no_show": counts["no_show"],
             "attendance_confirmed": sum(1 for item in appointments if item.attendance_confirmed_at),
-            "week": sum(1 for item in week_ahead if item.status in (AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED)),
+            "week": len(upcoming),
+            "week_confirmed": sum(1 for item in upcoming if item.status == AppointmentStatus.CONFIRMED),
         },
         alerts=alerts,
         actions_for=lambda appointment: allowed_actions(current_user, appointment),

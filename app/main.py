@@ -6,7 +6,7 @@ import mimetypes
 import secrets
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -119,3 +119,9 @@ mimetypes.add_type("font/woff2", ".woff2")
 mimetypes.add_type("font/woff", ".woff")
 
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> FileResponse:
+    """Browsers ask for it at the root even on pages that declare their own icon."""
+    return FileResponse(BASE_DIR / "static" / "icons" / "favicon.ico", media_type="image/x-icon")

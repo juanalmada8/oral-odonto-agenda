@@ -89,6 +89,11 @@ y versionado semántico.
   cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
 
 ### Changed
+- El panel abre en un **Overview**: título *Resumen*, la agenda de hoy (con su filtro de fecha) y una
+  sección **Próximos 7 días** con los turnos agrupados por día. Las tarjetas cuentan lo que importa sin
+  seña activa (*Sin confirmar* en lugar de *Reservados sin seña*); *Esperando seña* aparece solo si hay alguno.
+- Favicon nuevo: el logo de ORAL dentro de un círculo blanco, legible en pestañas claras y oscuras, con
+  versiones para celulares (`apple-touch-icon`) y `/favicon.ico`.
 - El teléfono del consultorio deja de mostrarse en la portada de reservas. Sigue en los emails, en la
   página del turno y en la política de privacidad.
 - Dependencias actualizadas: `actions/checkout` 7, `actions/setup-python` 7, `actions/upload-artifact` 7,

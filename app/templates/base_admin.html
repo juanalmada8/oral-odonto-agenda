@@ -8,7 +8,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex" />
     <title>{{ page_title }} | ORAL</title>
-    <link rel="icon" type="image/png" href="{{ brand_logo }}" />
+    <link rel="icon" href="{{ asset_url('icons/favicon.ico') }}" sizes="any" />
+    <link rel="icon" type="image/png" href="{{ asset_url('icons/favicon-32.png') }}" sizes="32x32" />
+    <link rel="apple-touch-icon" href="{{ asset_url('icons/apple-touch-icon.png') }}" />
     <link rel="stylesheet" href="{{ asset_url('styles.css') }}" />
   </head>
   <body class="admin-body">
@@ -26,7 +28,7 @@
         <nav id="sidebar-nav" class="sidebar__nav" aria-label="Secciones del panel">
           <div class="nav-group">
             <p class="nav-group__label">Agenda</p>
-            <a href="/app" class="nav-link {% if active_page == 'dashboard' %}is-active{% endif %}" {% if active_page == 'dashboard' %}aria-current="page"{% endif %}>{{ 'Mi agenda' if role == 'professional' else 'Hoy' }}</a>
+            <a href="/app" class="nav-link {% if active_page == 'dashboard' %}is-active{% endif %}" {% if active_page == 'dashboard' %}aria-current="page"{% endif %}>{{ 'Mi agenda' if role == 'professional' else 'Overview' }}</a>
             <a href="/app/appointments" class="nav-link {% if active_page == 'appointments' %}is-active{% endif %}" {% if active_page == 'appointments' %}aria-current="page"{% endif %}>Turnos</a>
             {% if role in ['admin', 'professional'] %}
             <a href="/app/availability" class="nav-link {% if active_page == 'availability' %}is-active{% endif %}" {% if active_page == 'availability' %}aria-current="page"{% endif %}>{{ 'Mi disponibilidad' if role == 'professional' else 'Disponibilidad' }}</a>
