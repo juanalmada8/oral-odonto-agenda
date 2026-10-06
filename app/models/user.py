@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import UserRole
@@ -20,6 +20,9 @@ class User(TimestampMixin, Base):
         server_default=UserRole.RECEPTIONIST.value,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    # Goes into every session token. Bumping it (on a password change) invalidates the sessions issued
+    # before, so someone who stole a session is kicked out as soon as the password changes.
+    session_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     # Set for role=professional: the dentist this login belongs to (their agenda and availability).
     professional_id: Mapped[int | None] = mapped_column(
         ForeignKey("professional.id", ondelete="SET NULL"),

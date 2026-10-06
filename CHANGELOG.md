@@ -15,6 +15,15 @@ y versionado semántico.
 ## [Unreleased]
 
 ### Security
+- **Cambiar una contraseña cierra todas las sesiones abiertas con la anterior.** Antes, una sesión robada
+  seguía valiendo hasta vencer (8 horas) aunque se cambiara la contraseña. Cada usuario tiene una versión
+  de sesión que viaja en el token (migración `20261006_12`). Quien cambia su propia contraseña sigue
+  conectado en ese navegador.
+- **Content-Security-Policy** en todas las páginas: solo se ejecutan los scripts del sitio que llevan el
+  nonce de esa respuesta, así que un script inyectado no corre aunque se colara un XSS. Verificado en
+  navegador recorriendo la reserva y el panel: cero bloqueos ni errores.
+- Dependencias con vulnerabilidades publicadas: `starlette` (desde 1.3.1) y `python-multipart` (desde
+  0.0.27), que procesa todos los formularios. `pip-audit` pasa a correr en CI.
 - **Terraform configuraba `TRUSTED_PROXY_COUNT=2` apenas había un dominio propio**, valor que solo
   corresponde al balanceador de carga. Con el mapeo de dominio gratuito hay un único salto, y con `2` la
   app habría tomado la entrada de `X-Forwarded-For` que manda el propio cliente: un atacante podía

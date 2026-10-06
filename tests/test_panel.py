@@ -799,3 +799,47 @@ def test_the_privacy_policy_never_shows_an_empty_contact(client, monkeypatch):
     assert "mailto:</a>" not in cuerpo
     assert 'href="mailto:"' not in cuerpo
     assert "+54 9 2243 40-7958" in cuerpo
+
+
+def test_changing_a_password_closes_the_sessions_opened_before(client, db_session, clinic):
+    """Una sesión robada seguía valiendo hasta vencer (8 horas) aunque se cambiara la contraseña."""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    victima = TestClient(app)
+    assert login(victima, "recepcion").headers["location"].endswith("/app")
+    assert victima.get("/app", follow_redirects=False).status_code == 200
+
+    login(client, "admin")
+    usuario = db_session.scalar(select(User).where(User.username == "recepcion"))
+    client.post(f"/app/users/{usuario.id}/password", data={"password": "OtraClave2026!"}, follow_redirects=False)
+
+    assert victima.get("/app", follow_redirects=False).headers["location"].startswith("/app/login")
+    assert login(victima, "recepcion", "OtraClave2026!").headers["location"].endswith("/app")
+
+
+def test_changing_your_own_password_keeps_you_logged_in(client, db_session, clinic):
+    login(client, "admin")
+    admin = db_session.scalar(select(User).where(User.username == "admin"))
+
+    client.post(f"/app/users/{admin.id}/password", data={"password": "OtraClave2026!"}, follow_redirects=False)
+
+    assert client.get("/app", follow_redirects=False).status_code == 200
+
+
+def test_html_pages_send_a_csp_whose_nonce_matches_their_scripts(client, clinic):
+    """Sin CSP, un XSS que se colara podría ejecutar cualquier script. El nonce cambia en cada respuesta."""
+    import re
+
+    paginas = [client.get("/reservar"), client.get("/reservar")]
+    nonces = []
+    for respuesta in paginas:
+        politica = respuesta.headers["content-security-policy"]
+        nonce = re.search(r"'nonce-([^']+)'", politica).group(1)
+        assert "object-src 'none'" in politica and "frame-ancestors 'none'" in politica
+        assert f'<script nonce="{nonce}">' in respuesta.text
+        assert "<script>" not in respuesta.text
+        nonces.append(nonce)
+    assert nonces[0] != nonces[1]
+    assert "content-security-policy" not in client.get("/health").headers

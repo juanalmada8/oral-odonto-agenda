@@ -3,6 +3,7 @@ from urllib.parse import quote
 
 import logging
 import mimetypes
+import secrets
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -46,7 +47,24 @@ app = FastAPI(
 async def security_headers(request: Request, call_next):
     trace_header = request.headers.get("x-cloud-trace-context")
     trace_context.set(trace_header.split("/", 1)[0] if trace_header else None)
+    # Fresh per response: templates stamp it on their inline <script> tags and the CSP below only
+    # runs scripts that carry it, so markup injected by an attacker cannot execute.
+    nonce = secrets.token_urlsafe(16)
+    request.state.csp_nonce = nonce
     response = await call_next(request)
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            f"script-src 'self' 'nonce-{nonce}'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "connect-src 'self'; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
+            "frame-ancestors 'none'",
+        )
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")

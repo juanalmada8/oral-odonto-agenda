@@ -1299,8 +1299,13 @@ def reset_user_password_from_admin(
 ):
     require_roles(current_user, *ADMIN_ONLY)
     try:
-        auth_service.set_password(db, user_id, password, actor=current_user)
+        user = auth_service.set_password(db, user_id, password, actor=current_user)
     except Exception as exc:
         db.rollback()
         return redirect_with_message("/app/users", error=user_facing_message(exc))
-    return redirect_with_message("/app/users", message="Contraseña actualizada.")
+    response = redirect_with_message("/app/users", message="Contraseña actualizada.")
+    # The change closes every session of that user. When it is their own, the browser that made the
+    # change gets a fresh session instead of being logged out.
+    if user.id == current_user.id:
+        auth_service.set_session_cookie(response, auth_service.create_token_for_user(user))
+    return response

@@ -101,7 +101,7 @@
       </div>
     </div>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
       (() => {
         const modal = document.getElementById("confirm-modal");
         const title = document.getElementById("confirm-modal-title");

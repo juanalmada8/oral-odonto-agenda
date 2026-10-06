@@ -145,7 +145,7 @@
         </section>
       </main>
     </div>
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
       document.querySelectorAll("form[data-confirm]").forEach((form) => {
         form.addEventListener("submit", (event) => {
           if (!window.confirm(form.dataset.confirm)) event.preventDefault();
@@ -153,7 +153,7 @@
       });
     </script>
     {% if status == 'pending_payment' %}
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
       (() => {
         const card = document.querySelector(".status-card");
         const countdown = document.querySelector("[data-seconds-left]");

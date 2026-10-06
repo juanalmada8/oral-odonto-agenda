@@ -36,10 +36,11 @@ def verify_password(password: str, password_hash: str) -> bool:
     return hmac.compare_digest(candidate, stored_hash)
 
 
-def create_access_token(*, subject: str, secret_key: str, expires_minutes: int) -> str:
+def create_access_token(*, subject: str, secret_key: str, expires_minutes: int, session_version: int = 0) -> str:
     now = datetime.now(UTC)
     payload = {
         "sub": subject,
+        "ver": session_version,
         "iat": now,
         "exp": now + timedelta(minutes=expires_minutes),
     }
