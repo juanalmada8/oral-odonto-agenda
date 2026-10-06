@@ -843,3 +843,29 @@ def test_html_pages_send_a_csp_whose_nonce_matches_their_scripts(client, clinic)
         nonces.append(nonce)
     assert nonces[0] != nonces[1]
     assert "content-security-policy" not in client.get("/health").headers
+
+
+def test_every_page_uses_the_round_favicon(client, clinic):
+    for ruta in ("/reservar", "/privacidad", "/app/login"):
+        cuerpo = client.get(ruta).text
+        assert "icons/favicon.ico" in cuerpo and "icons/apple-touch-icon.png" in cuerpo, ruta
+    respuesta = client.get("/favicon.ico")
+    assert respuesta.status_code == 200 and respuesta.headers["content-type"] == "image/x-icon"
+
+
+def test_the_overview_shows_the_next_seven_days_grouped_by_day(client, db_session, clinic):
+    """El resumen ya no muestra solo hoy: lista lo que viene en la semana, agrupado por día."""
+    from tests.conftest import FROZEN_NOW
+
+    manana = FROZEN_NOW.replace(hour=9, minute=0) + timedelta(days=3)  # lunes 30
+    lejos = FROZEN_NOW.replace(hour=9, minute=0) + timedelta(days=12)
+    add_appointment(db_session, clinic["laura"], starts_at=manana)
+    add_appointment(db_session, clinic["laura"], starts_at=lejos)
+    login(client, "admin")
+
+    cuerpo = client.get("/app").text
+
+    assert ">Overview<" in cuerpo
+    assert "Próximos 7 días" in cuerpo
+    assert "Lunes 30 de marzo" in cuerpo
+    assert "Miércoles 8 de abril" not in cuerpo  # fuera de la semana

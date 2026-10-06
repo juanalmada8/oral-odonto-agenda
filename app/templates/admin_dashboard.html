@@ -10,7 +10,7 @@
 
 <section class="metrics-grid">
   <article class="metric-card">
-    <span class="metric-label">Turnos del día</span>
+    <span class="metric-label">Turnos {{ "de hoy" if agenda_is_today else "del " ~ agenda_label }}</span>
     <strong class="metric-value">{{ summary.total }}</strong>
   </article>
   <article class="metric-card">
@@ -19,23 +19,26 @@
     {% if summary.attendance_confirmed %}<span class="metric-foot">{{ summary.attendance_confirmed }} confirmaron asistencia</span>{% endif %}
   </article>
   <article class="metric-card">
-    <span class="metric-label">Reservados sin seña</span>
+    <span class="metric-label">Sin confirmar</span>
     <strong class="metric-value">{{ summary.reserved }}</strong>
-  </article>
-  <article class="metric-card">
-    <span class="metric-label">Esperando seña</span>
-    <strong class="metric-value">{{ summary.pending_payment }}</strong>
   </article>
   <article class="metric-card">
     <span class="metric-label">Próximos 7 días</span>
     <strong class="metric-value">{{ summary.week }}</strong>
+    {% if summary.week %}<span class="metric-foot">{{ summary.week_confirmed }} confirmados</span>{% endif %}
   </article>
+  {% if summary.pending_payment %}
+  <article class="metric-card">
+    <span class="metric-label">Esperando seña</span>
+    <strong class="metric-value">{{ summary.pending_payment }}</strong>
+  </article>
+  {% endif %}
 </section>
 
 <section class="surface surface-main">
   <div class="surface-head">
     <div>
-      <h2>Agenda del día</h2>
+      <h2>{{ "Agenda de hoy" if agenda_is_today else "Agenda del " ~ agenda_label }}</h2>
     </div>
     <form method="get" action="/app" class="toolbar-form">
       <input type="date" name="selected_date" value="{{ agenda_date }}" aria-label="Fecha" />
@@ -91,6 +94,50 @@
       </tbody>
     </table>
   </div>
+</section>
+
+<section class="surface upcoming">
+  <div class="surface-head">
+    <div>
+      <h2>Próximos 7 días</h2>
+    </div>
+    <a class="text-link" href="/app/appointments">Ver todos los turnos</a>
+  </div>
+
+  {% for day in upcoming_days %}
+  <div class="upcoming-day">
+    <h3 class="upcoming-day__title">
+      {{ day.label }}
+      <span class="upcoming-day__count">{{ day.appointments | length }} {{ "turno" if day.appointments | length == 1 else "turnos" }}</span>
+    </h3>
+    <div class="table-wrap">
+      <table class="data-table data-table--stacked">
+        <thead>
+          <tr>
+            <th>Hora</th>
+            <th>Paciente</th>
+            {% if not is_professional %}<th>Profesional</th>{% endif %}
+            <th>Estado</th>
+            <th>Motivo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for appointment in day.appointments %}
+          <tr>
+            <td data-label="Hora"><strong>{{ appointment.starts_at.strftime("%H:%M") }}</strong></td>
+            <td data-label="Paciente">{{ appointment.patient.first_name }} {{ appointment.patient.last_name }}</td>
+            {% if not is_professional %}<td data-label="Profesional">{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>{% endif %}
+            <td data-label="Estado">{{ status_badge(appointment.status) }}</td>
+            <td data-label="Motivo">{{ appointment.reason or "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <p class="upcoming-empty">No hay turnos en los próximos 7 días.</p>
+  {% endfor %}
 </section>
 
 {% endblock %}
