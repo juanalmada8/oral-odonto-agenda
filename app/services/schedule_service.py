@@ -66,6 +66,10 @@ ALLOWED_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {
 # Moving into these states takes the slot again, so the calendar must be re-validated.
 REACTIVATING_SOURCES = {AppointmentStatus.CANCELLED, AppointmentStatus.EXPIRED}
 
+# Coming from one of these, reaching RESERVED/CONFIRMED means an appointment that did not exist for the
+# professional until now (a paid deposit, a reactivation). From RESERVED it is only a confirmation.
+BECOMES_AN_APPOINTMENT = (AppointmentStatus.PENDING_PAYMENT, AppointmentStatus.CANCELLED, AppointmentStatus.EXPIRED)
+
 
 @dataclass(frozen=True)
 class SeriesResult:
@@ -181,6 +185,7 @@ class ScheduleService:
             actor=actor,
         )
         followup_service.queue_confirmation(db, appointment, actor=actor)
+        followup_service.queue_professional_booking(db, appointment, actor=actor)
         self.commit(db)
         return self.get_appointment(db, appointment.id)
 
@@ -240,6 +245,7 @@ class ScheduleService:
             )
         # Un solo email con todas las fechas: doce confirmaciones seguidas son spam.
         followup_service.queue_series(db, created, actor=actor)
+        followup_service.queue_professional_booking(db, created, actor=actor)
         self.commit(db)
         return SeriesResult(created=created, skipped=skipped)
 
@@ -347,6 +353,11 @@ class ScheduleService:
                     # Sin este aviso el paciente se presenta en el horario viejo.
                     if appointment.status in UPCOMING_APPOINTMENT_STATUSES:
                         followup_service.queue_reschedule(db, appointment, previous_when=previous_when, actor=actor)
+                    # A held (unpaid) slot is not on the professional's agenda yet, so there is nothing to move.
+                    if appointment.status in (AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED):
+                        followup_service.queue_professional_reschedule(
+                            db, appointment, previous_when=previous_when, actor=actor
+                        )
 
         for field in ("reason", "notes", "charged_amount"):
             if field in changes:
@@ -494,11 +505,18 @@ class ScheduleService:
         if new_status == AppointmentStatus.RESERVED:
             appointment.confirmed_at = None
             appointment.cancelled_at = None
+            # The slot becomes a real appointment: a held one released without payment, or a cancelled
+            # one brought back. The professional had not heard of it (or heard it was cancelled).
+            if followup_service and current in BECOMES_AN_APPOINTMENT:
+                followup_service.queue_professional_booking(db, appointment)
         elif new_status == AppointmentStatus.CONFIRMED:
             appointment.confirmed_at = now
             appointment.cancelled_at = None
             if followup_service:
                 followup_service.queue_confirmation(db, appointment)
+                # Confirming one that was already reserved is not news; paying a deposit is.
+                if current in BECOMES_AN_APPOINTMENT:
+                    followup_service.queue_professional_booking(db, appointment)
         elif new_status == AppointmentStatus.CANCELLED:
             appointment.cancelled_at = now
             if followup_service:
@@ -506,6 +524,7 @@ class ScheduleService:
                 # An abandoned unpaid hold was never a real booking for the patient: no email.
                 if current in (AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED):
                     followup_service.queue_cancellation(db, appointment)
+                    followup_service.queue_professional_cancellation(db, appointment)
                 # El horario quedó libre: se lo ofrecemos a quien esté esperando.
                 self.waitlist.notify_freed_slot(db, appointment, followup_service=followup_service)
         self.flush(db)

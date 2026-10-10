@@ -76,6 +76,21 @@ medicación ni ningún dato de salud, ni siquiera en las notas. Eso se guarda en
 consultorio. Los motivos de esta decisión están en
 [decisions/0002-sin-datos-de-salud.md](decisions/0002-sin-datos-de-salud.md).
 
+## Que cada profesional se entere de sus turnos
+
+El sistema le manda un email a cada profesional, **a la dirección que figura en su ficha**:
+
+- cuando le **reservan** un turno (online o cargado por el consultorio),
+- cuando se **cancela** o se **mueve**,
+- y **cada tarde, desde las 18 h, su agenda del día siguiente** (si tiene turnos).
+
+Para que funcione, revisá en **Profesionales** que cada uno tenga el **email** cargado. Si lo dejás vacío,
+ese profesional no recibe avisos. Los mensajes traen solo el nombre del paciente, el día y la hora, con un
+enlace al panel: el resto de los datos se ve ahí.
+
+Además, cada profesional puede tener **su propio acceso al panel** (**Usuarios**, rol *Profesional*,
+vinculado a su ficha) y ver en **Mi agenda** su día y los próximos 7 días.
+
 ## Los emails y las respuestas
 
 - Los pacientes reciben los avisos desde **turnos@oral.com.ar**: confirmación, recordatorio, cambios y

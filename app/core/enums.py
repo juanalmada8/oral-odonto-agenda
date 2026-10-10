@@ -59,6 +59,11 @@ class NotificationType(str, Enum):
     WAITLIST = "waitlist"
     PAYMENT_LINK = "payment_link"
     CUSTOM = "custom"
+    # Avisos a quien atiende (no al paciente). La columna es VARCHAR(20): valores de hasta 20 caracteres.
+    PROFESSIONAL_NEW = "professional_new"
+    PROFESSIONAL_CANCEL = "professional_cancel"
+    PROFESSIONAL_MOVE = "professional_move"
+    PROFESSIONAL_DIGEST = "professional_digest"
 
 
 class PaymentStatus(str, Enum):
@@ -119,4 +124,19 @@ WAITLIST_STATUS_LABELS = {
     WaitlistStatus.NOTIFIED: "Avisado",
     WaitlistStatus.BOOKED: "Reservó",
     WaitlistStatus.CANCELLED: "Dado de baja",
+}
+
+
+NOTIFICATION_TYPE_LABELS = {
+    NotificationType.CONFIRMATION: "Confirmación",
+    NotificationType.REMINDER: "Recordatorio",
+    NotificationType.CANCELLATION: "Cancelación",
+    NotificationType.RESCHEDULE: "Reprogramación",
+    NotificationType.WAITLIST: "Lista de espera",
+    NotificationType.PAYMENT_LINK: "Link de pago",
+    NotificationType.CUSTOM: "Otro",
+    NotificationType.PROFESSIONAL_NEW: "Turno nuevo (al profesional)",
+    NotificationType.PROFESSIONAL_CANCEL: "Cancelación (al profesional)",
+    NotificationType.PROFESSIONAL_MOVE: "Cambio de horario (al profesional)",
+    NotificationType.PROFESSIONAL_DIGEST: "Agenda de mañana (al profesional)",
 }

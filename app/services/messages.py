@@ -86,6 +86,73 @@ class MessageComposer:
         context = self._context(appointment) | {"previous_when": previous_when}
         return self._render("reschedule", f"Cambiamos tu turno: ahora {context['when_short']}", context)
 
+    # ------------------------------------------------------------ avisos al profesional
+    #
+    # Contenido mínimo a propósito: nombre, día, hora y un enlace al panel. Nada de DNI, teléfono, email
+    # ni motivo: esos datos viven en el panel y no tienen por qué viajar por correo.
+
+    def professional_booking(self, appointments: list[Appointment]) -> EmailContent:
+        """Uno o varios turnos nuevos del mismo paciente (una serie va en un solo mensaje)."""
+        first = appointments[0]
+        patient = self._patient_name(first)
+        context = self._professional_context(first.professional, day=first.starts_at.date()) | {
+            "kicker": "Turno nuevo" if len(appointments) == 1 else f"{len(appointments)} turnos nuevos",
+            "accent": "#005075",
+            # Neutral on purpose: it may have been booked online or loaded by the clinic.
+            "heading": "Tenés un turno nuevo" if len(appointments) == 1 else f"Tenés {len(appointments)} turnos nuevos",
+            "intro": None,
+            "rows": [self._professional_row(item) for item in appointments],
+            "previous_when": None,
+        }
+        if len(appointments) == 1:
+            subject = f"Nuevo turno: {patient}, {self._when_short(first)}"
+        else:
+            subject = f"Nuevos turnos: {patient} ({len(appointments)}), desde {self._when_short(first)}"
+        return self._render("professional_notice", subject, context)
+
+    def professional_cancellation(self, appointment: Appointment) -> EmailContent:
+        patient = self._patient_name(appointment)
+        context = self._professional_context(appointment.professional, day=appointment.starts_at.date()) | {
+            "kicker": "Turno cancelado",
+            "accent": "#bf4b4b",
+            "heading": f"Se canceló el turno de {patient}",
+            "intro": "Este horario quedó libre en tu agenda.",
+            "rows": [self._professional_row(appointment)],
+            "previous_when": None,
+        }
+        return self._render(
+            "professional_notice", f"Turno cancelado: {patient}, {self._when_short(appointment)}", context
+        )
+
+    def professional_reschedule(self, appointment: Appointment, previous_when: str | None) -> EmailContent:
+        patient = self._patient_name(appointment)
+        context = self._professional_context(appointment.professional, day=appointment.starts_at.date()) | {
+            "kicker": "Turno movido",
+            "accent": "#ff5e37",
+            "heading": f"Cambió el horario del turno de {patient}",
+            "intro": None,
+            "rows": [self._professional_row(appointment)],
+            "previous_when": previous_when,
+        }
+        return self._render(
+            "professional_notice", f"Turno movido: {patient}, ahora {self._when_short(appointment)}", context
+        )
+
+    def professional_digest(self, professional, day, appointments: list[Appointment]) -> EmailContent:
+        """La agenda de un día, para recibirla la víspera."""
+        count = len(appointments)
+        label = format_long_date(day)
+        context = self._professional_context(professional, day=day) | {
+            "kicker": "Agenda de mañana",
+            "accent": "#005075",
+            "heading": f"Mañana, {label}",
+            "intro": f"Tenés {count} {'turno' if count == 1 else 'turnos'}:",
+            "rows": [self._professional_row(item, with_date=False) for item in appointments],
+            "previous_when": None,
+        }
+        subject = f"Tu agenda de mañana: {label} ({count} {'turno' if count == 1 else 'turnos'})"
+        return self._render("professional_notice", subject, context)
+
     def whatsapp_reminder(self, appointment: Appointment) -> WhatsAppTemplateContent:
         context = self._context(appointment)
         params = [
@@ -135,6 +202,31 @@ class MessageComposer:
             ),
             "deposit_policy": self.settings.deposit_policy,
             "cancellation_notice_hours": self.settings.cancellation_notice_hours,
+        }
+
+    def _patient_name(self, appointment: Appointment) -> str:
+        return f"{appointment.patient.first_name} {appointment.patient.last_name}"
+
+    @staticmethod
+    def _when_short(appointment: Appointment) -> str:
+        return f"{appointment.starts_at:%d/%m} {appointment.starts_at:%H:%M} h"
+
+    def _professional_row(self, appointment: Appointment, *, with_date: bool = True) -> dict:
+        when = f"{format_long_date(appointment.starts_at).capitalize()} · " if with_date else ""
+        return {
+            "when": f"{when}{appointment.starts_at:%H:%M} h",
+            "patient": self._patient_name(appointment),
+            "duration": appointment.duration_minutes,
+        }
+
+    def _professional_context(self, professional, *, day) -> dict:
+        return {
+            "clinic_name": self.settings.clinic_name,
+            "clinic_address": self.settings.clinic_address,
+            "clinic_phone": self.settings.clinic_phone,
+            "logo_url": "cid:oral-logo",
+            "professional_first_name": professional.first_name,
+            "panel_url": f"{self.settings.public_base_url}/app?selected_date={day.isoformat()}",
         }
 
     def _render(self, name: str, subject: str, context: dict) -> EmailContent:

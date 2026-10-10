@@ -22,7 +22,7 @@ app/
 | `BookingService` | reserva pública: valida, bloquea el horario, crea el checkout y cancela por pedido del paciente |
 | `ScheduleService` | disponibilidad, alta de turnos, transiciones de estado y protección del calendario |
 | `PaymentService` | seña: checkout, aplicación idempotente de resultados, vencimientos y devoluciones a revisar |
-| `FollowUpService` | outbox de notificaciones (email + WhatsApp) con reintentos |
+| `FollowUpService` | outbox de notificaciones (email + WhatsApp) con reintentos; avisos al paciente y al profesional, y la agenda diaria ([spec](specs/0002-avisos-al-profesional.md)) |
 | `WhatsAppBot` | respuestas del paciente por WhatsApp (confirmar asistencia, cancelar) |
 | `ReceptionService` | pacientes; identidad por DNI en la reserva pública |
 | `WaitlistService` | lista de espera: anotarse, avisar cuando se libera un horario y cerrar la entrada al reservar |

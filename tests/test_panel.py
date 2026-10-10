@@ -869,3 +869,22 @@ def test_the_overview_shows_the_next_seven_days_grouped_by_day(client, db_sessio
     assert "Próximos 7 días" in cuerpo
     assert "Lunes 30 de marzo" in cuerpo
     assert "Miércoles 8 de abril" not in cuerpo  # fuera de la semana
+
+
+def test_the_notifications_page_names_every_type(client, db_session, clinic):
+    """Antes Reprogramación y Lista de espera salían con el tipo en blanco."""
+    from app.core.enums import NOTIFICATION_TYPE_LABELS, NotificationType
+    from app.models.notification import Notification
+
+    for tipo in NotificationType:
+        db_session.add(
+            Notification(type=tipo, recipient="x@example.com", subject=f"asunto {tipo.value}",
+                         body="cuerpo", scheduled_for=datetime(2026, 3, 27, 10, 0))
+        )
+    db_session.commit()
+    login(client, "admin")
+
+    cuerpo = client.get("/app/notifications").text
+
+    for etiqueta in NOTIFICATION_TYPE_LABELS.values():
+        assert f">{etiqueta}<" in cuerpo, etiqueta

@@ -1,0 +1,17 @@
+Hola {{ professional_first_name }},
+
+{{ heading }}.
+{% if intro %}
+{{ intro }}
+{% endif %}
+{% if previous_when %}
+Antes: {{ previous_when }}
+{% endif %}
+
+{% for row in rows %}
+- {{ row.when }} · {{ row.patient }} ({{ row.duration }} min)
+{% endfor %}
+
+Ver tu agenda: {{ panel_url }}
+
+{{ clinic_name }} · aviso automático del sistema de turnos

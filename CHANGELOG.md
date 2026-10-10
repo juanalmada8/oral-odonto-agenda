@@ -42,6 +42,9 @@ y versionado semántico.
   `.env`, aunque se fuerce con `git add -f`.
 
 ### Fixed
+- En *Notificaciones* los avisos de **Reprogramación** y de **Lista de espera** salían con el tipo en
+  blanco: faltaban sus etiquetas. Ahora todas salen de un único mapa, y un test impide que un tipo nuevo
+  quede sin etiqueta o no entre en la columna de la base (20 caracteres).
 - Terraform no podía aplicar cambios al servicio web. Un ajuste hecho el mismo día para silenciar un cambio
   falso en `terraform plan` (el nombre de la revisión) hacía que Cloud Run respondiera 409 en cuanto el
   servicio cambiaba de verdad; se revierte y se documenta por qué no hay que ignorar ese campo. No
@@ -73,6 +76,14 @@ y versionado semántico.
   turnos, no una historia clínica. Migración `20261001_11` borra la columna.
 
 ### Added
+- **Avisos al profesional por email** (especificación 0002). Hasta ahora todos los avisos iban solo al
+  paciente: un turno nuevo quedaba en la agenda y quien lo iba a atender no se enteraba. Ahora cada
+  profesional recibe, en el email de su ficha: un aviso por cada **turno nuevo** (reserva online, turno
+  cargado por el consultorio, serie en un solo mensaje, seña acreditada o turno reactivado), por cada
+  **cancelación** y por cada **cambio de horario**, y cada tarde (desde las 18 h,
+  `PROFESSIONAL_DIGEST_HOUR`) su **agenda del día siguiente**, solo si tiene turnos. El contenido es el
+  mínimo: nombre del paciente, día, hora y enlace al panel, sin DNI, teléfono, email ni motivo. Sin email
+  en la ficha no se envía nada. No requiere migración.
 - `docs/PRIMEROS_PASOS.md`: guía para el consultorio, sin jerga técnica, para cargar profesionales y horarios,
   probar una reserva como paciente y usar la agenda a diario.
 - Correo propio: `turnos@oral.com.ar` recibe con Cloudflare Email Routing y envía con Brevo por SMTP, con SPF,

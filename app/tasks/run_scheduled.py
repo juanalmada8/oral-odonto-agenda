@@ -2,7 +2,8 @@
 
 1. Expire unpaid booking holds and free their slots.
 2. Queue reminders for appointments entering the reminder window.
-3. Send (and retry) every due notification.
+3. Queue each professional's agenda for tomorrow (once a day, from the configured hour).
+4. Send (and retry) every due notification.
 """
 
 import json
@@ -31,10 +32,11 @@ def run(followup_service: FollowUpService | None = None) -> dict:
     try:
         expired = payment_service.expire_unpaid(db)
         prepared = followup_service.prepare_upcoming_reminders(db, actor="scheduler")
+        digests = followup_service.prepare_professional_digests(db, actor="scheduler")
         dispatched = followup_service.send_pending_notifications(db, limit=500, actor="scheduler")
     finally:
         db.close()
-    return {"expired_holds": expired, "reminders_prepared": prepared, **dispatched}
+    return {"expired_holds": expired, "reminders_prepared": prepared, "digests_prepared": digests, **dispatched}
 
 
 def main() -> None:

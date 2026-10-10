@@ -90,6 +90,8 @@ class BookingService:
         )
         if not requires_deposit:
             self.followup_service.queue_confirmation(db, appointment, actor=PUBLIC_ACTOR)
+            # With a deposit it is only a held slot: the professional hears of it once it is paid.
+            self.followup_service.queue_professional_booking(db, appointment, actor=PUBLIC_ACTOR)
         # Si venía esperando este horario, su anotación se cierra acá.
         self.waitlist.mark_booked_for(db, appointment.patient_id, appointment.starts_at)
         # Commit the hold before talking to the payment provider so the professional lock is not

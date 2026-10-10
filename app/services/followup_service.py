@@ -1,4 +1,4 @@
-"""Follow-up service: patient notifications (email + WhatsApp) through a retrying outbox.
+"""Follow-up service: patient and professional notifications through a retrying outbox.
 
 Messages are stored as `Notification` rows and sent by `send_pending_notifications`, which runs
 right after the request that queued them (background task) and periodically from the scheduled
@@ -6,7 +6,7 @@ job, so a provider outage only delays messages instead of losing them.
 """
 
 import logging
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,6 +18,7 @@ from app.integrations.email import EmailClient
 from app.integrations.whatsapp import WhatsAppClient
 from app.models.appointment import Appointment
 from app.models.notification import Notification
+from app.models.professional import Professional
 from app.services.messages import MessageComposer
 from app.utils.audit import create_audit_log
 
@@ -26,6 +27,8 @@ logger = logging.getLogger(__name__)
 # Reminders go to appointments the patient is expected to attend.
 REMINDABLE_STATUSES = (AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED)
 INACTIVE_STATUSES = (AppointmentStatus.CANCELLED, AppointmentStatus.EXPIRED)
+# What a professional has on the agenda: held (unpaid) slots are not an appointment yet.
+AGENDA_STATUSES = REMINDABLE_STATUSES
 RETRY_BASE_MINUTES = 5
 
 
@@ -163,6 +166,168 @@ class FollowUpService:
             html_body=content.html,
             actor=actor,
         )
+
+    # ------------------------------------------------------------ professional notices
+    #
+    # These go to the professional's own email (never to the patient) and carry no patient id, so they do
+    # not show up in a patient's history. A professional without an email simply gets nothing.
+
+    def queue_professional_booking(
+        self, db: Session, appointments: Appointment | list[Appointment], actor: str = "followup_service"
+    ) -> Notification | None:
+        """A new appointment (or a whole series, in one message) landed on the professional's agenda."""
+        items = [appointments] if isinstance(appointments, Appointment) else list(appointments)
+        first = items[0]
+        recipient = first.professional.email
+        if not recipient:
+            return None
+        content = self.composer.professional_booking(items)
+        return self._queue(
+            db,
+            appointment=first,
+            type_=NotificationType.PROFESSIONAL_NEW,
+            channel=NotificationChannel.EMAIL,
+            recipient=recipient,
+            subject=content.subject,
+            body=content.text,
+            html_body=content.html,
+            payload={"appointment_ids": [item.id for item in items]},
+            actor=actor,
+            about_patient=False,
+        )
+
+    def queue_professional_cancellation(
+        self, db: Session, appointment: Appointment, actor: str = "followup_service"
+    ) -> Notification | None:
+        recipient = appointment.professional.email
+        if not recipient:
+            return None
+        # The professional never heard about this appointment: telling them it was cancelled is noise.
+        unsent = self._pending_professional_booking(db, appointment)
+        if unsent is not None:
+            unsent.status = NotificationStatus.SKIPPED
+            unsent.error_message = "El turno se canceló antes de avisarlo"
+            return None
+        content = self.composer.professional_cancellation(appointment)
+        return self._queue(
+            db,
+            appointment=appointment,
+            type_=NotificationType.PROFESSIONAL_CANCEL,
+            channel=NotificationChannel.EMAIL,
+            recipient=recipient,
+            subject=content.subject,
+            body=content.text,
+            html_body=content.html,
+            actor=actor,
+            about_patient=False,
+        )
+
+    def queue_professional_reschedule(
+        self,
+        db: Session,
+        appointment: Appointment,
+        previous_when: str | None = None,
+        actor: str = "followup_service",
+    ) -> Notification | None:
+        recipient = appointment.professional.email
+        if not recipient:
+            return None
+        # "New appointment" has not gone out yet (e.g. the mail server was down): update that message
+        # with the new time instead of sending a stale one followed by a correction.
+        unsent = self._pending_professional_booking(db, appointment)
+        if unsent is not None:
+            content = self.composer.professional_booking([appointment])
+            unsent.subject, unsent.body, unsent.html_body = content.subject, content.text, content.html
+            unsent.scheduled_for = clock.now()
+            return unsent
+        content = self.composer.professional_reschedule(appointment, previous_when)
+        return self._queue(
+            db,
+            appointment=appointment,
+            type_=NotificationType.PROFESSIONAL_MOVE,
+            channel=NotificationChannel.EMAIL,
+            recipient=recipient,
+            subject=content.subject,
+            body=content.text,
+            html_body=content.html,
+            actor=actor,
+            about_patient=False,
+        )
+
+    def prepare_professional_digests(self, db: Session, *, actor: str = "followup_service") -> int:
+        """Queue tomorrow's agenda for every professional that has appointments and an email.
+
+        Runs on every scheduled tick but only acts from `professional_digest_hour`, once per
+        professional and day, and never sends an empty agenda.
+        """
+        now = clock.now()
+        if now.hour < self.settings.professional_digest_hour:
+            return 0
+        day = now.date() + timedelta(days=1)
+        day_start = datetime.combine(day, time.min)
+        # Any status counts as "already handled": a failed digest must not be regenerated every ten minutes.
+        done = {
+            payload.get("professional_id")
+            for (payload,) in db.execute(
+                select(Notification.payload)
+                .where(Notification.type == NotificationType.PROFESSIONAL_DIGEST)
+                .where(Notification.scheduled_for >= datetime.combine(now.date(), time.min))
+            )
+            if payload and payload.get("for_date") == day.isoformat()
+        }
+        professionals = db.scalars(
+            select(Professional)
+            .where(Professional.is_active.is_(True))
+            .where(Professional.email.is_not(None))
+            .where(Professional.email != "")
+            .order_by(Professional.id)
+        ).all()
+        created = 0
+        for professional in professionals:
+            if professional.id in done:
+                continue
+            appointments = db.scalars(
+                select(Appointment)
+                .where(Appointment.professional_id == professional.id)
+                .where(Appointment.status.in_(AGENDA_STATUSES))
+                .where(Appointment.starts_at >= day_start)
+                .where(Appointment.starts_at < day_start + timedelta(days=1))
+                .order_by(Appointment.starts_at)
+            ).all()
+            if not appointments:
+                continue
+            content = self.composer.professional_digest(professional, day, list(appointments))
+            self._queue(
+                db,
+                appointment=None,
+                type_=NotificationType.PROFESSIONAL_DIGEST,
+                channel=NotificationChannel.EMAIL,
+                recipient=professional.email,
+                subject=content.subject,
+                body=content.text,
+                html_body=content.html,
+                payload={"professional_id": professional.id, "for_date": day.isoformat()},
+                actor=actor,
+                about_patient=False,
+            )
+            created += 1
+        db.commit()
+        return created
+
+    def _pending_professional_booking(self, db: Session, appointment: Appointment) -> Notification | None:
+        """The not-yet-sent "new appointment" notice that is about this appointment and only this one."""
+        candidates = db.scalars(
+            select(Notification)
+            .where(Notification.appointment_id == appointment.id)
+            .where(Notification.type == NotificationType.PROFESSIONAL_NEW)
+            .where(Notification.status == NotificationStatus.PENDING)
+            .order_by(Notification.id.desc())
+        ).all()
+        for notification in candidates:
+            ids = (notification.payload or {}).get("appointment_ids")
+            if ids in (None, [appointment.id]):
+                return notification
+        return None
 
     def prepare_upcoming_reminders(
         self,
@@ -347,13 +512,16 @@ class FollowUpService:
         if notification.type == NotificationType.CONFIRMATION and appointment is not None:
             if appointment.status in INACTIVE_STATUSES:
                 return "El turno ya no está activo"
+        if notification.type in (NotificationType.PROFESSIONAL_NEW, NotificationType.PROFESSIONAL_MOVE):
+            if appointment is not None and appointment.status in INACTIVE_STATUSES:
+                return "El turno ya no está activo"
         return None
 
     def _queue(
         self,
         db: Session,
         *,
-        appointment: Appointment,
+        appointment: Appointment | None,
         type_: NotificationType,
         channel: NotificationChannel,
         recipient: str,
@@ -363,10 +531,11 @@ class FollowUpService:
         html_body: str | None = None,
         payload: dict | None = None,
         scheduled_for=None,
+        about_patient: bool = True,
     ) -> Notification:
         notification = Notification(
-            appointment_id=appointment.id,
-            patient_id=appointment.patient_id,
+            appointment_id=appointment.id if appointment is not None else None,
+            patient_id=appointment.patient_id if appointment is not None and about_patient else None,
             type=type_,
             channel=channel,
             recipient=recipient,

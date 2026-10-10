@@ -21,6 +21,7 @@ from app.api.deps import (
 )
 from app.core import clock
 from app.core.enums import (
+    NOTIFICATION_TYPE_LABELS,
     ROLE_LABELS,
     WAITLIST_PERIOD_LABELS,
     WAITLIST_STATUS_LABELS,
@@ -1068,7 +1069,8 @@ def notifications_page(
         template_name="admin_notifications.html",
         current_user=current_user,
         page_title="Notificaciones",
-        page_subtitle="Emails y WhatsApp a pacientes. Los que fallan se reintentan solos.",
+        page_subtitle="Emails y WhatsApp a pacientes y avisos a los profesionales. Los que fallan se reintentan solos.",
+        type_labels=NOTIFICATION_TYPE_LABELS,
         active_page="notifications",
         counts={status.value: counts.get(status, 0) for status in NotificationStatus},
         sent_by_channel={channel.value: channel_counts.get(channel, 0) for channel in NotificationChannel},
