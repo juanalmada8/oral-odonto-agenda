@@ -9,6 +9,8 @@
 | Recordatorio por email (y por WhatsApp, si está activado) | `REMINDER_HOURS_AHEAD` antes del turno (24 h por defecto) |
 | Reintento de un envío que falló | a los 5, 10 y 20 minutos; después queda como *fallida* |
 | Email de cancelación | cuando se cancela un turno reservado o confirmado |
+| **Aviso al profesional**: turno nuevo, cancelado o movido | en el momento, al email de su ficha |
+| **Agenda de mañana** al profesional | cada tarde, desde las 18 h (`PROFESSIONAL_DIGEST_HOUR`), solo si tiene turnos |
 
 Todo eso lo dispara la tarea programada (Cloud Scheduler cada 10 minutos) y, además, cada operación
 despacha lo suyo en el momento.
@@ -50,8 +52,14 @@ Online solo puede cancelar hasta `CANCELLATION_NOTICE_HOURS` antes. Después lo 
 el panel (queda registrado quién y cuándo).
 
 **Un profesional nuevo.**
-`/app/professionals` (alta, duración del turno y seña) → `/app/users` (acceso) →
-`/app/availability` (horarios).
+`/app/professionals` (alta, **email**, duración del turno y seña) → `/app/users` (acceso) →
+`/app/availability` (horarios). Sin email en la ficha, ese profesional no recibe avisos de turnos.
+
+**Un profesional dice que no se enteró de un turno.**
+Primero, que tenga **email cargado** en su ficha (`/app/professionals`): sin él no se le avisa nada. Después,
+`/app/notifications`: los avisos al profesional figuran como *(al profesional)* y, si fallaron, con el motivo.
+También le llegan con el enlace de baja de Brevo ([ADR 0008](decisions/0008-correo-cloudflare-y-brevo.md)):
+si lo tocó, hay que desbloquearlo igual que a un paciente.
 
 **Alguien se olvidó la contraseña.**
 `/app/users` → columna *Contraseña* → cambiarla y pasársela por un canal seguro.

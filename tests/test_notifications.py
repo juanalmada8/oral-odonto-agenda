@@ -654,3 +654,304 @@ def test_the_waitlist_validates_identity_like_the_booking_form(client, db_sessio
 
         assert "error=" in response.headers["location"], f"aceptó {campo}={valor!r}"
     assert db_session.scalars(select(Patient)).all() == []
+
+
+# ------------------------------------------------------------------ avisos al profesional
+
+PROFESSIONAL_EMAIL = "nazarena@example.com"
+PATIENT_EMAIL = "lucia@example.com"
+
+
+def with_email(db_session, professional_id: int, email: str = PROFESSIONAL_EMAIL) -> None:
+    from app.models.professional import Professional
+
+    db_session.get(Professional, professional_id).email = email
+    db_session.commit()
+
+
+def notices(outbox) -> list[dict]:
+    """Lo que recibió el profesional, sin los mensajes al paciente."""
+    return [message for message in outbox.sent if message["to"] == PROFESSIONAL_EMAIL]
+
+
+def make_appointment(
+    db_session, professional_id, *, starts_at, status=AppointmentStatus.RESERVED,
+    dni="30555111", first_name="Lucía", last_name="O'Connor",
+) -> Appointment:
+    patient = db_session.scalar(select(Patient).where(Patient.dni == dni))
+    if patient is None:
+        patient = Patient(dni=dni, first_name=first_name, last_name=last_name, email=PATIENT_EMAIL, phone="+5491155555555")
+        db_session.add(patient)
+        db_session.flush()
+    appointment = Appointment(
+        patient_id=patient.id, professional_id=professional_id, starts_at=starts_at,
+        ends_at=starts_at + timedelta(minutes=30), duration_minutes=30, status=status, created_by="test",
+    )
+    db_session.add(appointment)
+    db_session.commit()
+    return appointment
+
+
+def test_an_online_booking_emails_the_professional(client, db_session, make_professional, outbox):
+    professional_id = make_professional(deposit=Decimal("0"), name="Nazarena")
+    with_email(db_session, professional_id)
+
+    book(client, professional_id, starts_at="2026-03-30T09:00:00")
+
+    [aviso] = notices(outbox)
+    assert aviso["subject"] == "Nuevo turno: Lucía O'Connor, 30/03 09:00 h"
+    assert "Lunes 30 de marzo" in aviso["text"] and "09:00" in aviso["text"]
+    assert "/app" in aviso["text"]
+    # Solo lo mínimo: ni DNI, ni teléfono, ni email del paciente, en ninguna de las dos versiones.
+    for contenido in (aviso["text"], aviso["html"]):
+        for privado in ("30555111", "5555-5555", "11 5555", PATIENT_EMAIL):
+            assert privado not in contenido
+    # El paciente sigue recibiendo su propia confirmación.
+    assert any(message["to"] == PATIENT_EMAIL for message in outbox.sent)
+
+
+def test_a_professional_without_email_gets_no_notices(client, db_session, make_professional, outbox):
+    professional_id = make_professional(deposit=Decimal("0"))
+
+    response = book(client, professional_id, starts_at="2026-03-30T09:00:00")
+
+    assert response.status_code == 303
+    assert [message["to"] for message in outbox.sent] == [PATIENT_EMAIL]
+
+
+def test_an_unpaid_hold_does_not_email_the_professional_until_paid(client, db_session, make_professional, outbox):
+    professional_id = make_professional(name="Nazarena")  # con seña por defecto
+    with_email(db_session, professional_id)
+
+    checkout = book(client, professional_id, starts_at="2026-03-30T09:00:00").headers["location"]
+    assert notices(outbox) == []
+
+    client.post(checkout, data={"decision": "approve"})
+
+    assert [aviso["subject"] for aviso in notices(outbox)] == ["Nuevo turno: Lucía O'Connor, 30/03 09:00 h"]
+
+
+def test_a_counter_booking_emails_the_professional(client, db_session, make_professional, outbox, auth_headers):
+    professional_id = make_professional(deposit=Decimal("0"), name="Nazarena")
+    with_email(db_session, professional_id)
+    patient = Patient(dni="41333222", first_name="Tomás", last_name="Ruiz", email="tomas@example.com")
+    db_session.add(patient)
+    db_session.commit()
+
+    client.post(
+        "/api/v1/appointments/",
+        json={"patient_id": patient.id, "professional_id": professional_id, "starts_at": "2026-03-30T10:00:00"},
+        headers=auth_headers,
+    )
+
+    assert [aviso["subject"] for aviso in notices(outbox)] == ["Nuevo turno: Tomás Ruiz, 30/03 10:00 h"]
+
+
+def test_a_series_sends_the_professional_a_single_notice(client, db_session, make_professional, outbox, auth_headers):
+    from datetime import time as time_of_day
+
+    from app.models.availability_window import AvailabilityWindow
+
+    professional_id = make_professional(deposit=Decimal("0"), name="Nazarena")
+    with_email(db_session, professional_id)
+    patient = Patient(dni="41333222", first_name="Tomás", last_name="Ruiz", email="tomas@example.com")
+    db_session.add(patient)
+    for day in (date(2026, 4, 27), date(2026, 5, 25)):
+        db_session.add(
+            AvailabilityWindow(
+                professional_id=professional_id, availability_date=day,
+                start_time=time_of_day(9, 0), end_time=time_of_day(12, 0), slot_duration_minutes=30,
+            )
+        )
+    db_session.commit()
+
+    client.post(
+        "/api/v1/appointments/series",
+        json={"patient_id": patient.id, "professional_id": professional_id,
+              "starts_at": "2026-03-30T09:00:00", "every_weeks": 4, "occurrences": 3},
+        headers=auth_headers,
+    )
+
+    [aviso] = notices(outbox)
+    assert aviso["subject"] == "Nuevos turnos: Tomás Ruiz (3), desde 30/03 09:00 h"
+    for fecha in ("Lunes 30 de marzo", "Lunes 27 de abril", "Lunes 25 de mayo"):
+        assert fecha in aviso["text"]
+
+
+def test_cancelling_tells_the_professional(client, db_session, make_professional, outbox, auth_headers):
+    professional_id = make_professional(deposit=Decimal("0"), name="Nazarena")
+    with_email(db_session, professional_id)
+    book(client, professional_id, starts_at="2026-03-30T09:00:00")
+    appointment = db_session.scalars(select(Appointment)).one()
+
+    client.post(f"/api/v1/appointments/{appointment.id}/cancel", json={}, headers=auth_headers)
+
+    assert [aviso["subject"] for aviso in notices(outbox)] == [
+        "Nuevo turno: Lucía O'Connor, 30/03 09:00 h",
+        "Turno cancelado: Lucía O'Connor, 30/03 09:00 h",
+    ]
+
+
+def test_cancelling_before_the_new_booking_notice_goes_out_sends_neither(db_session, make_professional, outbox):
+    """Si el profesional nunca se enteró del turno, no tiene por qué enterarse de que se canceló."""
+    professional_id = make_professional(name="Nazarena")
+    with_email(db_session, professional_id)
+    appointment = make_appointment(db_session, professional_id, starts_at=datetime(2026, 3, 30, 9, 0))
+    service = followup(outbox)
+
+    service.queue_professional_booking(db_session, appointment)
+    db_session.commit()
+    assert service.queue_professional_cancellation(db_session, appointment) is None
+    db_session.commit()
+    service.send_pending_notifications(db_session)
+
+    assert outbox.sent == []
+    [fila] = db_session.scalars(select(Notification)).all()
+    assert fila.status == NotificationStatus.SKIPPED
+
+
+def test_rescheduling_tells_the_professional_both_times(client, db_session, make_professional, outbox, auth_headers):
+    professional_id = make_professional(deposit=Decimal("0"), name="Nazarena")
+    with_email(db_session, professional_id)
+    book(client, professional_id, starts_at="2026-03-30T09:00:00")
+    appointment = db_session.scalars(select(Appointment)).one()
+    outbox.sent.clear()
+
+    client.post(
+        f"/api/v1/appointments/{appointment.id}/reschedule",
+        json={"starts_at": "2026-03-30T11:00:00"},
+        headers=auth_headers,
+    )
+
+    [aviso] = notices(outbox)
+    assert aviso["subject"] == "Turno movido: Lucía O'Connor, ahora 30/03 11:00 h"
+    assert "09:00" in aviso["text"] and "11:00" in aviso["text"]
+
+
+def test_confirming_a_reserved_appointment_does_not_notify_the_professional(
+    client, db_session, make_professional, outbox, auth_headers
+):
+    professional_id = make_professional(deposit=Decimal("0"), name="Nazarena")
+    with_email(db_session, professional_id)
+    book(client, professional_id, starts_at="2026-03-30T09:00:00")
+    appointment = db_session.scalars(select(Appointment)).one()
+
+    client.post(f"/api/v1/appointments/{appointment.id}/confirm", json={}, headers=auth_headers)
+
+    assert len(notices(outbox)) == 1  # solo el de turno nuevo
+
+
+def test_the_evening_digest_lists_tomorrows_appointments_once(db_session, make_professional, outbox, frozen_clock):
+    professional_id = make_professional(name="Nazarena")
+    with_email(db_session, professional_id)
+    sabado = datetime(2026, 3, 28, 9, 0)
+    make_appointment(db_session, professional_id, starts_at=sabado)
+    make_appointment(db_session, professional_id, starts_at=sabado + timedelta(minutes=30),
+                     status=AppointmentStatus.CONFIRMED, dni="30111222", first_name="Ana", last_name="Pérez")
+    make_appointment(db_session, professional_id, starts_at=sabado + timedelta(hours=1),
+                     status=AppointmentStatus.CANCELLED, dni="30333444", first_name="Bruno", last_name="Díaz")
+    make_appointment(db_session, professional_id, starts_at=sabado + timedelta(days=1), dni="30555999",
+                     first_name="Carla", last_name="Ruiz")
+    frozen_clock.set(datetime(2026, 3, 27, 18, 0))
+    service = followup(outbox)
+
+    assert service.prepare_professional_digests(db_session) == 1
+    assert service.prepare_professional_digests(db_session) == 0
+    service.send_pending_notifications(db_session)
+
+    [aviso] = notices(outbox)
+    assert aviso["subject"] == "Tu agenda de mañana: sábado 28 de marzo (2 turnos)"
+    texto = aviso["text"]
+    assert texto.index("Lucía O'Connor") < texto.index("Ana Pérez")
+    assert "Bruno" not in texto and "Carla" not in texto  # cancelado, y otro día
+    assert "30555111" not in texto
+
+
+def test_the_digest_is_not_sent_early_empty_or_without_email(db_session, make_professional, outbox, frozen_clock, monkeypatch):
+    con_email = make_professional(name="Nazarena")
+    with_email(db_session, con_email)
+    sin_email = make_professional(name="Sabina")
+    make_appointment(db_session, sin_email, starts_at=datetime(2026, 3, 28, 9, 0), dni="30111222",
+                     first_name="Ana", last_name="Pérez")
+    service = followup(outbox)
+
+    frozen_clock.set(datetime(2026, 3, 27, 17, 59))
+    make_appointment(db_session, con_email, starts_at=datetime(2026, 3, 28, 9, 0))
+    assert service.prepare_professional_digests(db_session) == 0  # todavía no es la hora
+
+    frozen_clock.set(datetime(2026, 3, 27, 18, 0))
+    assert service.prepare_professional_digests(db_session) == 1  # solo quien tiene email y turnos
+    db_session.query(Notification).delete()
+    db_session.commit()
+
+    frozen_clock.set(datetime(2026, 3, 28, 18, 0))  # el domingo no hay turnos
+    assert service.prepare_professional_digests(db_session) == 0
+
+    monkeypatch.setattr(settings, "professional_digest_hour", 20)
+    frozen_clock.set(datetime(2026, 3, 27, 19, 0))
+    assert service.prepare_professional_digests(db_session) == 0  # la hora es configurable
+
+
+def test_the_scheduled_job_prepares_the_digests(db_session, make_professional, outbox, frozen_clock):
+    professional_id = make_professional(name="Nazarena")
+    with_email(db_session, professional_id)
+    make_appointment(db_session, professional_id, starts_at=datetime(2026, 3, 28, 9, 0))
+    frozen_clock.set(datetime(2026, 3, 27, 18, 0))
+
+    summary = run_scheduled.run(followup(outbox))
+
+    assert summary["digests_prepared"] == 1
+    assert [aviso["subject"] for aviso in notices(outbox)] == ["Tu agenda de mañana: sábado 28 de marzo (1 turno)"]
+
+
+def test_every_notification_type_has_a_label_and_fits_the_column():
+    from app.core.enums import NOTIFICATION_TYPE_LABELS
+
+    for tipo in NotificationType:
+        assert tipo in NOTIFICATION_TYPE_LABELS, f"{tipo.value} no tiene etiqueta en el panel"
+        # La columna es VARCHAR(20): un valor más largo falla recién en producción (PostgreSQL).
+        assert len(tipo.value) <= 20, tipo.value
+
+
+def test_the_panel_flows_notify_the_professional(client, db_session, make_professional, outbox):
+    """Recorre lo que hace recepción en el panel y comprueba, paso a paso, qué recibe el profesional."""
+    from app.core.enums import UserRole
+    from tests.conftest import create_user
+
+    professional_id = make_professional(deposit=Decimal("0"), name="Nazarena")
+    with_email(db_session, professional_id)
+    create_user(db_session, username="recepcion", role=UserRole.RECEPTIONIST)
+    patient = Patient(dni="41333222", first_name="Tomás", last_name="Ruiz", email="tomas@example.com")
+    db_session.add(patient)
+    db_session.commit()
+    client.post("/app/login", data={"username": "recepcion", "password": "demo12345"}, follow_redirects=False)
+
+    def asuntos() -> list[str]:
+        return [aviso["subject"] for aviso in notices(outbox)]
+
+    client.post(
+        "/app/appointments",
+        data={"patient_id": str(patient.id), "professional_id": str(professional_id),
+              "starts_at": "2026-03-30T09:00", "duration_minutes": "30", "reason": "Control"},
+        follow_redirects=False,
+    )
+    assert asuntos() == ["Nuevo turno: Tomás Ruiz, 30/03 09:00 h"]
+    turno = db_session.scalars(select(Appointment)).one()
+
+    client.post(
+        f"/app/appointments/{turno.id}/edit",
+        data={"starts_at": "2026-03-30T10:00", "duration_minutes": "30", "status": "reserved", "reason": "Control"},
+        follow_redirects=False,
+    )
+    assert asuntos()[-1] == "Turno movido: Tomás Ruiz, ahora 30/03 10:00 h"
+
+    client.post(f"/app/appointments/{turno.id}/status", data={"action": "cancel"}, follow_redirects=False)
+    assert asuntos()[-1] == "Turno cancelado: Tomás Ruiz, 30/03 10:00 h"
+
+    client.post(f"/app/appointments/{turno.id}/status", data={"action": "reserve"}, follow_redirects=False)
+    assert asuntos()[-1] == "Nuevo turno: Tomás Ruiz, 30/03 10:00 h"  # vuelve a la agenda: es noticia
+
+    cantidad = len(asuntos())
+    client.post(f"/app/appointments/{turno.id}/status", data={"action": "confirm"}, follow_redirects=False)
+    assert len(asuntos()) == cantidad  # confirmar un turno que ya estaba reservado no avisa
+    assert cantidad == 4

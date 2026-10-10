@@ -41,13 +41,12 @@
         <tr><th>Programada</th><th>Canal</th><th>Tipo</th><th>Destinatario</th><th>Estado</th><th>Detalle</th></tr>
       </thead>
       <tbody>
-        {% set type_labels = {"confirmation": "Confirmación", "reminder": "Recordatorio", "cancellation": "Cancelación", "payment_link": "Link de pago", "custom": "Otro"} %}
         {% set status_labels = {"pending": "En cola", "sent": "Enviada", "failed": "Fallida", "skipped": "Omitida"} %}
         {% for item in notifications %}
         <tr>
           <td>{{ item.scheduled_for.strftime("%d/%m %H:%M") }}{% if item.sent_at %}<div class="muted small">enviada {{ item.sent_at.strftime("%d/%m %H:%M") }}</div>{% endif %}</td>
           <td>{{ 'WhatsApp' if item.channel.value == 'whatsapp' else 'Email' }}</td>
-          <td>{{ type_labels[item.type.value] }}</td>
+          <td>{{ type_labels[item.type] }}</td>
           <td>{{ item.recipient | phone if item.channel.value == 'whatsapp' else item.recipient }}</td>
           <td><span class="status-badge notif-{{ item.status.value }}">{{ status_labels[item.status.value] }}</span>{% if item.attempts > 1 %}<div class="muted small">{{ item.attempts }} intentos</div>{% endif %}</td>
           <td class="small">{{ item.error_message or item.subject }}</td>

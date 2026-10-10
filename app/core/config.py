@@ -35,6 +35,8 @@ class Settings(BaseSettings):
 
 
     reminder_hours_ahead: int = Field(default=24, ge=1, le=168)
+    # Hour of the day (clinic time) from which each professional gets tomorrow's agenda by email.
+    professional_digest_hour: int = Field(default=18, ge=0, le=23)
     notification_max_attempts: int = Field(default=4, ge=1, le=10)
 
     # WhatsApp Cloud API (Meta). Reminders use an approved template with two quick-reply buttons.

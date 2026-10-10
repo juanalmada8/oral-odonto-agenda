@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block preheader %}{{ heading }}{% endblock %}
+{% block accent %}{{ accent }}{% endblock %}
+{% block footer_note %}Aviso automático del sistema de turnos, para quien atiende en {{ clinic_name }}.{% endblock %}
+{% block content %}
+<p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:{{ accent }};">{{ kicker }}</p>
+<h1 style="margin:0 0 12px;font-size:26px;line-height:1.15;letter-spacing:-0.02em;color:#112433;">{{ heading }}</h1>
+<p style="margin:0 0 {% if intro %}6px{% else %}16px{% endif %};font-size:16px;line-height:1.6;color:#112433;">Hola {{ professional_first_name }},</p>
+{% if intro %}
+<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#112433;">{{ intro }}</p>
+{% endif %}
+{% if previous_when %}
+<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#66717a;">Antes: <span style="text-decoration:line-through;">{{ previous_when }}</span></p>
+{% endif %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;border-top:1px solid #e7ebee;">
+  {% for row in rows %}
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #e7ebee;font-size:15px;font-weight:800;color:#112433;white-space:nowrap;">{{ row.when }}</td>
+    <td style="padding:12px 0 12px 16px;border-bottom:1px solid #e7ebee;font-size:15px;color:#112433;">{{ row.patient }} <span style="color:#66717a;">· {{ row.duration }} min</span></td>
+  </tr>
+  {% endfor %}
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 6px;">
+  <tr>
+    <td style="border-radius:999px;background:#005075;">
+      <a href="{{ panel_url }}" style="display:inline-block;padding:14px 24px;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;">Ver mi agenda</a>
+    </td>
+  </tr>
+</table>
+{% endblock %}

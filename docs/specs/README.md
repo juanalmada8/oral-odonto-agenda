@@ -26,3 +26,4 @@ La especificación dice **qué**; el [ADR](../decisions/) dice **por qué se eli
 | N.º | Funcionalidad | Estado |
 | --- | --- | --- |
 | [0001](0001-reserva-online.md) | Reserva online del paciente | Implementada |
+| [0002](0002-avisos-al-profesional.md) | Avisos al profesional por turnos nuevos, cancelados y movidos, y resumen diario | Implementada |

@@ -30,7 +30,7 @@
                 <strong style="color:#005075;">{{ clinic_name }}</strong>
                 {% if clinic_address %}<br />{{ clinic_address }}{% endif %}
                 {% if clinic_phone %}<br />Tel: {{ clinic_phone }}{% endif %}
-                <br />Recibís este email porque reservaste un turno en nuestro sitio.
+                <br />{% block footer_note %}Recibís este email porque reservaste un turno en nuestro sitio.{% endblock %}
               </td>
             </tr>
           </table>
