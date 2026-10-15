@@ -42,6 +42,13 @@ y versionado semántico.
   `.env`, aunque se fuerce con `git add -f`.
 
 ### Fixed
+- **No se podía cargar a mano un turno largo** (especificación 0003). En el formulario de turno manual la
+  duración era un campo oculto que se fijaba al largo de cada horario de la grilla (30 minutos): un
+  tratamiento de hora y media o dos horas no se podía cargar. Ahora hay un campo **Duración** visible
+  (de 15 minutos a 4 horas) y solo se ofrecen los horarios donde el turno entra entero y sin pisar a otro.
+- Un turno tenía que caber dentro de **un único** bloque de disponibilidad: una mañana cargada en dos
+  pedazos (9 a 11 y 11 a 13) rechazaba un turno de 2 horas a las 10:00. Ahora los bloques que se tocan
+  cuentan como uno solo; un hueco entre bloques sigue siendo un límite.
 - En *Notificaciones* los avisos de **Reprogramación** y de **Lista de espera** salían con el tipo en
   blanco: faltaban sus etiquetas. Ahora todas salen de un único mapa, y un test impide que un tipo nuevo
   quede sin etiqueta o no entre en la columna de la base (20 caracteres).

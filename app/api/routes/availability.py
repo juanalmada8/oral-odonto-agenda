@@ -28,10 +28,14 @@ router = APIRouter(
 def get_daily_availability(
     professional_id: int,
     agenda_date: date = Query(..., alias="date"),
+    duration_minutes: int | None = Query(default=None, ge=10, le=240),
     db: Session = Depends(get_db),
     schedule_service: ScheduleService = Depends(get_schedule_service),
 ):
-    slots = schedule_service.get_daily_availability(db, professional_id=professional_id, day=agenda_date)
+    """Free slots of the day; with `duration_minutes`, the starts where an appointment that long fits."""
+    slots = schedule_service.get_daily_availability(
+        db, professional_id=professional_id, day=agenda_date, duration_minutes=duration_minutes
+    )
     return DailyAvailabilityRead(professional_id=professional_id, date=agenda_date, slots=slots)
 
 

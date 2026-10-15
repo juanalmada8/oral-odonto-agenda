@@ -55,7 +55,7 @@
           <select name="professional_id" id="manual-professional" required>
             <option value="">Elegí un profesional</option>
             {% for professional in professionals %}
-            <option value="{{ professional.id }}">{{ professional.first_name }} {{ professional.last_name }}</option>
+            <option value="{{ professional.id }}" data-duration="{{ professional.default_appointment_duration }}">{{ professional.first_name }} {{ professional.last_name }}</option>
             {% endfor %}
           </select>
         </label>
@@ -66,13 +66,24 @@
           </select>
         </label>
       </div>
-      <label class="field">
-        <span class="field-label">Horario</span>
-        <select name="starts_at" id="manual-starts-at" disabled required>
-          <option value="">Elegí un día para ver horarios</option>
-        </select>
-      </label>
-      <input name="duration_minutes" type="hidden" id="manual-duration" value="30" />
+      {# Una limpieza dura 30 minutos y un tratamiento largo, dos horas: la duración la elige quien carga el turno. #}
+      {% set duration_options = [(15, "15 min"), (30, "30 min"), (45, "45 min"), (60, "1 h"), (75, "1 h 15"), (90, "1 h 30"), (105, "1 h 45"), (120, "2 h"), (150, "2 h 30"), (180, "3 h"), (240, "4 h")] %}
+      <div class="two-cols">
+        <label class="field">
+          <span class="field-label">Duración</span>
+          <select name="duration_minutes" id="manual-duration" required>
+            {% for minutes, label in duration_options %}
+            <option value="{{ minutes }}" {% if minutes == 30 %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Horario</span>
+          <select name="starts_at" id="manual-starts-at" disabled required>
+            <option value="">Elegí un día para ver horarios</option>
+          </select>
+        </label>
+      </div>
       <label class="field">
         <span class="field-label">Motivo</span>
         <input name="reason" placeholder="Control, limpieza, urgencia…" />
@@ -86,7 +97,7 @@
         <span class="field-label">Notas internas</span>
         <textarea name="notes" placeholder="Opcional"></textarea>
       </label>
-      <p class="muted small" id="manual-slot-hint">El turno manual no cobra online: se confirma por email al paciente.</p>
+      <p class="muted small" id="manual-slot-hint">El turno manual no cobra online: se confirma por email al paciente. Los horarios que se ofrecen son los que entran enteros en la disponibilidad, según la duración elegida.</p>
       <button type="submit" id="manual-submit" disabled>Guardar turno</button>
     </form>
   </details>
@@ -215,7 +226,7 @@
     const professionalSelect = document.getElementById("manual-professional");
     const dateSelect = document.getElementById("manual-date");
     const slotSelect = document.getElementById("manual-starts-at");
-    const durationInput = document.getElementById("manual-duration");
+    const durationSelect = document.getElementById("manual-duration");
     const submitButton = document.getElementById("manual-submit");
     const hint = document.getElementById("manual-slot-hint");
     if (!professionalSelect || !dateSelect || !slotSelect || !submitButton || !hint) return;
@@ -242,6 +253,8 @@
       submitButton.disabled = true;
       try {
         const params = new URLSearchParams({ professional_id: professionalSelect.value, date: dateSelect.value });
+        // Sin esto la API devuelve bloques de la grilla (30 min) y un trabajo largo no se puede ofrecer.
+        if (durationSelect && durationSelect.value) params.set("duration_minutes", durationSelect.value);
         const response = await fetch(`/api/v1/availability/?${params}`, { headers: { Accept: "application/json" } });
         if (!response.ok) throw new Error("slots");
         const slots = (await response.json()).slots || [];
@@ -250,9 +263,8 @@
           slots.map((slot) => ({
             value: slot.starts_at,
             label: `${hhmm(slot.starts_at)} a ${hhmm(slot.ends_at)}`,
-            data: { minutes: (new Date(slot.ends_at) - new Date(slot.starts_at)) / 60000 },
           })),
-          slots.length ? "Elegí un horario" : "Sin horarios libres ese día"
+          slots.length ? "Elegí un horario" : "No hay un hueco libre de esa duración ese día"
         );
       } catch (error) {
         fill(slotSelect, [], "No se pudieron cargar los horarios");
@@ -260,7 +272,21 @@
       }
     };
 
+    // Cada profesional arranca con su duración habitual (45 min en ortodoncia, por ejemplo).
+    const useProfessionalDuration = () => {
+      const preferred = professionalSelect.selectedOptions[0]?.dataset.duration;
+      if (!preferred || !durationSelect) return;
+      if (![...durationSelect.options].some((option) => option.value === preferred)) {
+        const extra = document.createElement("option");
+        extra.value = preferred;
+        extra.textContent = `${preferred} min`;
+        durationSelect.appendChild(extra);
+      }
+      durationSelect.value = preferred;
+    };
+
     professionalSelect.addEventListener("change", () => {
+      useProfessionalDuration();
       const dates = manualAvailableDates[professionalSelect.value] || [];
       fill(
         dateSelect,
@@ -271,9 +297,12 @@
       submitButton.disabled = true;
     });
     dateSelect.addEventListener("change", () => dateSelect.value && loadSlots());
+    // Cambiar la duración cambia qué horarios entran: se vuelven a pedir.
+    durationSelect?.addEventListener("change", () => {
+      submitButton.disabled = true;
+      if (dateSelect.value) loadSlots();
+    });
     slotSelect.addEventListener("change", () => {
-      const selected = slotSelect.selectedOptions[0];
-      if (selected?.dataset.minutes && durationInput) durationInput.value = selected.dataset.minutes;
       submitButton.disabled = !slotSelect.value;
     });
   });

@@ -5,6 +5,7 @@ from sqlalchemy import select, text
 from app.core.enums import AppointmentStatus
 from app.models.appointment import Appointment
 from app.models.patient import Patient
+from tests.conftest import MONDAY
 
 
 def create_professional_with_availability(
@@ -223,3 +224,104 @@ def test_cannot_create_availability_in_the_past(client, auth_headers):
     )
 
     assert response.status_code == 422
+
+
+# ------------------------------------------------------------------ turnos largos cargados a mano
+
+
+def _long_job_setup(db_session, make_professional, *, windows):
+    """Profesional con bloques de disponibilidad a medida (lunes 30/03) y un paciente."""
+    from datetime import time as time_of_day
+
+    from app.models.availability_window import AvailabilityWindow
+    from app.models.patient import Patient
+    from app.models.professional import Professional
+
+    professional_id = make_professional(days=())
+    professional = db_session.get(Professional, professional_id)
+    for start, end in windows:
+        db_session.add(
+            AvailabilityWindow(
+                professional_id=professional.id, availability_date=MONDAY,
+                start_time=time_of_day(*start), end_time=time_of_day(*end), slot_duration_minutes=30,
+            )
+        )
+    patient = Patient(dni="41333222", first_name="Tomás", last_name="Ruiz", email="tomas@example.com")
+    db_session.add(patient)
+    db_session.commit()
+    return professional_id, patient.id
+
+
+def _horarios(client, auth_headers, professional_id, **extra):
+    params = {"professional_id": professional_id, "date": MONDAY.isoformat(), **extra}
+    respuesta = client.get("/api/v1/availability/", params=params, headers=auth_headers)
+    assert respuesta.status_code == 200, respuesta.text
+    return [(slot["starts_at"][11:16], slot["ends_at"][11:16]) for slot in respuesta.json()["slots"]]
+
+
+def test_availability_can_be_asked_for_a_longer_appointment(client, db_session, make_professional, auth_headers):
+    """Un trabajo de 2 h solo puede empezar donde entra entero: antes el formulario ofrecía bloques de 30 min."""
+    professional_id, _ = _long_job_setup(db_session, make_professional, windows=[((9, 0), (12, 0))])
+
+    assert _horarios(client, auth_headers, professional_id, duration_minutes=120) == [
+        ("09:00", "11:00"), ("09:30", "11:30"), ("10:00", "12:00"),
+    ]
+    assert _horarios(client, auth_headers, professional_id)[0] == ("09:00", "09:30")  # sin duración, como siempre
+
+
+def test_a_long_appointment_is_only_offered_where_it_does_not_collide(client, db_session, make_professional, auth_headers):
+    from app.core.enums import AppointmentStatus
+    from app.models.appointment import Appointment
+
+    professional_id, patient_id = _long_job_setup(db_session, make_professional, windows=[((9, 0), (12, 0))])
+    db_session.add(
+        Appointment(
+            patient_id=patient_id, professional_id=professional_id, starts_at=datetime(2026, 3, 30, 11, 30),
+            ends_at=datetime(2026, 3, 30, 12, 0), duration_minutes=30, status=AppointmentStatus.RESERVED, created_by="test",
+        )
+    )
+    db_session.commit()
+
+    assert _horarios(client, auth_headers, professional_id, duration_minutes=120) == [("09:00", "11:00"), ("09:30", "11:30")]
+
+
+def test_a_long_appointment_can_span_two_blocks_that_touch(client, db_session, make_professional, auth_headers):
+    """La mañana cargada en dos pedazos (9 a 11 y 11 a 13) es, para el consultorio, una sola mañana."""
+    professional_id, patient_id = _long_job_setup(db_session, make_professional, windows=[((9, 0), (11, 0)), ((11, 0), (13, 0))])
+
+    assert ("10:00", "12:00") in _horarios(client, auth_headers, professional_id, duration_minutes=120)
+    respuesta = client.post(
+        "/api/v1/appointments/",
+        json={"patient_id": patient_id, "professional_id": professional_id,
+              "starts_at": "2026-03-30T10:00:00", "duration_minutes": 120},
+        headers=auth_headers,
+    )
+    assert respuesta.status_code == 201, respuesta.text
+    assert respuesta.json()["duration_minutes"] == 120
+
+
+def test_a_long_appointment_cannot_cross_a_gap_in_the_availability(client, db_session, make_professional, auth_headers):
+    professional_id, patient_id = _long_job_setup(db_session, make_professional, windows=[((9, 0), (11, 0)), ((12, 0), (14, 0))])
+
+    assert ("10:00", "12:00") not in _horarios(client, auth_headers, professional_id, duration_minutes=120)
+    respuesta = client.post(
+        "/api/v1/appointments/",
+        json={"patient_id": patient_id, "professional_id": professional_id,
+              "starts_at": "2026-03-30T10:00:00", "duration_minutes": 120},
+        headers=auth_headers,
+    )
+    assert respuesta.status_code == 409
+    assert "disponibilidad" in respuesta.text
+
+
+def test_a_long_manual_appointment_takes_every_slot_it_covers(client, db_session, make_professional, auth_headers):
+    """Mientras dure el trabajo largo, el paciente que reserva online no ve esos horarios."""
+    professional_id, patient_id = _long_job_setup(db_session, make_professional, windows=[((9, 0), (12, 0))])
+    client.post(
+        "/api/v1/appointments/",
+        json={"patient_id": patient_id, "professional_id": professional_id,
+              "starts_at": "2026-03-30T09:00:00", "duration_minutes": 120},
+        headers=auth_headers,
+    )
+
+    assert _horarios(client, auth_headers, professional_id) == [("11:00", "11:30"), ("11:30", "12:00")]

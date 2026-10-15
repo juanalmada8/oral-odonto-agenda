@@ -746,8 +746,15 @@ class ScheduleService:
         date_from: date,
         date_to: date,
         earliest_start: datetime | None = None,
+        duration_minutes: int | None = None,
     ) -> dict[date, list[AvailabilitySlot]]:
-        """Free slots per day in [date_from, date_to], computed with two queries."""
+        """Free slots per day in [date_from, date_to], computed with two queries.
+
+        With `duration_minutes` it answers a different question: where can an appointment of that
+        length start? Starts stay on the published grid, but the appointment may run past the end of
+        the block it starts in as long as the next block is contiguous (a morning loaded in two
+        pieces is still one morning) and nothing else is booked in between.
+        """
         professional = self._get_professional(db, professional_id)
         earliest_start = earliest_start or clock.now()
         windows = db.scalars(
@@ -767,17 +774,48 @@ class ScheduleService:
             .where(self._blocking_filter())
         ).all()
 
+        needed = timedelta(minutes=duration_minutes) if duration_minutes else None
+        spans = self._merged_spans_by_day(windows) if needed else {}
         availability: dict[date, list[AvailabilitySlot]] = defaultdict(list)
         for window in windows:
             for slot_start, slot_end in self._window_slots(window, professional):
                 if slot_start < earliest_start:
                     continue
+                if needed is not None:
+                    slot_end = slot_start + needed
+                    span_end = next(
+                        (end for start, end in spans[window.availability_date] if start <= slot_start < end), None
+                    )
+                    if span_end is None or slot_end > span_end:
+                        continue
                 if any(busy_start < slot_end and busy_end > slot_start for busy_start, busy_end in busy):
                     continue
                 availability[window.availability_date].append(
                     AvailabilitySlot(starts_at=slot_start, ends_at=slot_end, available=True)
                 )
         return dict(availability)
+
+    @staticmethod
+    def _merge_spans(intervals: list[tuple[datetime, datetime]]) -> list[tuple[datetime, datetime]]:
+        """Join blocks that touch or overlap: 9-11 and 11-13 are one span, 9-11 and 12-14 are two."""
+        merged: list[tuple[datetime, datetime]] = []
+        for start, end in sorted(intervals):
+            if merged and start <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+            else:
+                merged.append((start, end))
+        return merged
+
+    def _merged_spans_by_day(self, windows) -> dict[date, list[tuple[datetime, datetime]]]:
+        per_day: dict[date, list[tuple[datetime, datetime]]] = defaultdict(list)
+        for window in windows:
+            per_day[window.availability_date].append(
+                (
+                    combine_date_time(window.availability_date, window.start_time),
+                    combine_date_time(window.availability_date, window.end_time),
+                )
+            )
+        return {day: self._merge_spans(items) for day, items in per_day.items()}
 
     def get_daily_availability(
         self,
@@ -786,6 +824,7 @@ class ScheduleService:
         professional_id: int,
         day: date,
         earliest_start: datetime | None = None,
+        duration_minutes: int | None = None,
     ) -> list[AvailabilitySlot]:
         return self.compute_availability(
             db,
@@ -793,6 +832,7 @@ class ScheduleService:
             date_from=day,
             date_to=day,
             earliest_start=earliest_start,
+            duration_minutes=duration_minutes,
         ).get(day, [])
 
     def list_available_dates(
@@ -983,12 +1023,17 @@ class ScheduleService:
             .where(AvailabilityWindow.professional_id == professional_id)
             .where(AvailabilityWindow.availability_date == starts_at.date())
         ).all()
-        for block in blocks:
-            block_start = combine_date_time(starts_at.date(), block.start_time)
-            block_end = combine_date_time(starts_at.date(), block.end_time)
-            if starts_at >= block_start and ends_at <= block_end:
-                return True
-        return False
+        # Contiguous blocks count as one: a long appointment may span 9-11 and 11-13.
+        spans = self._merge_spans(
+            [
+                (
+                    combine_date_time(starts_at.date(), block.start_time),
+                    combine_date_time(starts_at.date(), block.end_time),
+                )
+                for block in blocks
+            ]
+        )
+        return any(start <= starts_at and ends_at <= end for start, end in spans)
 
     def _validate_availability_window(
         self,
