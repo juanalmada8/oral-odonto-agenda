@@ -888,3 +888,15 @@ def test_the_notifications_page_names_every_type(client, db_session, clinic):
 
     for etiqueta in NOTIFICATION_TYPE_LABELS.values():
         assert f">{etiqueta}<" in cuerpo, etiqueta
+
+
+def test_the_manual_appointment_form_lets_you_choose_the_duration(client, clinic):
+    """La duración era un campo oculto: se fijaba al largo del horario y no se podía cambiar."""
+    login(client, "admin")
+
+    cuerpo = client.get("/app/appointments").text
+
+    assert '<select name="duration_minutes"' in cuerpo
+    assert 'type="hidden" id="manual-duration"' not in cuerpo
+    for minutos in ("60", "90", "120", "180"):
+        assert f'<option value="{minutos}"' in cuerpo

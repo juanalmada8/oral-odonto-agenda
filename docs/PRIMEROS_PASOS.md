@@ -69,6 +69,19 @@ tomados en esos días, el sistema te avisa y no los toca hasta que los reprogram
 - **Lista de espera:** las personas que pidieron que les avisen si se libera un horario antes.
 - **Notificaciones:** si algún email no se pudo enviar, aparece acá con el motivo.
 
+## Cargar un turno que dura más de lo normal
+
+En **Turnos → Crear turno manual** elegí el paciente, el profesional y el día, y después la **Duración**
+(de 15 minutos a 4 horas). Recién ahí te ofrece los **horarios donde el trabajo entra entero**: si elegís
+2 horas, no te va a proponer un horario que termine después de que cierra la disponibilidad ni uno que
+pise a otro paciente.
+
+- Mientras dure ese turno, nadie puede reservar online los horarios que cubre.
+- Si el trabajo termina más tarde que la disponibilidad cargada, antes agregá un bloque en
+  **Disponibilidad → Agregar un bloque** para ese día.
+- Dos bloques pegados (por ejemplo, de 9 a 11 y de 11 a 13) cuentan como una sola mañana. Si hay un hueco
+  entre ellos, el turno no puede cruzarlo.
+
 ## Qué NO cargar en el sistema
 
 El sistema es una **agenda de turnos, no una historia clínica**. No cargues diagnósticos, alergias,
