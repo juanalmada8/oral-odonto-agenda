@@ -27,4 +27,6 @@ La especificación dice **qué**; el [ADR](../decisions/) dice **por qué se eli
 | --- | --- | --- |
 | [0001](0001-reserva-online.md) | Reserva online del paciente | Implementada |
 | [0002](0002-avisos-al-profesional.md) | Avisos al profesional por turnos nuevos, cancelados y movidos, y resumen diario | Implementada |
-| [0003](0003-turnos-largos-cargados-a-mano.md) | Turnos largos cargados a mano: duración elegible | Implementada |
+| [0003](0003-turnos-largos-cargados-a-mano.md) | Turnos largos cargados a mano: duración elegible | Implementada (reglas 2 y 6 reemplazadas por 0004) |
+| [0004](0004-turnos-manuales-a-cualquier-hora.md) | Turnos manuales a cualquier hora, sin pisar nunca otro turno | Implementada |
+| [0005](0005-confirmacion-del-paciente.md) | El paciente confirma su turno desde el email; aviso a la profesional si no lo hace | Implementada |

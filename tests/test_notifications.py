@@ -276,7 +276,11 @@ def test_rescheduling_discards_pending_reminders(client, db_session, make_profes
     db_session.expire_all()
     reminder = db_session.scalars(select(Notification).where(Notification.type == NotificationType.REMINDER)).one()
     assert reminder.status == NotificationStatus.SKIPPED
-    assert followup(outbox).prepare_upcoming_reminders(db_session) == 1
+    # El horario nuevo está a menos de 24 h: el email de reprogramación ya pide confirmarlo (spec 0005),
+    # así que no se suma otro recordatorio.
+    reschedule = db_session.scalars(select(Notification).where(Notification.type == NotificationType.RESCHEDULE)).one()
+    assert reschedule.payload == {"for_starts_at": "2026-03-30T11:00:00", "asks_confirmation": True}
+    assert followup(outbox).prepare_upcoming_reminders(db_session) == 0
 
 
 def test_scheduled_job_expires_holds_prepares_and_sends(client, db_session, make_professional, outbox, frozen_clock):

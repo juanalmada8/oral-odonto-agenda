@@ -10,7 +10,6 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core import clock
 from app.core.config import Settings
 from app.core.enums import AppointmentStatus, NotificationStatus
 from app.core.exceptions import DomainError
@@ -102,16 +101,12 @@ class WhatsAppBot:
             if not active:
                 self._reply(sender, f"Ese turno ya no está activo. Podés reservar uno nuevo en {self.settings.public_base_url}/reservar")
                 return
-            appointment.attendance_confirmed_at = clock.now()
-            create_audit_log(
-                db,
-                action="appointment.attendance_confirmed",
-                entity_name="appointment",
-                entity_id=str(appointment.id),
-                actor="patient:whatsapp",
-                description="Patient confirmed attendance from WhatsApp",
-            )
-            db.commit()
+            try:
+                self.schedule_service.confirm_by_patient(db, appointment, channel="whatsapp")
+            except DomainError as exc:
+                db.rollback()
+                self._reply(sender, exc.detail)
+                return
             self._reply(sender, f"¡Gracias, {appointment.patient.first_name}! Te esperamos el {when} con {professional}.")
         elif action == "CANCEL":
             if not active:

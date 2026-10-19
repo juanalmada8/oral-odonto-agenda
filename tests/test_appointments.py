@@ -97,7 +97,10 @@ def test_prevent_appointment_overlap(client, auth_headers):
     )
 
     assert overlap_response.status_code == 409
-    assert "no está disponible" in overlap_response.json()["detail"]
+    # Al consultorio se le dice qué turno pisa (spec 0004); al paciente online, nunca.
+    assert overlap_response.json()["detail"] == (
+        "Atención, tenés un turno de 10:00 a 10:30. Empezá este turno a las 10:30 o elegí otro horario."
+    )
 
 
 def test_patient_is_not_duplicated_when_booking_with_same_dni(client, auth_headers, db_session):

@@ -80,7 +80,7 @@
           {% if not is_professional %}<td data-label="Profesional">{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>{% endif %}
           <td data-label="Estado">
             {{ status_badge(appointment.status) }}
-            {% if appointment.attendance_confirmed_at %}<div class="muted small attendance-ok">✓ Confirmó por WhatsApp</div>{% endif %}
+            {% if appointment.attendance_confirmed_at %}<div class="muted small attendance-ok">✓ Confirmó el paciente</div>{% endif %}
           </td>
           <td data-label="Seña">{{ payment_badge(appointment) }}</td>
           <td data-label="Motivo">{{ appointment.reason or "—" }}</td>

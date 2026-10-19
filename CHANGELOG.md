@@ -42,6 +42,9 @@ y versionado semántico.
   `.env`, aunque se fuerce con `git add -f`.
 
 ### Fixed
+- Un turno que ya había recibido su recordatorio y se movía a otro día **no se volvía a recordar**:
+  el recordatorio se buscaba por turno y no por horario. Ahora cada recordatorio queda atado a la hora
+  que anuncia.
 - **No se podía cargar a mano un turno largo** (especificación 0003). En el formulario de turno manual la
   duración era un campo oculto que se fijaba al largo de cada horario de la grilla (30 minutos): un
   tratamiento de hora y media o dos horas no se podía cargar. Ahora hay un campo **Duración** visible
@@ -83,6 +86,27 @@ y versionado semántico.
   turnos, no una historia clínica. Migración `20261001_11` borra la columna.
 
 ### Added
+- **El paciente confirma su turno desde el email** (especificación 0005). El recordatorio de 24 h
+  (`REMINDER_HOURS_AHEAD`) pasa a ser el pedido de confirmación: trae el botón *Confirmar turno*, que abre la
+  página del turno con un botón *Sí, voy a ir*. Al tocarlo, el turno queda **confirmado** en el panel sin
+  que el consultorio haga nada. La confirmación es un segundo toque y no la simple apertura del link
+  porque Outlook/Hotmail abren los links de los emails para revisarlos. Si se reserva o se carga con menos
+  de 24 h, el email de la reserva ya trae el botón. Si a las 12 h (`PROFESSIONAL_UNCONFIRMED_HOURS`) el
+  paciente todavía no confirmó, la profesional recibe un aviso (uno por turno, solo si al paciente se le
+  pidió con tiempo). **La app nunca cancela sola.** Cada link confirma un horario: el link es una firma del
+  turno y su hora con `SECRET_KEY`, así que si el turno se reprograma el link viejo deja de servir, la
+  confirmación anterior se borra y el paciente recibe un pedido nuevo. No requiere migración. Rotar
+  `SECRET_KEY` invalida los links de confirmación ya enviados.
+- **Turnos manuales a cualquier hora** (especificación 0004). El formulario del panel pide hora de inicio
+  libre (de a 5 minutos) y duración, en lugar de ofrecer solo los horarios de la grilla online: un
+  tratamiento de 10:00 a 11:30 con una grilla de 40 minutos se carga en un paso y el paciente recibe un
+  solo email (antes se cargaba a las 10:20, se editaba a las 10:00 y llegaban dos). El formulario muestra
+  qué horas atiende el profesional ese día y qué ya está ocupado, y avisa antes de guardar si el turno
+  pisa otro: *"Atención, tenés un turno a las 11:00 (hasta 11:40). Acortá este turno para que termine a
+  las 11:00 o elegí otro horario."* El servidor aplica la misma regla y **nunca pisa un turno ya cargado**;
+  al paciente online se le sigue mostrando el mensaje genérico, sin datos de otros turnos. Después de un
+  turno que termina fuera de la grilla, **la grilla online arranca donde ese turno termina** (11:30 y no
+  11:40), sin tiempo muerto. Nueva ruta `GET /api/v1/availability/day-plan`, solo para el consultorio.
 - **Avisos al profesional por email** (especificación 0002). Hasta ahora todos los avisos iban solo al
   paciente: un turno nuevo quedaba en la agenda y quien lo iba a atender no se enteraba. Ahora cada
   profesional recibe, en el email de su ficha: un aviso por cada **turno nuevo** (reserva online, turno

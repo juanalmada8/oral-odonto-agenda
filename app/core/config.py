@@ -34,7 +34,10 @@ class Settings(BaseSettings):
     email_from: str | None = None
 
 
+    # The reminder doubles as the patient's request to confirm (spec 0005).
     reminder_hours_ahead: int = Field(default=24, ge=1, le=168)
+    # Hours before an appointment at which the professional hears that the patient has not confirmed.
+    professional_unconfirmed_hours: int = Field(default=12, ge=1, le=72)
     # Hour of the day (clinic time) from which each professional gets tomorrow's agenda by email.
     professional_digest_hour: int = Field(default=18, ge=0, le=23)
     notification_max_attempts: int = Field(default=4, ge=1, le=10)

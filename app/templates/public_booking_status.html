@@ -25,6 +25,13 @@
         <section class="panel status-card status-card--{{ status }}" data-status="{{ status }}" data-token="{{ appointment.public_token }}">
           {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
           {% if message %}<div class="alert alert-success" role="status">{{ message }}</div>{% endif %}
+          {% if stale_confirmation_link %}
+          <div class="alert alert-warning" role="status">
+            Este link era para el horario anterior. Tu turno ahora es el
+            <strong>{{ appointment.starts_at | long_date }} a las {{ appointment.starts_at.strftime('%H:%M') }} h</strong>.
+            Para confirmarlo usá el email más reciente que te mandamos.
+          </div>
+          {% endif %}
 
           {% if status == 'pending_payment' %}
             <div class="status-head">
@@ -55,8 +62,8 @@
               </div>
             </div>
             <p class="status-lead">
-              {% if payment and payment.status.value == 'approved' %}Recibimos tu seña. {% endif %}Te enviamos la confirmación a
-              <strong>{{ appointment.notification_email | mask_email }}</strong> y te vamos a recordar el turno por WhatsApp.
+              {% if appointment.attendance_confirmed_at %}Gracias por confirmar. {% endif %}{% if payment and payment.status.value == 'approved' %}Recibimos tu seña. {% endif %}Te enviamos los detalles a
+              <strong>{{ appointment.notification_email | mask_email }}</strong>.
             </p>
           {% elif status == 'reserved' %}
             <div class="status-head">
@@ -101,6 +108,17 @@
                 <h1>{{ appointment.status | status_label }}</h1>
               </div>
             </div>
+          {% endif %}
+
+          {% if confirm_code %}
+          <div class="confirm-box">
+            <p class="confirm-box__title">¿Venís a tu turno?</p>
+            <p class="confirm-box__text">Confirmanos que vas a venir así te esperamos.</p>
+            <form method="post" action="/reservar/turno/{{ appointment.public_token }}/confirmar">
+              <input type="hidden" name="c" value="{{ confirm_code }}" />
+              <button type="submit">Sí, voy a ir</button>
+            </form>
+          </div>
           {% endif %}
 
           <dl class="status-details">

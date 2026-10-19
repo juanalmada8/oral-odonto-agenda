@@ -64,6 +64,7 @@ class NotificationType(str, Enum):
     PROFESSIONAL_CANCEL = "professional_cancel"
     PROFESSIONAL_MOVE = "professional_move"
     PROFESSIONAL_DIGEST = "professional_digest"
+    PROFESSIONAL_PENDING = "professional_pending"
 
 
 class PaymentStatus(str, Enum):
@@ -139,4 +140,5 @@ NOTIFICATION_TYPE_LABELS = {
     NotificationType.PROFESSIONAL_CANCEL: "Cancelación (al profesional)",
     NotificationType.PROFESSIONAL_MOVE: "Cambio de horario (al profesional)",
     NotificationType.PROFESSIONAL_DIGEST: "Agenda de mañana (al profesional)",
+    NotificationType.PROFESSIONAL_PENDING: "Sin confirmar (al profesional)",
 }

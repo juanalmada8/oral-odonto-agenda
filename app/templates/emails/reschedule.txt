@@ -11,6 +11,10 @@ Profesional: {{ professional_name }}
 Dirección: {{ clinic_address }}
 {% endif %}
 
+{% if confirm_url %}
+Confirmá el horario nuevo: {{ confirm_url }}
+
+{% endif %}
 Ver tu turno: {{ status_url }}
 Agregar al calendario: {{ calendar_url }}
 
