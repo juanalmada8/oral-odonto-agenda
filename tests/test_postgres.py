@@ -116,4 +116,7 @@ def test_concurrent_bookings_of_the_same_slot_only_one_wins(db_session):
     for thread in threads:
         thread.join(timeout=30)
 
-    assert sorted(outcomes) == sorted(["booked", "Ese horario ya no está disponible. Elegí otro, por favor."])
+    # Una sola gana. La otra, como es una carga del consultorio, recibe el aviso que nombra el turno (spec 0004).
+    assert sorted(outcomes) == sorted(
+        ["booked", "Atención, tenés un turno de 10:00 a 10:30. Empezá este turno a las 10:30 o elegí otro horario."]
+    )
