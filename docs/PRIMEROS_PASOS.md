@@ -69,18 +69,35 @@ tomados en esos días, el sistema te avisa y no los toca hasta que los reprogram
 - **Lista de espera:** las personas que pidieron que les avisen si se libera un horario antes.
 - **Notificaciones:** si algún email no se pudo enviar, aparece acá con el motivo.
 
-## Cargar un turno que dura más de lo normal
+## Cargar un turno a mano (a cualquier hora y con su duración)
 
-En **Turnos → Crear turno manual** elegí el paciente, el profesional y el día, y después la **Duración**
-(de 15 minutos a 4 horas). Recién ahí te ofrece los **horarios donde el trabajo entra entero**: si elegís
-2 horas, no te va a proponer un horario que termine después de que cierra la disponibilidad ni uno que
-pise a otro paciente.
+En **Turnos → Crear turno manual** elegí el paciente, el profesional y el día. Después poné la **Duración**
+(de 15 minutos a 4 horas) y la **Hora de inicio**, que puede ser cualquiera: no tiene que coincidir con los
+horarios que se ofrecen online. Un tratamiento de 10:00 a 11:30 se carga así, directo, y al paciente le llega
+**un solo email**.
 
-- Mientras dure ese turno, nadie puede reservar online los horarios que cubre.
+- Abajo del formulario ves qué horas atiende ese día y qué ya está **ocupado**.
+- Si el turno pisa a otro, te avisa antes de guardar, por ejemplo: *"Atención, tenés un turno a las 11:00
+  (hasta 11:40)"*. Acortalo para que termine a las 11:00 o elegí otro horario: **nunca se puede pisar un
+  turno ya reservado**.
+- Mientras dure ese turno, nadie puede reservar online los horarios que cubre, y el siguiente horario online
+  arranca justo cuando termina (si termina 11:30, el próximo libre es 11:30).
 - Si el trabajo termina más tarde que la disponibilidad cargada, antes agregá un bloque en
   **Disponibilidad → Agregar un bloque** para ese día.
 - Dos bloques pegados (por ejemplo, de 9 a 11 y de 11 a 13) cuentan como una sola mañana. Si hay un hueco
   entre ellos, el turno no puede cruzarlo.
+
+## Los pacientes confirman solos
+
+No hace falta confirmar los turnos uno por uno. **El día anterior** (24 horas antes) cada paciente con email
+recibe un mensaje con el botón **Confirmar turno**. Cuando lo confirma, en **Turnos** aparece como
+*Confirmado* y con la marca "✓ Confirmó el paciente".
+
+- Si a **12 horas** del turno todavía no confirmó, a la profesional le llega un email avisándole. El turno
+  **no se cancela**: queda en la agenda y ustedes deciden si lo llaman.
+- Si cambiás el día o la hora de un turno, la confirmación anterior se borra y el paciente recibe un pedido
+  nuevo para el horario nuevo.
+- Los pacientes sin email no reciben el pedido: a esos hay que confirmarlos por teléfono, como siempre.
 
 ## Qué NO cargar en el sistema
 

@@ -39,6 +39,18 @@ def get_daily_availability(
     return DailyAvailabilityRead(professional_id=professional_id, date=agenda_date, slots=slots)
 
 
+@router.get("/day-plan")
+def get_day_plan(
+    professional_id: int,
+    agenda_date: date = Query(..., alias="date"),
+    db: Session = Depends(get_db),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+) -> dict:
+    """The day's availability and booked times, for loading an appointment by hand at any time."""
+    plan = schedule_service.day_plan(db, professional_id=professional_id, day=agenda_date)
+    return {"professional_id": professional_id, "date": agenda_date.isoformat(), **plan}
+
+
 @router.get("/week", response_model=WeeklyAvailabilityRead)
 def get_weekly_availability(
     professional_id: int,

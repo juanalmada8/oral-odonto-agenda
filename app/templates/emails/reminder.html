@@ -1,11 +1,14 @@
 {% extends "base.html" %}
-{% block preheader %}Tu turno es el {{ date_long }} a las {{ time }} h.{% endblock %}
+{% block preheader %}{% if confirm_url %}Confirmá tu turno del {{ date_long }} a las {{ time }} h.{% else %}Tu turno es el {{ date_long }} a las {{ time }} h.{% endif %}{% endblock %}
 {% block accent %}#005075{% endblock %}
 {% block content %}
-<p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#ff5e37;">Recordatorio</p>
-<h1 style="margin:0 0 12px;font-size:28px;line-height:1.1;letter-spacing:-0.03em;color:#112433;">{{ patient_first_name }}, se acerca tu turno</h1>
-<p style="margin:0;font-size:16px;line-height:1.6;color:#112433;">Te esperamos con {{ professional_name }}:</p>
+<p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#ff5e37;">{% if confirm_url %}Confirmá tu turno{% else %}Recordatorio{% endif %}</p>
+<h1 style="margin:0 0 12px;font-size:28px;line-height:1.1;letter-spacing:-0.03em;color:#112433;">{% if confirm_url %}{{ patient_first_name }}, ¿venís a tu turno?{% else %}{{ patient_first_name }}, se acerca tu turno{% endif %}</h1>
+<p style="margin:0;font-size:16px;line-height:1.6;color:#112433;">{% if confirm_url %}Tenés turno con {{ professional_name }}. Confirmanos que venís:{% else %}Te esperamos con {{ professional_name }}:{% endif %}</p>
 {% include "_details.html" %}
+{% if confirm_url %}
+{% include "_confirm_button.html" %}
+{% else %}
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 18px;">
   <tr>
     <td style="border-radius:999px;background:#ff5e37;">
@@ -17,4 +20,5 @@
   Si no vas a poder venir, avisanos desde <a href="{{ status_url }}" style="color:#005075;">el link de tu turno</a>
   así otra persona puede usar el horario.
 </p>
+{% endif %}
 {% endblock %}

@@ -372,7 +372,9 @@ def create_manual_appointment(
     background_tasks: BackgroundTasks,
     patient_id: int = Form(...),
     professional_id: int = Form(...),
-    starts_at: str = Form(...),
+    starts_at: str = Form(""),
+    manual_date: str = Form(""),
+    manual_time: str = Form(""),
     duration_minutes: int = Form(30),
     reason: str = Form(""),
     notes: str = Form(""),
@@ -386,7 +388,13 @@ def create_manual_appointment(
 ):
     require_roles(current_user, *STAFF)
     try:
-        selected_dt = datetime.fromisoformat(starts_at)
+        # The form sends the day and a free start time (any minute, not only the online grid).
+        if not starts_at and manual_date and manual_time:
+            starts_at = f"{manual_date}T{manual_time}"
+        try:
+            selected_dt = datetime.fromisoformat(starts_at)
+        except ValueError as exc:
+            raise DomainError("Elegí el día y la hora del turno.", status_code=422) from exc
         appointment = schedule_service.create_appointment(
             db,
             AppointmentCreate(

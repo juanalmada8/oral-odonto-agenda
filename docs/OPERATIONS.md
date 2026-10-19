@@ -6,7 +6,9 @@
 | --- | --- |
 | Se libera el horario de una seña impaga | al vencer el bloqueo (20 min) |
 | Email de confirmación | al acreditarse la seña o al crear un turno desde el panel |
-| Recordatorio por email (y por WhatsApp, si está activado) | `REMINDER_HOURS_AHEAD` antes del turno (24 h por defecto) |
+| Recordatorio por email con el botón **Confirmar turno** (y por WhatsApp, si está activado) | `REMINDER_HOURS_AHEAD` antes del turno (24 h por defecto); si se reservó con menos tiempo, va en el email de la reserva |
+| El turno pasa a **confirmado** | cuando el paciente toca *Sí, voy a ir* en la página del link |
+| **Aviso "sin confirmar"** al profesional | `PROFESSIONAL_UNCONFIRMED_HOURS` antes del turno (12 h por defecto), si al paciente se le pidió y no confirmó. Nunca se cancela solo |
 | Reintento de un envío que falló | a los 5, 10 y 20 minutos; después queda como *fallida* |
 | Email de cancelación | cuando se cancela un turno reservado o confirmado |
 | **Aviso al profesional**: turno nuevo, cancelado o movido | en el momento, al email de su ficha |
@@ -22,7 +24,8 @@ devolver, notificaciones fallidas) y marcar los turnos como **atendido** o **aus
 
 **Cada mañana (recepción)**
 
-1. `/app` → agenda del día. Con WhatsApp activado, los turnos con ✓ ya confirmaron asistencia.
+1. `/app` → agenda del día. Los turnos con "✓ Confirmó el paciente" ya confirmaron desde el email; los
+   que siguen *reservados* el día del turno conviene llamarlos.
 2. Atender los avisos que aparezcan arriba.
 3. Al cerrar el día, marcar atendidos y ausentes (de ahí sale la métrica de ausentismo).
 

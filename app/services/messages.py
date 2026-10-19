@@ -8,6 +8,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 from app.core.config import Settings
 from app.core.enums import AppointmentStatus, PaymentStatus
 from app.models.appointment import Appointment
+from app.utils.confirmation import confirmation_path
 from app.utils.formatting import format_long_date, format_money
 
 EMAIL_TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates" / "emails"
@@ -51,16 +52,20 @@ class MessageComposer:
         )
         self.env.filters["money"] = format_money
 
-    def confirmation(self, appointment: Appointment) -> EmailContent:
-        context = self._context(appointment)
+    def confirmation(self, appointment: Appointment, *, ask_to_confirm: bool = False) -> EmailContent:
+        """`ask_to_confirm`: booked less than a day ahead, so this email already carries the confirm button."""
+        context = self._context(appointment, ask_to_confirm=ask_to_confirm)
         if appointment.status == AppointmentStatus.CONFIRMED:
             subject = f"Turno confirmado: {context['when_short']}"
         else:
             subject = f"Turno reservado: {context['when_short']}"
         return self._render("confirmation", subject, context)
 
-    def reminder(self, appointment: Appointment) -> EmailContent:
-        context = self._context(appointment)
+    def reminder(self, appointment: Appointment, *, ask_to_confirm: bool = False) -> EmailContent:
+        """The day-before email. While the appointment is not confirmed it asks the patient to confirm it."""
+        context = self._context(appointment, ask_to_confirm=ask_to_confirm)
+        if ask_to_confirm:
+            return self._render("reminder", f"Confirmá tu turno: {context['when_short']}", context)
         return self._render("reminder", f"Recordatorio de tu turno: {context['when_short']}", context)
 
     def cancellation(self, appointment: Appointment) -> EmailContent:
@@ -81,9 +86,11 @@ class MessageComposer:
         subject = f"Tus {len(appointments)} turnos: desde el {context['when_short']}"
         return self._render("series", subject, context)
 
-    def reschedule(self, appointment: Appointment, previous_when: str | None = None) -> EmailContent:
+    def reschedule(
+        self, appointment: Appointment, previous_when: str | None = None, *, ask_to_confirm: bool = False
+    ) -> EmailContent:
         """`previous_when` is the old date in words, so the patient sees what changed."""
-        context = self._context(appointment) | {"previous_when": previous_when}
+        context = self._context(appointment, ask_to_confirm=ask_to_confirm) | {"previous_when": previous_when}
         return self._render("reschedule", f"Cambiamos tu turno: ahora {context['when_short']}", context)
 
     # ------------------------------------------------------------ avisos al profesional
@@ -138,6 +145,24 @@ class MessageComposer:
             "professional_notice", f"Turno movido: {patient}, ahora {self._when_short(appointment)}", context
         )
 
+    def professional_unconfirmed(self, appointment: Appointment) -> EmailContent:
+        """The patient was asked to confirm and has not: the professional decides whether to call."""
+        patient = self._patient_name(appointment)
+        context = self._professional_context(appointment.professional, day=appointment.starts_at.date()) | {
+            "kicker": "Sin confirmar",
+            "accent": "#b87b22",
+            "heading": f"{patient} todavía no confirmó su turno",
+            "intro": (
+                "Le pedimos por email que confirme y todavía no lo hizo. El turno sigue en tu agenda: "
+                "la app nunca lo cancela sola."
+            ),
+            "rows": [self._professional_row(appointment)],
+            "previous_when": None,
+        }
+        return self._render(
+            "professional_notice", f"Sin confirmar: {patient}, {self._when_short(appointment)}", context
+        )
+
     def professional_digest(self, professional, day, appointments: list[Appointment]) -> EmailContent:
         """La agenda de un día, para recibirla la víspera."""
         count = len(appointments)
@@ -175,7 +200,7 @@ class MessageComposer:
     def when_text(self, appointment: Appointment) -> str:
         return f"{format_long_date(appointment.starts_at)} a las {appointment.starts_at:%H:%M} h"
 
-    def _context(self, appointment: Appointment) -> dict:
+    def _context(self, appointment: Appointment, *, ask_to_confirm: bool = False) -> dict:
         base_url = self.settings.public_base_url
         professional = appointment.professional
         payment = appointment.latest_payment
@@ -202,6 +227,11 @@ class MessageComposer:
             ),
             "deposit_policy": self.settings.deposit_policy,
             "cancellation_notice_hours": self.settings.cancellation_notice_hours,
+            "confirm_url": (
+                f"{base_url}{confirmation_path(self.settings.secret_key, appointment)}" if ask_to_confirm else None
+            ),
+            "reminder_hours": self.settings.reminder_hours_ahead,
+            "whatsapp_enabled": bool(self.settings.whatsapp_access_token and self.settings.whatsapp_phone_number_id),
         }
 
     def _patient_name(self, appointment: Appointment) -> str:

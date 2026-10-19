@@ -36,6 +36,7 @@ from app.services.reception_service import ReceptionService
 from app.services.schedule_service import ScheduleService
 from app.services.waitlist_service import WaitlistService
 from app.tasks.notifications import dispatch_due_notifications
+from app.utils.confirmation import is_valid_confirmation_code
 from app.web.common import active_professionals, format_long_date, format_short_date, redirect_with_message, templates
 
 logger = logging.getLogger(__name__)
@@ -415,6 +416,71 @@ def cancel_booking_by_patient(
         return redirect_with_message(status_url, error=exc.detail)
     background_tasks.add_task(dispatch_due_notifications, followup_service)
     return redirect_with_message(status_url, message="Cancelamos tu turno. Te enviamos la confirmación por email.")
+
+
+STALE_CONFIRMATION_LINK = "Este link era para el horario anterior."
+
+
+@router.get("/reservar/turno/{public_token}/confirmar", response_class=HTMLResponse)
+def confirmation_page(
+    request: Request,
+    public_token: str,
+    c: str | None = None,
+    db: Session = Depends(get_db),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    payment_service: PaymentService = Depends(get_payment_service),
+    booking_service: BookingService = Depends(get_booking_service),
+):
+    """Landing of the "Confirmar turno" email button (spec 0005).
+
+    Opening it never confirms: mail providers open links to scan them, so the patient confirms
+    with a button on this page.
+    """
+    appointment = _get_public_appointment(db, schedule_service, public_token)
+    if appointment is None:
+        return templates.TemplateResponse(request, "public_booking_missing.html", {}, status_code=404)
+    view = _booking_view(appointment, payment_service, booking_service)
+    valid = is_valid_confirmation_code(get_settings().secret_key, appointment, c)
+    can_confirm = (
+        valid
+        and view["is_upcoming"]
+        and appointment.attendance_confirmed_at is None
+        and appointment.starts_at > clock.now()
+    )
+    return templates.TemplateResponse(
+        request,
+        "public_booking_status.html",
+        {
+            **view,
+            "confirm_code": c if can_confirm else None,
+            "stale_confirmation_link": not valid and view["is_upcoming"],
+            "message": None,
+            "error": None,
+        },
+    )
+
+
+@router.post("/reservar/turno/{public_token}/confirmar")
+def confirm_booking_by_patient(
+    public_token: str,
+    c: str = Form(""),
+    db: Session = Depends(get_db),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+):
+    appointment = _get_public_appointment(db, schedule_service, public_token)
+    if appointment is None:
+        return RedirectResponse("/reservar", status_code=303)
+    status_url = f"/reservar/turno/{public_token}"
+    if not is_valid_confirmation_code(get_settings().secret_key, appointment, c):
+        return redirect_with_message(
+            status_url, error=f"{STALE_CONFIRMATION_LINK} Para confirmar, usá el email más reciente que te mandamos."
+        )
+    try:
+        schedule_service.confirm_by_patient(db, appointment, channel="email")
+    except DomainError as exc:
+        db.rollback()
+        return redirect_with_message(status_url, error=exc.detail)
+    return redirect_with_message(status_url, message="Confirmaste tu turno. ¡Te esperamos!")
 
 
 @router.get("/reservar/turno/{public_token}/calendario.ics")

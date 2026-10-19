@@ -2,6 +2,9 @@
 
 **Estado:** Implementada · **Fecha:** octubre de 2026
 
+> **Actualización:** la [0004](0004-turnos-manuales-a-cualquier-hora.md) reemplaza las reglas 2 y 6: el
+> horario ya no se elige de una lista de la grilla, se escribe la hora de inicio libre.
+
 ## Objetivo
 
 Que quien carga un turno desde el panel pueda elegir **cuánto dura**, para cargar tratamientos de una

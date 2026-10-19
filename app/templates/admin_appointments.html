@@ -78,12 +78,16 @@
           </select>
         </label>
         <label class="field">
-          <span class="field-label">Horario</span>
-          <select name="starts_at" id="manual-starts-at" disabled required>
-            <option value="">Elegí un día para ver horarios</option>
-          </select>
+          <span class="field-label">Hora de inicio</span>
+          {# Libre, de a 5 minutos: un tratamiento no tiene por qué empezar en la grilla de la reserva online. #}
+          <input type="time" name="manual_time" id="manual-time" step="300" disabled required />
         </label>
       </div>
+      <div class="day-plan" id="manual-day-plan" hidden>
+        <p class="day-plan__row"><span class="day-plan__label">Atiende</span> <span id="manual-day-spans"></span></p>
+        <p class="day-plan__row"><span class="day-plan__label">Ocupado</span> <span id="manual-day-busy"></span></p>
+      </div>
+      <div class="alert alert-error" id="manual-conflict" role="alert" hidden></div>
       <label class="field">
         <span class="field-label">Motivo</span>
         <input name="reason" placeholder="Control, limpieza, urgencia…" />
@@ -97,7 +101,7 @@
         <span class="field-label">Notas internas</span>
         <textarea name="notes" placeholder="Opcional"></textarea>
       </label>
-      <p class="muted small" id="manual-slot-hint">El turno manual no cobra online: se confirma por email al paciente. Los horarios que se ofrecen son los que entran enteros en la disponibilidad, según la duración elegida.</p>
+      <p class="muted small" id="manual-slot-hint">El turno manual no cobra online: se confirma por email al paciente. Puede empezar a cualquier hora dentro de la disponibilidad del día; lo que ocupe deja de ofrecerse online.</p>
       <button type="submit" id="manual-submit" disabled>Guardar turno</button>
     </form>
   </details>
@@ -195,7 +199,7 @@
           {% if not is_professional %}<td data-label="Profesional">{{ appointment.professional.first_name }} {{ appointment.professional.last_name }}</td>{% endif %}
           <td data-label="Estado">
             {{ status_badge(appointment.status) }}
-            {% if appointment.attendance_confirmed_at %}<div class="muted small attendance-ok">✓ Confirmó por WhatsApp</div>{% endif %}
+            {% if appointment.attendance_confirmed_at %}<div class="muted small attendance-ok">✓ Confirmó el paciente</div>{% endif %}
             <div class="muted small">{{ 'Online' if appointment.created_by == 'public_booking' else 'Consultorio' }}</div>
           </td>
           <td data-label="Seña">{{ payment_badge(appointment) }}</td>
@@ -225,11 +229,17 @@
     const manualAvailableDates = {{ manual_available_dates | tojson }};
     const professionalSelect = document.getElementById("manual-professional");
     const dateSelect = document.getElementById("manual-date");
-    const slotSelect = document.getElementById("manual-starts-at");
+    const timeInput = document.getElementById("manual-time");
     const durationSelect = document.getElementById("manual-duration");
     const submitButton = document.getElementById("manual-submit");
     const hint = document.getElementById("manual-slot-hint");
-    if (!professionalSelect || !dateSelect || !slotSelect || !submitButton || !hint) return;
+    const plan = document.getElementById("manual-day-plan");
+    const spansText = document.getElementById("manual-day-spans");
+    const busyText = document.getElementById("manual-day-busy");
+    const conflictBox = document.getElementById("manual-conflict");
+    if (!professionalSelect || !dateSelect || !timeInput || !durationSelect || !submitButton || !plan) return;
+
+    let dayPlan = null;
 
     const fill = (select, options, placeholder) => {
       select.innerHTML = "";
@@ -237,45 +247,78 @@
       first.value = "";
       first.textContent = placeholder;
       select.appendChild(first);
-      options.forEach(({ value, label, data }) => {
+      options.forEach(({ value, label }) => {
         const option = document.createElement("option");
         option.value = value;
         option.textContent = label;
-        Object.entries(data || {}).forEach(([key, val]) => (option.dataset[key] = val));
         select.appendChild(option);
       });
       select.disabled = options.length === 0;
     };
-    const hhmm = (iso) => iso.slice(11, 16);
+    const toMinutes = (hhmm) => {
+      const [hours, minutes] = hhmm.split(":").map(Number);
+      return hours * 60 + minutes;
+    };
+    const toHHMM = (total) => `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+    const ranges = (items) => items.map((item) => `${item.start} a ${item.end}`).join(" · ");
 
-    const loadSlots = async () => {
-      fill(slotSelect, [], "Buscando horarios…");
+    const showConflict = (text) => {
+      conflictBox.textContent = text || "";
+      conflictBox.hidden = !text;
+    };
+
+    // Same rules the server applies when saving: inside the day's availability and never over another appointment.
+    const check = () => {
+      showConflict("");
       submitButton.disabled = true;
+      if (!dayPlan || !timeInput.value || !durationSelect.value) return;
+      const start = toMinutes(timeInput.value);
+      const end = start + Number(durationSelect.value);
+      const clash = dayPlan.busy.find((item) => toMinutes(item.start) < end && toMinutes(item.end) > start);
+      if (clash) {
+        showConflict(
+          toMinutes(clash.start) > start
+            ? `Atención, tenés un turno a las ${clash.start} (hasta ${clash.end}). Acortá este turno para que termine a las ${clash.start} o elegí otro horario.`
+            : `Atención, tenés un turno de ${clash.start} a ${clash.end}. Empezá este turno a las ${clash.end} o elegí otro horario.`
+        );
+        return;
+      }
+      const fits = dayPlan.spans.some((span) => toMinutes(span.start) <= start && end <= toMinutes(span.end));
+      if (!fits) {
+        showConflict(`De ${toHHMM(start)} a ${toHHMM(end)} queda fuera de la disponibilidad de ese día.`);
+        return;
+      }
+      submitButton.disabled = false;
+    };
+
+    const loadDayPlan = async () => {
+      dayPlan = null;
+      plan.hidden = true;
+      timeInput.disabled = true;
+      check();
       try {
         const params = new URLSearchParams({ professional_id: professionalSelect.value, date: dateSelect.value });
-        // Sin esto la API devuelve bloques de la grilla (30 min) y un trabajo largo no se puede ofrecer.
-        if (durationSelect && durationSelect.value) params.set("duration_minutes", durationSelect.value);
-        const response = await fetch(`/api/v1/availability/?${params}`, { headers: { Accept: "application/json" } });
-        if (!response.ok) throw new Error("slots");
-        const slots = (await response.json()).slots || [];
-        fill(
-          slotSelect,
-          slots.map((slot) => ({
-            value: slot.starts_at,
-            label: `${hhmm(slot.starts_at)} a ${hhmm(slot.ends_at)}`,
-          })),
-          slots.length ? "Elegí un horario" : "No hay un hueco libre de esa duración ese día"
-        );
+        const response = await fetch(`/api/v1/availability/day-plan?${params}`, { headers: { Accept: "application/json" } });
+        if (!response.ok) throw new Error("day-plan");
+        dayPlan = await response.json();
+        spansText.textContent = ranges(dayPlan.spans) || "sin disponibilidad";
+        busyText.textContent = ranges(dayPlan.busy) || "nada todavía";
+        plan.hidden = false;
+        timeInput.disabled = false;
+        if (dayPlan.spans.length) {
+          timeInput.min = dayPlan.spans[0].start;
+          timeInput.max = dayPlan.spans[dayPlan.spans.length - 1].end;
+        }
+        check();
       } catch (error) {
-        fill(slotSelect, [], "No se pudieron cargar los horarios");
-        hint.textContent = "No pudimos cargar horarios. Reintentá en unos segundos.";
+        hint.textContent = "No pudimos cargar la agenda de ese día. Reintentá en unos segundos.";
       }
     };
 
     // Cada profesional arranca con su duración habitual (45 min en ortodoncia, por ejemplo).
     const useProfessionalDuration = () => {
       const preferred = professionalSelect.selectedOptions[0]?.dataset.duration;
-      if (!preferred || !durationSelect) return;
+      if (!preferred) return;
       if (![...durationSelect.options].some((option) => option.value === preferred)) {
         const extra = document.createElement("option");
         extra.value = preferred;
@@ -291,20 +334,17 @@
       fill(
         dateSelect,
         dates.map((item) => ({ value: item.value, label: `${item.label} · ${item.slots} libres` })),
-        dates.length ? "Elegí un día" : "Sin días con horarios libres"
+        dates.length ? "Elegí un día" : "Sin días con disponibilidad"
       );
-      fill(slotSelect, [], "Elegí un día para ver horarios");
-      submitButton.disabled = true;
+      dayPlan = null;
+      plan.hidden = true;
+      timeInput.value = "";
+      timeInput.disabled = true;
+      check();
     });
-    dateSelect.addEventListener("change", () => dateSelect.value && loadSlots());
-    // Cambiar la duración cambia qué horarios entran: se vuelven a pedir.
-    durationSelect?.addEventListener("change", () => {
-      submitButton.disabled = true;
-      if (dateSelect.value) loadSlots();
-    });
-    slotSelect.addEventListener("change", () => {
-      submitButton.disabled = !slotSelect.value;
-    });
+    dateSelect.addEventListener("change", () => dateSelect.value && loadDayPlan());
+    timeInput.addEventListener("input", check);
+    durationSelect.addEventListener("change", check);
   });
 </script>
 {% endif %}

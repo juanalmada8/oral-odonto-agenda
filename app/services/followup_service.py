@@ -30,6 +30,8 @@ INACTIVE_STATUSES = (AppointmentStatus.CANCELLED, AppointmentStatus.EXPIRED)
 # What a professional has on the agenda: held (unpaid) slots are not an appointment yet.
 AGENDA_STATUSES = REMINDABLE_STATUSES
 RETRY_BASE_MINUTES = 5
+# Patient emails that may carry the "confirm your appointment" button (spec 0005).
+CONFIRMATION_REQUEST_TYPES = (NotificationType.REMINDER, NotificationType.CONFIRMATION, NotificationType.RESCHEDULE)
 
 
 class FollowUpService:
@@ -50,6 +52,18 @@ class FollowUpService:
     def list_notifications(self, db: Session, *, limit: int = 300) -> list[Notification]:
         return list(db.scalars(select(Notification).order_by(Notification.scheduled_for.desc()).limit(limit)))
 
+    def asks_confirmation(self, appointment: Appointment) -> bool:
+        """An unconfirmed appointment less than a day away: its email carries the confirm button (spec 0005)."""
+        if appointment.status != AppointmentStatus.RESERVED or not appointment.notification_email:
+            return False
+        now = clock.now()
+        return now < appointment.starts_at <= now + timedelta(hours=self.settings.reminder_hours_ahead)
+
+    @staticmethod
+    def _for_time(appointment: Appointment, asks_confirmation: bool) -> dict:
+        """Ties a patient email to the time it talks about: once the appointment moves, it is stale."""
+        return {"for_starts_at": appointment.starts_at.isoformat(), "asks_confirmation": asks_confirmation}
+
     # ------------------------------------------------------------------ queueing
 
     def queue_confirmation(self, db: Session, appointment: Appointment, actor: str = "followup_service") -> Notification | None:
@@ -67,10 +81,13 @@ class FollowUpService:
         )
         if existing and existing.status == NotificationStatus.SENT:
             return existing
-        content = self.composer.confirmation(appointment)
+        # Booked less than a day ahead: this email is also the request to confirm, no second one follows.
+        asks = self.asks_confirmation(appointment)
+        content = self.composer.confirmation(appointment, ask_to_confirm=asks)
         if existing:
             existing.recipient = recipient
             existing.subject, existing.body, existing.html_body = content.subject, content.text, content.html
+            existing.payload = self._for_time(appointment, asks)
             existing.scheduled_for = clock.now()
             return existing
         return self._queue(
@@ -82,6 +99,7 @@ class FollowUpService:
             subject=content.subject,
             body=content.text,
             html_body=content.html,
+            payload=self._for_time(appointment, asks),
             actor=actor,
         )
 
@@ -113,7 +131,9 @@ class FollowUpService:
         recipient = appointment.notification_email
         if not recipient:
             return None
-        content = self.composer.reschedule(appointment, previous_when=previous_when)
+        # Moved to less than a day ahead: the new time is confirmed from this email, with its own link.
+        asks = self.asks_confirmation(appointment)
+        content = self.composer.reschedule(appointment, previous_when=previous_when, ask_to_confirm=asks)
         return self._queue(
             db,
             appointment=appointment,
@@ -123,6 +143,7 @@ class FollowUpService:
             subject=content.subject,
             body=content.text,
             html_body=content.html,
+            payload=self._for_time(appointment, asks),
             actor=actor,
         )
 
@@ -254,6 +275,73 @@ class FollowUpService:
             about_patient=False,
         )
 
+    def prepare_unconfirmed_alerts(self, db: Session, *, actor: str = "followup_service") -> int:
+        """Tell the professional which patients were asked to confirm and still have not (spec 0005).
+
+        Only when the request went out at least `professional_unconfirmed_hours` before the
+        appointment: someone booked late at night for the next morning had no time to answer.
+        One alert per appointment and time. Nothing is ever cancelled.
+        """
+        hours = self.settings.professional_unconfirmed_hours
+        now = clock.now()
+        appointments = db.scalars(
+            select(Appointment)
+            .where(Appointment.status == AppointmentStatus.RESERVED)
+            .where(Appointment.starts_at > now)
+            .where(Appointment.starts_at <= now + timedelta(hours=hours))
+            .order_by(Appointment.starts_at)
+        ).all()
+        created = 0
+        for appointment in appointments:
+            recipient = appointment.professional.email
+            if not recipient:
+                continue
+            current = appointment.starts_at.isoformat()
+            deadline = appointment.starts_at - timedelta(hours=hours)
+            requests = db.execute(
+                select(Notification.payload, Notification.sent_at)
+                .where(Notification.appointment_id == appointment.id)
+                .where(Notification.channel == NotificationChannel.EMAIL)
+                .where(Notification.status == NotificationStatus.SENT)
+                .where(Notification.type.in_(CONFIRMATION_REQUEST_TYPES))
+            ).all()
+            asked_in_time = any(
+                (payload or {}).get("asks_confirmation")
+                and payload.get("for_starts_at") == current
+                and sent_at is not None
+                and sent_at <= deadline
+                for payload, sent_at in requests
+            )
+            if not asked_in_time:
+                continue
+            already = any(
+                (payload or {}).get("for_starts_at") == current
+                for (payload,) in db.execute(
+                    select(Notification.payload)
+                    .where(Notification.appointment_id == appointment.id)
+                    .where(Notification.type == NotificationType.PROFESSIONAL_PENDING)
+                )
+            )
+            if already:
+                continue
+            content = self.composer.professional_unconfirmed(appointment)
+            self._queue(
+                db,
+                appointment=appointment,
+                type_=NotificationType.PROFESSIONAL_PENDING,
+                channel=NotificationChannel.EMAIL,
+                recipient=recipient,
+                subject=content.subject,
+                body=content.text,
+                html_body=content.html,
+                payload={"for_starts_at": current},
+                actor=actor,
+                about_patient=False,
+            )
+            created += 1
+        db.commit()
+        return created
+
     def prepare_professional_digests(self, db: Session, *, actor: str = "followup_service") -> int:
         """Queue tomorrow's agenda for every professional that has appointments and an email.
 
@@ -336,7 +424,12 @@ class FollowUpService:
         hours_ahead: int | None = None,
         actor: str = "followup_service",
     ) -> int:
-        """Queue email and WhatsApp reminders for appointments starting within `hours_ahead`."""
+        """Queue email and WhatsApp reminders for appointments starting within `hours_ahead`.
+
+        While the appointment is not confirmed, the email reminder is the request to confirm it.
+        Reminders are tied to the appointment's time: one moved to another day is reminded again,
+        and one whose booking or reschedule email already asked for confirmation is not.
+        """
         hours = hours_ahead or self.settings.reminder_hours_ahead
         now = clock.now()
         appointments = db.scalars(
@@ -350,17 +443,23 @@ class FollowUpService:
         created = 0
         for appointment in appointments:
             scheduled_for = max(now, appointment.starts_at - timedelta(hours=hours))
-            already = {
-                channel
-                for (channel,) in db.execute(
-                    select(Notification.channel)
-                    .where(Notification.appointment_id == appointment.id)
-                    .where(Notification.type == NotificationType.REMINDER)
-                    .where(Notification.status != NotificationStatus.SKIPPED)
-                )
-            }
+            current = appointment.starts_at.isoformat()
+            already = set()
+            for channel, type_, payload in db.execute(
+                select(Notification.channel, Notification.type, Notification.payload)
+                .where(Notification.appointment_id == appointment.id)
+                .where(Notification.type.in_(CONFIRMATION_REQUEST_TYPES))
+                .where(Notification.status != NotificationStatus.SKIPPED)
+            ):
+                payload = payload or {}
+                # Reminders queued before they carried their time count as done for the current one.
+                if type_ == NotificationType.REMINDER and payload.get("for_starts_at", current) == current:
+                    already.add(channel)
+                elif payload.get("asks_confirmation") and payload.get("for_starts_at") == current:
+                    already.add(channel)
             if appointment.notification_email and NotificationChannel.EMAIL not in already:
-                content = self.composer.reminder(appointment)
+                asks = self.asks_confirmation(appointment)
+                content = self.composer.reminder(appointment, ask_to_confirm=asks)
                 self._queue(
                     db,
                     appointment=appointment,
@@ -370,6 +469,7 @@ class FollowUpService:
                     subject=content.subject,
                     body=content.text,
                     html_body=content.html,
+                    payload=self._for_time(appointment, asks),
                     scheduled_for=scheduled_for,
                     actor=actor,
                 )
@@ -388,7 +488,7 @@ class FollowUpService:
                     recipient=appointment.notification_phone,
                     subject="Recordatorio por WhatsApp",
                     body=message.preview,
-                    payload=message.as_payload(),
+                    payload=message.as_payload() | {"for_starts_at": current},
                     scheduled_for=scheduled_for,
                     actor=actor,
                 )
@@ -504,6 +604,17 @@ class FollowUpService:
         if notification.channel == NotificationChannel.WHATSAPP and not self.whatsapp_client.is_configured():
             return "WhatsApp no configurado"
         appointment = notification.appointment
+        for_starts_at = (notification.payload or {}).get("for_starts_at")
+        if appointment is not None and for_starts_at and for_starts_at != appointment.starts_at.isoformat():
+            # Written for a time the appointment no longer has; a newer message covers the new one.
+            return "El turno cambió de horario"
+        if notification.type == NotificationType.PROFESSIONAL_PENDING:
+            if appointment is not None and appointment.status == AppointmentStatus.CONFIRMED:
+                return "El paciente ya confirmó"
+            if appointment is None or appointment.status != AppointmentStatus.RESERVED:
+                return "El turno ya no está activo"
+            if appointment.starts_at <= now:
+                return "El turno ya pasó"
         if notification.type == NotificationType.REMINDER:
             if appointment is None or appointment.status not in REMINDABLE_STATUSES:
                 return "El turno ya no está activo"

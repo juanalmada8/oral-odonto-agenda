@@ -645,6 +645,34 @@ fieldset {
   color: var(--success-fg);
 }
 
+/* Agenda del día en el formulario de turno manual: qué horas atiende y qué ya está tomado. */
+.day-plan {
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.day-plan[hidden] {
+  display: none;
+}
+
+.day-plan__row {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.day-plan__label {
+  display: inline-block;
+  min-width: 72px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
 /* ==========================================================================
    Reserva pública
    ========================================================================== */
@@ -1467,6 +1495,34 @@ fieldset {
 .countdown {
   font-variant-numeric: tabular-nums;
   color: var(--warning-fg);
+}
+
+/* Pedido de confirmación del turno (link del email del día anterior). */
+.confirm-box {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border: 1px solid var(--coral-100);
+  border-radius: 16px;
+  background: var(--canvas-warm);
+}
+
+.confirm-box__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.confirm-box__text {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.confirm-box button {
+  width: 100%;
 }
 
 .status-details {

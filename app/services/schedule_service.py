@@ -348,6 +348,11 @@ class ScheduleService:
                 appointment.starts_at = starts_at
                 appointment.ends_at = ends_at
                 appointment.duration_minutes = duration
+                # A confirmation was for the old time (spec 0005): the patient confirms the new one.
+                appointment.attendance_confirmed_at = None
+                if appointment.status == AppointmentStatus.CONFIRMED:
+                    appointment.status = AppointmentStatus.RESERVED
+                    appointment.confirmed_at = None
                 if followup_service:
                     followup_service.discard_pending_reminders(db, appointment)
                     # Sin este aviso el paciente se presenta en el horario viejo.
@@ -421,6 +426,28 @@ class ScheduleService:
         )
         self.commit(db)
         return self.get_appointment(db, appointment.id)
+
+    def confirm_by_patient(self, db: Session, appointment: Appointment, *, channel: str) -> Appointment:
+        """The patient says they will come (email link or WhatsApp). Confirms it; nobody gets emailed."""
+        if appointment.status not in (AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED):
+            raise DomainError("Este turno ya no está activo.", status_code=409)
+        if appointment.starts_at <= clock.now():
+            raise DomainError("Este turno ya pasó.", status_code=409)
+        if appointment.attendance_confirmed_at is not None:
+            return appointment
+        appointment.attendance_confirmed_at = clock.now()
+        if appointment.status == AppointmentStatus.RESERVED:
+            self.apply_transition(db, appointment, AppointmentStatus.CONFIRMED)
+        create_audit_log(
+            db,
+            action="appointment.attendance_confirmed",
+            entity_name="appointment",
+            entity_id=str(appointment.id),
+            actor=f"patient:{channel}",
+            description=f"Patient confirmed attendance ({channel})",
+        )
+        self.commit(db)
+        return appointment
 
     def confirm_appointment(self, db: Session, appointment_id: int, *, followup_service: FollowUpService | None = None, actor: str = "schedule_service") -> Appointment:
         return self.change_status(db, appointment_id, AppointmentStatus.CONFIRMED, followup_service=followup_service, actor=actor)
@@ -496,6 +523,7 @@ class ScheduleService:
                 starts_at=appointment.starts_at,
                 ends_at=appointment.ends_at,
                 exclude_appointment_id=appointment.id,
+                name_the_conflict=True,
             )
 
         now = clock.now()
@@ -750,6 +778,9 @@ class ScheduleService:
     ) -> dict[date, list[AvailabilitySlot]]:
         """Free slots per day in [date_from, date_to], computed with two queries.
 
+        The grid restarts where a booked appointment ends (see `_open_slots`), so an appointment
+        loaded by hand at 10:00-11:30 on a 40-minute grid leaves 11:30 free, not 11:40.
+
         With `duration_minutes` it answers a different question: where can an appointment of that
         length start? Starts stay on the published grid, but the appointment may run past the end of
         the block it starts in as long as the next block is contiguous (a morning loaded in two
@@ -778,7 +809,11 @@ class ScheduleService:
         spans = self._merged_spans_by_day(windows) if needed else {}
         availability: dict[date, list[AvailabilitySlot]] = defaultdict(list)
         for window in windows:
-            for slot_start, slot_end in self._window_slots(window, professional):
+            if needed is None:
+                slots = self._open_slots(window, professional, busy)
+            else:
+                slots = self._window_slots(window, professional)
+            for slot_start, slot_end in slots:
                 if slot_start < earliest_start:
                     continue
                 if needed is not None:
@@ -788,8 +823,8 @@ class ScheduleService:
                     )
                     if span_end is None or slot_end > span_end:
                         continue
-                if any(busy_start < slot_end and busy_end > slot_start for busy_start, busy_end in busy):
-                    continue
+                    if any(busy_start < slot_end and busy_end > slot_start for busy_start, busy_end in busy):
+                        continue
                 availability[window.availability_date].append(
                     AvailabilitySlot(starts_at=slot_start, ends_at=slot_end, available=True)
                 )
@@ -866,17 +901,28 @@ class ScheduleService:
         return {week_start + timedelta(days=index): availability.get(week_start + timedelta(days=index), []) for index in range(7)}
 
     def published_slot_duration(self, db: Session, *, professional: Professional, starts_at: datetime) -> int | None:
-        """Duration of the published slot starting exactly at `starts_at`, if there is one."""
+        """Duration of the free published slot starting exactly at `starts_at`, if there is one."""
+        for slot_start, slot_end in self._open_slots_of_day(db, professional=professional, day=starts_at.date()):
+            if slot_start == starts_at:
+                return int((slot_end - slot_start).total_seconds() // 60)
+        return None
+
+    def day_plan(self, db: Session, *, professional_id: int, day: date) -> dict:
+        """What the manual-appointment form shows: the day's availability and what is already booked."""
+        professional = self._get_professional(db, professional_id)
         windows = db.scalars(
             select(AvailabilityWindow)
             .where(AvailabilityWindow.professional_id == professional.id)
-            .where(AvailabilityWindow.availability_date == starts_at.date())
+            .where(AvailabilityWindow.availability_date == day)
         ).all()
-        for window in windows:
-            for slot_start, slot_end in self._window_slots(window, professional):
-                if slot_start == starts_at:
-                    return int((slot_end - slot_start).total_seconds() // 60)
-        return None
+        spans = self._merged_spans_by_day(windows).get(day, [])
+        return {
+            "spans": [{"start": f"{start:%H:%M}", "end": f"{end:%H:%M}"} for start, end in spans],
+            "busy": [
+                {"start": f"{start:%H:%M}", "end": f"{end:%H:%M}"}
+                for start, end in sorted(self._busy_intervals(db, professional_id=professional.id, day=day))
+            ],
+        }
 
     def upcoming_for_patient(self, db: Session, patient_id: int) -> list[Appointment]:
         """Appointments the patient is still expected to attend (live holds included)."""
@@ -943,6 +989,8 @@ class ScheduleService:
             starts_at=starts_at,
             ends_at=ends_at,
             exclude_appointment_id=exclude_appointment_id,
+            # The clinic needs to know what is in the way; a patient must never learn about someone else's booking.
+            name_the_conflict=not public_rules,
         )
 
     def flush(self, db: Session) -> None:
@@ -973,15 +1021,29 @@ class ScheduleService:
         starts_at: datetime,
         ends_at: datetime,
         exclude_appointment_id: int | None = None,
+        name_the_conflict: bool = False,
     ) -> None:
-        if self._has_overlap(
+        conflict = self._first_overlap(
             db,
             professional_id=professional_id,
             starts_at=starts_at,
             ends_at=ends_at,
             exclude_appointment_id=exclude_appointment_id,
-        ):
-            raise DomainError(SLOT_TAKEN_MESSAGE, status_code=409)
+        )
+        if conflict is not None:
+            if not name_the_conflict:
+                raise DomainError(SLOT_TAKEN_MESSAGE, status_code=409)
+            if conflict.starts_at > starts_at:
+                detail = (
+                    f"Atención, tenés un turno a las {conflict.starts_at:%H:%M} (hasta {conflict.ends_at:%H:%M}). "
+                    f"Acortá este turno para que termine a las {conflict.starts_at:%H:%M} o elegí otro horario."
+                )
+            else:
+                detail = (
+                    f"Atención, tenés un turno de {conflict.starts_at:%H:%M} a {conflict.ends_at:%H:%M}. "
+                    f"Empezá este turno a las {conflict.ends_at:%H:%M} o elegí otro horario."
+                )
+            raise DomainError(detail, status_code=409)
         if patient_id and self._has_patient_overlap(
             db,
             patient_id=patient_id,
@@ -1009,13 +1071,48 @@ class ScheduleService:
             yield cursor, cursor + step
             cursor += step
 
-    def _is_published_slot(self, db: Session, *, professional: Professional, starts_at: datetime, ends_at: datetime) -> bool:
+    def _open_slots(self, window: AvailabilityWindow, professional: Professional, busy):
+        """Free slots of a window, with the grid restarting where a booked appointment ends.
+
+        Online bookings sit on the grid, so around them nothing moves. An appointment loaded by
+        hand can start and end anywhere: the slots it touches disappear and the grid picks up again
+        right where it ends, so no time is wasted between it and the next online patient.
+        """
+        cursor = combine_date_time(window.availability_date, window.start_time)
+        window_end = combine_date_time(window.availability_date, window.end_time)
+        step = timedelta(minutes=window.slot_duration_minutes or professional.default_appointment_duration)
+        while cursor + step <= window_end:
+            slot_end = cursor + step
+            in_the_way = [busy_end for busy_start, busy_end in busy if busy_start < slot_end and busy_end > cursor]
+            if in_the_way:
+                cursor = max(in_the_way)
+                continue
+            yield cursor, slot_end
+            cursor = slot_end
+
+    def _busy_intervals(self, db: Session, *, professional_id: int, day: date) -> list[tuple[datetime, datetime]]:
+        return [
+            (start, end)
+            for start, end in db.execute(
+                select(Appointment.starts_at, Appointment.ends_at)
+                .where(Appointment.professional_id == professional_id)
+                .where(Appointment.starts_at < date_range_start(day + timedelta(days=1)))
+                .where(Appointment.ends_at > date_range_start(day))
+                .where(self._blocking_filter())
+            )
+        ]
+
+    def _open_slots_of_day(self, db: Session, *, professional: Professional, day: date) -> list[tuple[datetime, datetime]]:
         windows = db.scalars(
             select(AvailabilityWindow)
             .where(AvailabilityWindow.professional_id == professional.id)
-            .where(AvailabilityWindow.availability_date == starts_at.date())
+            .where(AvailabilityWindow.availability_date == day)
         ).all()
-        return any((starts_at, ends_at) in set(self._window_slots(window, professional)) for window in windows)
+        busy = self._busy_intervals(db, professional_id=professional.id, day=day)
+        return [slot for window in windows for slot in self._open_slots(window, professional, busy)]
+
+    def _is_published_slot(self, db: Session, *, professional: Professional, starts_at: datetime, ends_at: datetime) -> bool:
+        return (starts_at, ends_at) in self._open_slots_of_day(db, professional=professional, day=starts_at.date())
 
     def _fits_availability_windows(self, db: Session, *, professional_id: int, starts_at: datetime, ends_at: datetime) -> bool:
         blocks = db.scalars(
@@ -1093,7 +1190,7 @@ class ScheduleService:
                 status_code=409,
             )
 
-    def _has_overlap(
+    def _first_overlap(
         self,
         db: Session,
         *,
@@ -1101,17 +1198,18 @@ class ScheduleService:
         starts_at: datetime,
         ends_at: datetime,
         exclude_appointment_id: int | None = None,
-    ) -> bool:
+    ) -> Appointment | None:
         query = (
-            select(Appointment.id)
+            select(Appointment)
             .where(Appointment.professional_id == professional_id)
             .where(self._blocking_filter())
             .where(Appointment.starts_at < ends_at)
             .where(Appointment.ends_at > starts_at)
+            .order_by(Appointment.starts_at)
         )
         if exclude_appointment_id:
             query = query.where(Appointment.id != exclude_appointment_id)
-        return db.scalar(query.limit(1)) is not None
+        return db.scalar(query.limit(1))
 
     def _has_patient_overlap(
         self,
