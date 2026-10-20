@@ -875,7 +875,8 @@ def test_the_digest_is_not_sent_early_empty_or_without_email(db_session, make_pr
     con_email = make_professional(name="Nazarena")
     with_email(db_session, con_email)
     sin_email = make_professional(name="Sabina")
-    make_appointment(db_session, sin_email, starts_at=datetime(2026, 3, 28, 9, 0), dni="30111222",
+    # 10:00 y no 9:00: con un solo sillón, dos profesionales no pueden tener turno a la vez (spec 0006).
+    make_appointment(db_session, sin_email, starts_at=datetime(2026, 3, 28, 10, 0), dni="30111222",
                      first_name="Ana", last_name="Pérez")
     service = followup(outbox)
 
