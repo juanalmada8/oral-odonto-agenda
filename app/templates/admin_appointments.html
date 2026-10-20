@@ -255,6 +255,10 @@
     };
     const toHHMM = (total) => `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
     const ranges = (items) => items.map((item) => `${item.start} a ${item.end}`).join(" · ");
+    // Un solo sillón (spec 0006): lo ocupado incluye los turnos de los demás profesionales, con su nombre.
+    const isOther = (item) => String(item.professional_id) !== professionalSelect.value;
+    const busyText = (items) =>
+      items.map((item) => `${item.start} a ${item.end}${isOther(item) ? ` (${item.professional})` : ""}`).join(" · ");
     const clashWith = (start, end) =>
       dayPlan.busy.find((item) => toMinutes(item.start) < end && toMinutes(item.end) > start);
     const show = (box, text) => {
@@ -321,11 +325,12 @@
       }
       const clash = clashWith(start, end);
       if (clash) {
+        const who = isOther(clash) ? `Atención, el sillón está ocupado: ${clash.professional} tiene` : "Atención, tenés";
         show(
           conflictBox,
           toMinutes(clash.start) > start
-            ? `Atención, tenés un turno a las ${clash.start} (hasta ${clash.end}). Acortá este turno para que termine a las ${clash.start} o elegí otro horario.`
-            : `Atención, tenés un turno de ${clash.start} a ${clash.end}. Empezá este turno a las ${clash.end} o elegí otro horario.`
+            ? `${who} un turno a las ${clash.start} (hasta ${clash.end}). Acortá este turno para que termine a las ${clash.start} o elegí otro horario.`
+            : `${who} un turno de ${clash.start} a ${clash.end}. Empezá este turno a las ${clash.end} o elegí otro horario.`
         );
         return;
       }
@@ -347,7 +352,7 @@
         if (!response.ok) throw new Error("day-plan");
         dayPlan = await response.json();
         $("manual-day-spans").textContent = ranges(dayPlan.spans) || "no tiene horario cargado ese día";
-        $("manual-day-busy").textContent = ranges(dayPlan.busy) || "nada todavía";
+        $("manual-day-busy").textContent = busyText(dayPlan.busy) || "nada todavía";
         plan.hidden = false;
         renderChips();
         check();

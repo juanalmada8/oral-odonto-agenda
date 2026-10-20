@@ -85,6 +85,8 @@ Un tratamiento de 10:00 a 11:30 se carga así, directo, y al paciente le llega *
 - Abajo del formulario ves qué horas atiende ese día y qué ya está **ocupado**.
 - Si el turno **pisa a otro**, te avisa en rojo antes de guardar, por ejemplo *"Atención, tenés un turno a
   las 11:00 (hasta 11:40)"*. Acortalo o elegí otro horario: **nunca se puede pisar un turno ya reservado**.
+- Como hay **un solo sillón**, tampoco se puede pisar el turno de **otra profesional**: en "Ocupado" aparecen
+  también sus turnos, con su nombre, y el aviso dice de quién es.
 - Si queda **fuera del horario de atención** (un sobreturno, un sábado), te avisa en amarillo pero se guarda
   igual. El horario de atención solo limita lo que se ofrece online.
 - Mientras dure ese turno, nadie puede reservar online los horarios que cubre, y el siguiente horario online

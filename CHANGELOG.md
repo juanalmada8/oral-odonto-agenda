@@ -42,6 +42,15 @@ y versionado semántico.
   `.env`, aunque se fuerce con `git add -f`.
 
 ### Fixed
+- **Un solo sillón: dos turnos ya no pueden superponerse aunque sean de profesionales distintos**
+  (especificación 0006, ADR 0010). La regla era por profesional, así que se podía cargar a Sabina y a Nazarena
+  a la misma hora y, si las dos atendían el mismo día, la reserva online ofrecía el mismo horario a dos
+  pacientes. Ahora cualquier turno activo ocupa el sillón: no se puede reservar, cargar, mover ni reactivar
+  encima, la grilla online lo descuenta y el formulario manual muestra lo ocupado con el nombre de la otra
+  profesional (*"Atención, el sillón está ocupado: Nazarena Almada Ortiz tiene un turno a las 11:00…"*).
+  Toda escritura en la agenda bloquea a todos los profesionales para que dos reservas simultáneas no se
+  salteen el control. La restricción de PostgreSQL sigue siendo por profesional hasta verificar que en
+  producción no haya superposiciones previas.
 - Un turno que ya había recibido su recordatorio y se movía a otro día **no se volvía a recordar**:
   el recordatorio se buscaba por turno y no por horario. Ahora cada recordatorio queda atado a la hora
   que anuncia.

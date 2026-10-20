@@ -120,3 +120,54 @@ def test_concurrent_bookings_of_the_same_slot_only_one_wins(db_session):
     assert sorted(outcomes) == sorted(
         ["booked", "Atención, tenés un turno de 10:00 a 10:30. Empezá este turno a las 10:30 o elegí otro horario."]
     )
+
+
+def test_concurrent_bookings_for_two_professionals_only_one_wins(db_session):
+    """Un solo sillón (spec 0006): dos profesionales distintos tampoco pueden quedar a la misma hora."""
+    professional_id, patient_ids = seed_calendar(db_session)
+    other = Professional(first_name="Nazarena", last_name="Almada", default_appointment_duration=30)
+    db_session.add(other)
+    db_session.flush()
+    db_session.add(
+        AvailabilityWindow(
+            professional_id=other.id, availability_date=date(2026, 3, 30),
+            start_time=time(9, 0), end_time=time(12, 0), slot_duration_minutes=30,
+        )
+    )
+    db_session.commit()
+    settings = get_settings()
+    barrier = threading.Barrier(2)
+    outcomes: list[str] = []
+
+    def attempt(professional, patient_id: int) -> None:
+        session = db_session_module.SessionLocal()
+        try:
+            barrier.wait()
+            ScheduleService(settings).create_appointment(
+                session,
+                AppointmentCreate(
+                    professional_id=professional, patient_id=patient_id,
+                    starts_at=datetime(2026, 3, 30, 10, 0), duration_minutes=30, created_by="test",
+                ),
+                reception_service=ReceptionService(),
+                followup_service=FollowUpService(settings, EmailClient(settings)),
+                actor="test",
+            )
+            outcomes.append("booked")
+        except DomainError as exc:
+            outcomes.append(exc.detail)
+        finally:
+            session.close()
+
+    threads = [
+        threading.Thread(target=attempt, args=(professional_id, patient_ids[0])),
+        threading.Thread(target=attempt, args=(other.id, patient_ids[1])),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+
+    assert outcomes.count("booked") == 1
+    [loser] = [outcome for outcome in outcomes if outcome != "booked"]
+    assert loser.startswith("Atención, el sillón está ocupado:")

@@ -30,3 +30,4 @@ La especificación dice **qué**; el [ADR](../decisions/) dice **por qué se eli
 | [0003](0003-turnos-largos-cargados-a-mano.md) | Turnos largos cargados a mano: duración elegible | Implementada (reglas 2 y 6 reemplazadas por 0004) |
 | [0004](0004-turnos-manuales-a-cualquier-hora.md) | Turnos manuales a cualquier día y hora, sin pisar nunca otro turno | Implementada |
 | [0005](0005-confirmacion-del-paciente.md) | El paciente confirma su turno desde el email; aviso a la profesional si no lo hace | Implementada |
+| [0006](0006-un-solo-sillon.md) | Un solo sillón: nunca dos turnos a la vez en el consultorio | Implementada |

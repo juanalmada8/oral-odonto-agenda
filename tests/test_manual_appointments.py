@@ -283,7 +283,7 @@ def test_the_day_plan_lists_availability_and_busy_times(client, db_session, make
         "professional_id": professional_id,
         "date": "2026-03-30",
         "spans": [{"start": "09:00", "end": "13:00"}],
-        "busy": [{"start": "11:00", "end": "11:40"}],
+        "busy": [{"start": "11:00", "end": "11:40", "professional_id": professional_id, "professional": "Nazarena Gómez"}],
     }
 
 
