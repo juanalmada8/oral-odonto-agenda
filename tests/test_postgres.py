@@ -193,7 +193,8 @@ def test_database_rejects_overlap_between_professionals(db_session):
     db_session.add(appointment(professional_id, first_patient, 10, 0))  # encima de uno cancelado: se permite
     db_session.commit()
 
-    db_session.add(appointment(other.id, second_patient, 9, 15))
+    # 8:45 a 9:15 solo choca con el de Sabina de las 9:00: lo rechaza la regla del sillón, no la del profesional.
+    db_session.add(appointment(other.id, second_patient, 8, 45))
     with pytest.raises(IntegrityError, match="no_overlap"):
         db_session.commit()
     db_session.rollback()
