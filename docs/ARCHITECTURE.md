@@ -61,10 +61,12 @@ pending_payment ──paga──► confirmed ──► completed / no_show
 
 ## Concurrencia y consistencia
 
-1. Cada reserva toma un **lock de la fila del profesional** (`SELECT ... FOR UPDATE`), de modo que
-   dos reservas del mismo profesional se serializan.
-2. PostgreSQL tiene además una **restricción de exclusión**: dos turnos activos del mismo profesional
-   no pueden superponerse, aunque el código fallara. La violación se traduce a un mensaje amable.
+1. Hay **un solo sillón** (spec 0006, ADR 0010): toda escritura en la agenda toma un **lock de las filas
+   de todos los profesionales** (`SELECT ... FOR UPDATE`, en orden de id), así que dos reservas que
+   compiten por el sillón se serializan aunque sean de profesionales distintos.
+2. PostgreSQL tiene además una **restricción de exclusión** (`appointment_chair_no_overlap`): dos turnos
+   activos no pueden superponerse, sean de quien sean, aunque el código fallara. La violación se traduce
+   a un mensaje amable.
 3. Los pagos se aplican de forma **idempotente** y una notificación tardía no puede degradar un pago
    aprobado.
 4. El envío de notificaciones toma cada fila con `FOR UPDATE SKIP LOCKED`: dos despachadores en

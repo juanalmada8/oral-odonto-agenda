@@ -14,6 +14,9 @@ y eso lo impone una **restricción de exclusión** (`EXCLUDE USING gist` sobre e
 rango de tiempo, migración `20260911_04`). Además cada reserva toma un lock de la fila del
 profesional (`SELECT ... FOR UPDATE`).
 
+> Ampliada por [ADR 0010](0010-un-solo-sillon.md): desde la migración `20261020_13` la restricción y el
+> lock cubren todo el consultorio (un solo sillón), no cada profesional por separado.
+
 SQLite se admite **solo para desarrollo local y tests rápidos**. La aplicación se niega a arrancar
 en producción con SQLite.
 

@@ -17,9 +17,11 @@ turnos a la misma hora con profesionales distintos.
   orden para no generar bloqueos cruzados). Con dos o tres profesionales el costo es nulo.
 - **No es configurable.** Si el consultorio suma un segundo sillón, se cambia el código con su
   especificación: una variable que nadie recuerda que existe es peor que una regla escrita.
-- La restricción de exclusión de PostgreSQL sigue siendo **por profesional**. Pasarla a todo el consultorio
-  exige primero verificar que en producción no haya turnos superpuestos entre profesionales (si los hay, la
-  migración falla y el despliegue se frena). Queda como paso siguiente, con esa verificación hecha.
+- La restricción de exclusión de PostgreSQL pasa a cubrir **todo el consultorio**
+  (`appointment_chair_no_overlap`, migración `20261020_13`): la base rechaza dos turnos a la vez aunque
+  alguien se saltee la aplicación. Se aplicó después de confirmar con el consultorio que no había turnos
+  superpuestos entre profesionales; si los hubiera, la migración falla entera (es una sola transacción) y
+  el despliegue se frena antes de tocar la aplicación.
 
 ## Consecuencias
 

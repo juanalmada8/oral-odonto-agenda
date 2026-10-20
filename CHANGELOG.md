@@ -49,8 +49,8 @@ y versionado semántico.
   encima, la grilla online lo descuenta y el formulario manual muestra lo ocupado con el nombre de la otra
   profesional (*"Atención, el sillón está ocupado: Nazarena Almada Ortiz tiene un turno a las 11:00…"*).
   Toda escritura en la agenda bloquea a todos los profesionales para que dos reservas simultáneas no se
-  salteen el control. La restricción de PostgreSQL sigue siendo por profesional hasta verificar que en
-  producción no haya superposiciones previas.
+  salteen el control, y la **restricción de exclusión de PostgreSQL** pasa a cubrir todo el consultorio
+  (migración `20261020_13`, reversible): la base rechaza el choque aunque alguien se saltee la app.
 - Un turno que ya había recibido su recordatorio y se movía a otro día **no se volvía a recordar**:
   el recordatorio se buscaba por turno y no por horario. Ahora cada recordatorio queda atado a la hora
   que anuncia.
