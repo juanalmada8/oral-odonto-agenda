@@ -805,9 +805,9 @@ class ScheduleService:
         ).all()
         if not windows:
             return {}
+        # One chair (spec 0006): any professional's appointment takes it.
         busy = db.execute(
             select(Appointment.starts_at, Appointment.ends_at)
-            .where(Appointment.professional_id == professional.id)
             .where(Appointment.starts_at < date_range_start(date_to + timedelta(days=1)))
             .where(Appointment.ends_at > date_range_start(date_from))
             .where(self._blocking_filter())
@@ -924,11 +924,25 @@ class ScheduleService:
             .where(AvailabilityWindow.availability_date == day)
         ).all()
         spans = self._merged_spans_by_day(windows).get(day, [])
+        # Everything in the chair that day, whoever it belongs to (spec 0006).
+        in_the_chair = db.scalars(
+            select(Appointment)
+            .options(joinedload(Appointment.professional))
+            .where(Appointment.starts_at < date_range_start(day + timedelta(days=1)))
+            .where(Appointment.ends_at > date_range_start(day))
+            .where(self._blocking_filter())
+            .order_by(Appointment.starts_at)
+        ).all()
         return {
             "spans": [{"start": f"{start:%H:%M}", "end": f"{end:%H:%M}"} for start, end in spans],
             "busy": [
-                {"start": f"{start:%H:%M}", "end": f"{end:%H:%M}"}
-                for start, end in sorted(self._busy_intervals(db, professional_id=professional.id, day=day))
+                {
+                    "start": f"{item.starts_at:%H:%M}",
+                    "end": f"{item.ends_at:%H:%M}",
+                    "professional_id": item.professional_id,
+                    "professional": f"{item.professional.first_name} {item.professional.last_name}",
+                }
+                for item in in_the_chair
             ],
         }
 
@@ -948,10 +962,13 @@ class ScheduleService:
     # --------------------------------------------------------------- validation
 
     def lock_professional(self, db: Session, professional_id: int) -> Professional:
-        """Serialize bookings per professional (SELECT ... FOR UPDATE on PostgreSQL)."""
-        professional = db.scalar(
-            select(Professional).where(Professional.id == professional_id).with_for_update()
-        )
+        """Serialize every agenda write in the clinic (SELECT ... FOR UPDATE on PostgreSQL).
+
+        One chair (spec 0006, ADR 0010): a booking for one professional can collide with one for
+        another, so all of them are locked, always in id order so two writers never deadlock.
+        """
+        locked = db.scalars(select(Professional).order_by(Professional.id).with_for_update()).all()
+        professional = next((item for item in locked if item.id == professional_id), None)
         if not professional:
             raise DomainError("No encontramos el profesional.", status_code=404)
         if not professional.is_active:
@@ -1035,27 +1052,7 @@ class ScheduleService:
         exclude_appointment_id: int | None = None,
         name_the_conflict: bool = False,
     ) -> None:
-        conflict = self._first_overlap(
-            db,
-            professional_id=professional_id,
-            starts_at=starts_at,
-            ends_at=ends_at,
-            exclude_appointment_id=exclude_appointment_id,
-        )
-        if conflict is not None:
-            if not name_the_conflict:
-                raise DomainError(SLOT_TAKEN_MESSAGE, status_code=409)
-            if conflict.starts_at > starts_at:
-                detail = (
-                    f"Atención, tenés un turno a las {conflict.starts_at:%H:%M} (hasta {conflict.ends_at:%H:%M}). "
-                    f"Acortá este turno para que termine a las {conflict.starts_at:%H:%M} o elegí otro horario."
-                )
-            else:
-                detail = (
-                    f"Atención, tenés un turno de {conflict.starts_at:%H:%M} a {conflict.ends_at:%H:%M}. "
-                    f"Empezá este turno a las {conflict.ends_at:%H:%M} o elegí otro horario."
-                )
-            raise DomainError(detail, status_code=409)
+        # The patient's own clash first: it is the more precise message.
         if patient_id and self._has_patient_overlap(
             db,
             patient_id=patient_id,
@@ -1064,6 +1061,31 @@ class ScheduleService:
             exclude_appointment_id=exclude_appointment_id,
         ):
             raise DomainError("El paciente ya tiene otro turno en ese horario.", status_code=409)
+        conflict = self._first_overlap(
+            db,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            exclude_appointment_id=exclude_appointment_id,
+        )
+        if conflict is not None:
+            if not name_the_conflict:
+                raise DomainError(SLOT_TAKEN_MESSAGE, status_code=409)
+            if conflict.professional_id == professional_id:
+                who = "Atención, tenés"
+            else:
+                name = f"{conflict.professional.first_name} {conflict.professional.last_name}"
+                who = f"Atención, el sillón está ocupado: {name} tiene"
+            if conflict.starts_at > starts_at:
+                detail = (
+                    f"{who} un turno a las {conflict.starts_at:%H:%M} (hasta {conflict.ends_at:%H:%M}). "
+                    f"Acortá este turno para que termine a las {conflict.starts_at:%H:%M} o elegí otro horario."
+                )
+            else:
+                detail = (
+                    f"{who} un turno de {conflict.starts_at:%H:%M} a {conflict.ends_at:%H:%M}. "
+                    f"Empezá este turno a las {conflict.ends_at:%H:%M} o elegí otro horario."
+                )
+            raise DomainError(detail, status_code=409)
 
     def _blocking_filter(self):
         return and_(
@@ -1102,12 +1124,12 @@ class ScheduleService:
             yield cursor, slot_end
             cursor = slot_end
 
-    def _busy_intervals(self, db: Session, *, professional_id: int, day: date) -> list[tuple[datetime, datetime]]:
+    def _busy_intervals(self, db: Session, *, day: date) -> list[tuple[datetime, datetime]]:
+        """Time the chair is taken that day, by any professional (spec 0006)."""
         return [
             (start, end)
             for start, end in db.execute(
                 select(Appointment.starts_at, Appointment.ends_at)
-                .where(Appointment.professional_id == professional_id)
                 .where(Appointment.starts_at < date_range_start(day + timedelta(days=1)))
                 .where(Appointment.ends_at > date_range_start(day))
                 .where(self._blocking_filter())
@@ -1120,7 +1142,7 @@ class ScheduleService:
             .where(AvailabilityWindow.professional_id == professional.id)
             .where(AvailabilityWindow.availability_date == day)
         ).all()
-        busy = self._busy_intervals(db, professional_id=professional.id, day=day)
+        busy = self._busy_intervals(db, day=day)
         return [slot for window in windows for slot in self._open_slots(window, professional, busy)]
 
     def _is_published_slot(self, db: Session, *, professional: Professional, starts_at: datetime, ends_at: datetime) -> bool:
@@ -1206,14 +1228,14 @@ class ScheduleService:
         self,
         db: Session,
         *,
-        professional_id: int,
         starts_at: datetime,
         ends_at: datetime,
         exclude_appointment_id: int | None = None,
     ) -> Appointment | None:
+        """The first active appointment in the chair during [starts_at, ends_at), of any professional."""
         query = (
             select(Appointment)
-            .where(Appointment.professional_id == professional_id)
+            .options(joinedload(Appointment.professional))
             .where(self._blocking_filter())
             .where(Appointment.starts_at < ends_at)
             .where(Appointment.ends_at > starts_at)
