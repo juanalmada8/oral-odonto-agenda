@@ -30,6 +30,8 @@ día, ofrecía online el mismo horario a dos pacientes.
    del profesional cuando es otro, y sus horarios libres ya lo descuentan.
 6. Si el mismo paciente ya tiene un turno en ese horario, se avisa eso primero (es más preciso).
 7. Dos reservas simultáneas para profesionales distintos en el mismo horario: gana una sola.
+8. La **base de datos** también rechaza dos turnos activos superpuestos de cualquier profesional, aunque
+   se inserten sin pasar por la aplicación.
 
 ## Criterios de aceptación
 
@@ -45,6 +47,7 @@ día, ofrecía online el mismo horario a dos pacientes.
 | 8 | Un turno cancelado no ocupa el sillón | `test_a_cancelled_appointment_frees_the_chair` |
 | 9 | La serie saltea las fechas en que el sillón está ocupado | `test_a_series_skips_dates_when_the_chair_is_taken` |
 | 10 | Dos reservas simultáneas para profesionales distintos: gana una (PostgreSQL) | `test_concurrent_bookings_for_two_professionals_only_one_wins` |
+| 11 | La base rechaza turnos superpuestos entre profesionales (PostgreSQL) | `test_database_rejects_overlap_between_professionals` |
 
 ## Casos límite y errores
 
