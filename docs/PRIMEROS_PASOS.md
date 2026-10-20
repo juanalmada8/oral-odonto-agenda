@@ -69,23 +69,27 @@ tomados en esos días, el sistema te avisa y no los toca hasta que los reprogram
 - **Lista de espera:** las personas que pidieron que les avisen si se libera un horario antes.
 - **Notificaciones:** si algún email no se pudo enviar, aparece acá con el motivo.
 
-## Cargar un turno a mano (a cualquier hora y con su duración)
+## Cargar un turno a mano (cualquier día, cualquier hora)
 
-En **Turnos → Crear turno manual** elegí el paciente, el profesional y el día. Después poné la **Duración**
-(de 15 minutos a 4 horas) y la **Hora de inicio**, que puede ser cualquiera: no tiene que coincidir con los
-horarios que se ofrecen online. Un tratamiento de 10:00 a 11:30 se carga así, directo, y al paciente le llega
-**un solo email**.
+En **Turnos → Crear turno manual** elegí el paciente, el profesional y la **duración** (de 15 minutos a
+4 horas). Después:
+
+- **Día:** tocá el calendario y elegí cualquier día, atienda o no. Abajo aparecen los próximos días en que
+  ese profesional atiende, para elegirlos con un toque.
+- **Hora:** tocá uno de los **horarios libres** que aparecen, o escribí otra en 24 h: `1015`, `9.30` o
+  `14` quedan 10:15, 09:30 y 14:00. Los horarios libres incluyen la hora en que termina cada turno, para
+  poner uno detrás del otro sin huecos.
+
+Un tratamiento de 10:00 a 11:30 se carga así, directo, y al paciente le llega **un solo email**.
 
 - Abajo del formulario ves qué horas atiende ese día y qué ya está **ocupado**.
-- Si el turno pisa a otro, te avisa antes de guardar, por ejemplo: *"Atención, tenés un turno a las 11:00
-  (hasta 11:40)"*. Acortalo para que termine a las 11:00 o elegí otro horario: **nunca se puede pisar un
-  turno ya reservado**.
+- Si el turno **pisa a otro**, te avisa en rojo antes de guardar, por ejemplo *"Atención, tenés un turno a
+  las 11:00 (hasta 11:40)"*. Acortalo o elegí otro horario: **nunca se puede pisar un turno ya reservado**.
+- Si queda **fuera del horario de atención** (un sobreturno, un sábado), te avisa en amarillo pero se guarda
+  igual. El horario de atención solo limita lo que se ofrece online.
 - Mientras dure ese turno, nadie puede reservar online los horarios que cubre, y el siguiente horario online
   arranca justo cuando termina (si termina 11:30, el próximo libre es 11:30).
-- Si el trabajo termina más tarde que la disponibilidad cargada, antes agregá un bloque en
-  **Disponibilidad → Agregar un bloque** para ese día.
-- Dos bloques pegados (por ejemplo, de 9 a 11 y de 11 a 13) cuentan como una sola mañana. Si hay un hueco
-  entre ellos, el turno no puede cruzarlo.
+- Para mover un turno, en **Editar** cambiás día, hora y duración de la misma forma.
 
 ## Los pacientes confirman solos
 

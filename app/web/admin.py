@@ -1,7 +1,8 @@
 """Internal panel (/app): reception and admin run the clinic; professionals manage their own agenda."""
 
+import re
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from itertools import groupby
 from urllib.parse import urlencode
 
@@ -125,6 +126,27 @@ def _parse_date(value: str | None, default: date) -> date:
         return date.fromisoformat(value) if value else default
     except ValueError:
         return default
+
+
+TIME_24H = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
+BAD_TIME_MESSAGE = "Escribí la hora en formato 24 h, por ejemplo 10:15."
+
+
+def _start_from_form(starts_at: str, day: str, hhmm: str) -> datetime:
+    """Panel forms send a calendar date and a 24 h time; the API and older clients, one ISO datetime."""
+    if starts_at:
+        try:
+            return datetime.fromisoformat(starts_at)
+        except ValueError as exc:
+            raise DomainError("Elegí el día y la hora del turno.", status_code=422) from exc
+    match = TIME_24H.match((hhmm or "").strip())
+    if match is None:
+        raise DomainError(BAD_TIME_MESSAGE, status_code=422)
+    try:
+        chosen_day = date.fromisoformat(day)
+    except ValueError as exc:
+        raise DomainError("Elegí el día del turno.", status_code=422) from exc
+    return datetime.combine(chosen_day, time(int(match.group(1)), int(match.group(2))))
 
 
 WEEKDAY_SHORT = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
@@ -362,6 +384,7 @@ def appointments_page(
         },
         filters_querystring=urlencode(filter_params),
         manual_available_dates=manual_available_dates,
+        today=clock.today().isoformat(),
         is_professional=scope is not None,
         actions_for=lambda appointment: allowed_actions(current_user, appointment),
     )
@@ -388,13 +411,8 @@ def create_manual_appointment(
 ):
     require_roles(current_user, *STAFF)
     try:
-        # The form sends the day and a free start time (any minute, not only the online grid).
-        if not starts_at and manual_date and manual_time:
-            starts_at = f"{manual_date}T{manual_time}"
-        try:
-            selected_dt = datetime.fromisoformat(starts_at)
-        except ValueError as exc:
-            raise DomainError("Elegí el día y la hora del turno.", status_code=422) from exc
+        # Any day from the calendar and a free 24 h time (not only the online grid, spec 0004).
+        selected_dt = _start_from_form(starts_at, manual_date, manual_time)
         appointment = schedule_service.create_appointment(
             db,
             AppointmentCreate(
@@ -432,7 +450,9 @@ def create_appointment_series(
     background_tasks: BackgroundTasks,
     patient_id: int = Form(...),
     professional_id: int = Form(...),
-    starts_at: str = Form(...),
+    starts_at: str = Form(""),
+    series_date: str = Form(""),
+    series_time: str = Form(""),
     duration_minutes: int = Form(30),
     every_weeks: int = Form(4),
     occurrences: int = Form(6),
@@ -447,7 +467,7 @@ def create_appointment_series(
     """Carga de una vez los controles de un tratamiento (ortodoncia, seguimientos)."""
     require_roles(current_user, *STAFF)
     try:
-        selected_dt = datetime.fromisoformat(starts_at)
+        selected_dt = _start_from_form(starts_at, series_date, series_time)
         result = schedule_service.create_series(
             db,
             AppointmentSeriesCreate(
@@ -536,7 +556,9 @@ def edit_appointment_page(
 def edit_appointment_submit(
     appointment_id: int,
     background_tasks: BackgroundTasks,
-    starts_at: str = Form(...),
+    starts_at: str = Form(""),
+    edit_date: str = Form(""),
+    edit_time: str = Form(""),
     duration_minutes: int = Form(30),
     status: str = Form(...),
     reason: str = Form(""),
@@ -553,7 +575,7 @@ def edit_appointment_submit(
             db,
             appointment_id,
             AppointmentUpdate(
-                starts_at=datetime.fromisoformat(starts_at),
+                starts_at=_start_from_form(starts_at, edit_date, edit_time),
                 duration_minutes=duration_minutes,
                 status=AppointmentStatus(status),
                 reason=reason or None,

@@ -1,5 +1,5 @@
 {% extends "base_admin.html" %}
-{% from "_macros.html" import status_badge, payment_badge, appointment_actions %}
+{% from "_macros.html" import status_badge, payment_badge, appointment_actions, time_input, duration_select %}
 
 {% block content %}
 <section class="surface">
@@ -60,34 +60,34 @@
           </select>
         </label>
         <label class="field">
-          <span class="field-label">Día</span>
-          <select name="manual_date" id="manual-date" disabled required>
-            <option value="">Elegí primero un profesional</option>
-          </select>
+          <span class="field-label">Duración</span>
+          {{ duration_select("duration_minutes", "manual-duration", 30) }}
         </label>
       </div>
-      {# Una limpieza dura 30 minutos y un tratamiento largo, dos horas: la duración la elige quien carga el turno. #}
-      {% set duration_options = [(15, "15 min"), (30, "30 min"), (45, "45 min"), (60, "1 h"), (75, "1 h 15"), (90, "1 h 30"), (105, "1 h 45"), (120, "2 h"), (150, "2 h 30"), (180, "3 h"), (240, "4 h")] %}
-      <div class="two-cols">
-        <label class="field">
-          <span class="field-label">Duración</span>
-          <select name="duration_minutes" id="manual-duration" required>
-            {% for minutes, label in duration_options %}
-            <option value="{{ minutes }}" {% if minutes == 30 %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field">
-          <span class="field-label">Hora de inicio</span>
-          {# Libre, de a 5 minutos: un tratamiento no tiene por qué empezar en la grilla de la reserva online. #}
-          <input type="time" name="manual_time" id="manual-time" step="300" disabled required />
-        </label>
+      <div class="field">
+        <label class="field-label" for="manual-date">Día</label>
+        {# Calendario: cualquier día desde hoy, atienda o no (spec 0004). Los botones son atajos. #}
+        <input type="date" name="manual_date" id="manual-date" min="{{ today }}" required />
+        <div class="quick-picks" id="manual-next-days" hidden>
+          <span class="quick-picks__label">Próximos días que atiende</span>
+          <div class="quick-picks__list" id="manual-next-days-list"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label" for="manual-time">Hora de inicio <em>24 h</em></label>
+        {{ time_input("manual_time", "manual-time") }}
+        <span class="field-hint">Escribila como quieras: 1015, 9.30 o 14 quedan 10:15, 09:30 y 14:00.</span>
       </div>
       <div class="day-plan" id="manual-day-plan" hidden>
         <p class="day-plan__row"><span class="day-plan__label">Atiende</span> <span id="manual-day-spans"></span></p>
         <p class="day-plan__row"><span class="day-plan__label">Ocupado</span> <span id="manual-day-busy"></span></p>
+        <div class="quick-picks">
+          <span class="quick-picks__label" id="manual-time-chips-label">Horarios libres</span>
+          <div class="quick-picks__list" id="manual-time-chips" data-time-chips="manual-time"></div>
+        </div>
       </div>
       <div class="alert alert-error" id="manual-conflict" role="alert" hidden></div>
+      <div class="alert alert-warning" id="manual-outside" role="status" hidden></div>
       <label class="field">
         <span class="field-label">Motivo</span>
         <input name="reason" placeholder="Control, limpieza, urgencia…" />
@@ -101,7 +101,7 @@
         <span class="field-label">Notas internas</span>
         <textarea name="notes" placeholder="Opcional"></textarea>
       </label>
-      <p class="muted small" id="manual-slot-hint">El turno manual no cobra online: se confirma por email al paciente. Puede empezar a cualquier hora dentro de la disponibilidad del día; lo que ocupe deja de ofrecerse online.</p>
+      <p class="muted small" id="manual-slot-hint">Se le avisa al paciente por email. Puede ser cualquier día y hora, aunque quede fuera del horario de atención; lo único que no se puede es pisar otro turno. Lo que ocupe deja de ofrecerse online.</p>
       <button type="submit" id="manual-submit" disabled>Guardar turno</button>
     </form>
   </details>
@@ -133,8 +133,18 @@
           </select>
         </label>
         <label class="field">
-          <span class="field-label">Primer turno</span>
-          <input type="datetime-local" name="starts_at" step="300" required />
+          <span class="field-label">Duración</span>
+          {{ duration_select("duration_minutes", "series-duration", 30) }}
+        </label>
+      </div>
+      <div class="two-cols">
+        <label class="field">
+          <span class="field-label">Primer turno: día</span>
+          <input type="date" name="series_date" min="{{ today }}" required />
+        </label>
+        <label class="field">
+          <span class="field-label">Hora <em>24 h</em></span>
+          {{ time_input("series_time", "series-time") }}
         </label>
       </div>
       <div class="two-cols">
@@ -153,16 +163,10 @@
           <input type="number" name="occurrences" min="2" max="24" value="6" />
         </label>
       </div>
-      <div class="two-cols">
-        <label class="field">
-          <span class="field-label">Duración</span>
-          <input type="number" name="duration_minutes" min="10" max="240" step="5" value="30" />
-        </label>
-        <label class="field">
-          <span class="field-label">Motivo</span>
-          <input name="reason" placeholder="Control de ortodoncia" />
-        </label>
-      </div>
+      <label class="field">
+        <span class="field-label">Motivo</span>
+        <input name="reason" placeholder="Control de ortodoncia" />
+      </label>
       <label class="field">
         <span class="field-label">Notas internas</span>
         <textarea name="notes" placeholder="Opcional"></textarea>
@@ -227,66 +231,107 @@
 <script nonce="{{ request.state.csp_nonce }}">
   document.addEventListener("DOMContentLoaded", () => {
     const manualAvailableDates = {{ manual_available_dates | tojson }};
-    const professionalSelect = document.getElementById("manual-professional");
-    const dateSelect = document.getElementById("manual-date");
-    const timeInput = document.getElementById("manual-time");
-    const durationSelect = document.getElementById("manual-duration");
-    const submitButton = document.getElementById("manual-submit");
-    const hint = document.getElementById("manual-slot-hint");
-    const plan = document.getElementById("manual-day-plan");
-    const spansText = document.getElementById("manual-day-spans");
-    const busyText = document.getElementById("manual-day-busy");
-    const conflictBox = document.getElementById("manual-conflict");
-    if (!professionalSelect || !dateSelect || !timeInput || !durationSelect || !submitButton || !plan) return;
+    const $ = (id) => document.getElementById(id);
+    const professionalSelect = $("manual-professional");
+    const dateInput = $("manual-date");
+    const timeInput = $("manual-time");
+    const durationSelect = $("manual-duration");
+    const submitButton = $("manual-submit");
+    const hint = $("manual-slot-hint");
+    const plan = $("manual-day-plan");
+    const nextDays = $("manual-next-days");
+    const nextDaysList = $("manual-next-days-list");
+    const chips = $("manual-time-chips");
+    const chipsLabel = $("manual-time-chips-label");
+    const conflictBox = $("manual-conflict");
+    const outsideBox = $("manual-outside");
+    const time = window.oralTime;
+    if (!professionalSelect || !dateInput || !timeInput || !durationSelect || !submitButton || !plan || !time) return;
 
     let dayPlan = null;
-
-    const fill = (select, options, placeholder) => {
-      select.innerHTML = "";
-      const first = document.createElement("option");
-      first.value = "";
-      first.textContent = placeholder;
-      select.appendChild(first);
-      options.forEach(({ value, label }) => {
-        const option = document.createElement("option");
-        option.value = value;
-        option.textContent = label;
-        select.appendChild(option);
-      });
-      select.disabled = options.length === 0;
-    };
     const toMinutes = (hhmm) => {
       const [hours, minutes] = hhmm.split(":").map(Number);
       return hours * 60 + minutes;
     };
     const toHHMM = (total) => `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
     const ranges = (items) => items.map((item) => `${item.start} a ${item.end}`).join(" · ");
-
-    const showConflict = (text) => {
-      conflictBox.textContent = text || "";
-      conflictBox.hidden = !text;
+    const clashWith = (start, end) =>
+      dayPlan.busy.find((item) => toMinutes(item.start) < end && toMinutes(item.end) > start);
+    const show = (box, text) => {
+      box.textContent = text || "";
+      box.hidden = !text;
+    };
+    const button = (label, data) => {
+      const element = document.createElement("button");
+      element.type = "button";
+      element.className = "chip time-chip";
+      element.textContent = label;
+      Object.entries(data).forEach(([key, value]) => (element.dataset[key] = value));
+      return element;
     };
 
-    // Same rules the server applies when saving: inside the day's availability and never over another appointment.
+    // Horarios libres como botones: cada 15 min dentro del horario de atención, más la hora en que termina
+    // cada turno (para encadenar sin huecos), donde el turno entra entero y no pisa a otro.
+    const renderChips = () => {
+      chips.innerHTML = "";
+      if (!dayPlan) return;
+      const duration = Number(durationSelect.value);
+      const candidates = new Set();
+      dayPlan.spans.forEach((span) => {
+        for (let start = toMinutes(span.start); start < toMinutes(span.end); start += 15) candidates.add(start);
+        dayPlan.busy.forEach((item) => {
+          const end = toMinutes(item.end);
+          if (toMinutes(span.start) <= end && end < toMinutes(span.end)) candidates.add(end);
+        });
+      });
+      const starts = [...candidates]
+        .sort((a, b) => a - b)
+        .filter((start) => {
+          const fits = dayPlan.spans.some((span) => toMinutes(span.start) <= start && start + duration <= toMinutes(span.end));
+          return fits && !clashWith(start, start + duration);
+        })
+        .map(toHHMM);
+      starts.forEach((value) => chips.appendChild(button(value, { timeChip: value })));
+      if (!dayPlan.spans.length) {
+        chipsLabel.textContent = "No tiene horario de atención cargado ese día. Igual podés cargar el turno: escribí la hora.";
+      } else if (!starts.length) {
+        chipsLabel.textContent = "No queda un hueco de esa duración en su horario. Podés escribir otra hora.";
+      } else {
+        chipsLabel.textContent = "Horarios libres (o escribí otra hora)";
+      }
+      time.syncChips(timeInput);
+    };
+
+    // Mismas reglas que aplica el servidor: nunca pisar otro turno. Fuera del horario de atención se puede, con aviso.
     const check = () => {
-      showConflict("");
+      show(conflictBox, "");
+      show(outsideBox, "");
       submitButton.disabled = true;
-      if (!dayPlan || !timeInput.value || !durationSelect.value) return;
-      const start = toMinutes(timeInput.value);
+      const value = time.normalize(timeInput.value);
+      if (!dayPlan || !value) return;
+      if (!time.isValid(value)) {
+        show(conflictBox, "Escribí la hora en formato 24 h, por ejemplo 10:15.");
+        return;
+      }
+      const start = toMinutes(value);
       const end = start + Number(durationSelect.value);
-      const clash = dayPlan.busy.find((item) => toMinutes(item.start) < end && toMinutes(item.end) > start);
+      if (end > 24 * 60) {
+        show(conflictBox, "El turno no puede terminar después de la medianoche.");
+        return;
+      }
+      const clash = clashWith(start, end);
       if (clash) {
-        showConflict(
+        show(
+          conflictBox,
           toMinutes(clash.start) > start
             ? `Atención, tenés un turno a las ${clash.start} (hasta ${clash.end}). Acortá este turno para que termine a las ${clash.start} o elegí otro horario.`
             : `Atención, tenés un turno de ${clash.start} a ${clash.end}. Empezá este turno a las ${clash.end} o elegí otro horario.`
         );
         return;
       }
-      const fits = dayPlan.spans.some((span) => toMinutes(span.start) <= start && end <= toMinutes(span.end));
-      if (!fits) {
-        showConflict(`De ${toHHMM(start)} a ${toHHMM(end)} queda fuera de la disponibilidad de ese día.`);
-        return;
+      const inside = dayPlan.spans.some((span) => toMinutes(span.start) <= start && end <= toMinutes(span.end));
+      if (!inside) {
+        show(outsideBox, `De ${toHHMM(start)} a ${toHHMM(end)} queda fuera del horario de atención de ese día. Se puede cargar igual.`);
       }
       submitButton.disabled = false;
     };
@@ -294,25 +339,29 @@
     const loadDayPlan = async () => {
       dayPlan = null;
       plan.hidden = true;
-      timeInput.disabled = true;
       check();
+      if (!professionalSelect.value || !dateInput.value) return;
       try {
-        const params = new URLSearchParams({ professional_id: professionalSelect.value, date: dateSelect.value });
+        const params = new URLSearchParams({ professional_id: professionalSelect.value, date: dateInput.value });
         const response = await fetch(`/api/v1/availability/day-plan?${params}`, { headers: { Accept: "application/json" } });
         if (!response.ok) throw new Error("day-plan");
         dayPlan = await response.json();
-        spansText.textContent = ranges(dayPlan.spans) || "sin disponibilidad";
-        busyText.textContent = ranges(dayPlan.busy) || "nada todavía";
+        $("manual-day-spans").textContent = ranges(dayPlan.spans) || "no tiene horario cargado ese día";
+        $("manual-day-busy").textContent = ranges(dayPlan.busy) || "nada todavía";
         plan.hidden = false;
-        timeInput.disabled = false;
-        if (dayPlan.spans.length) {
-          timeInput.min = dayPlan.spans[0].start;
-          timeInput.max = dayPlan.spans[dayPlan.spans.length - 1].end;
-        }
+        renderChips();
         check();
       } catch (error) {
         hint.textContent = "No pudimos cargar la agenda de ese día. Reintentá en unos segundos.";
       }
+    };
+
+    const renderNextDays = () => {
+      nextDaysList.innerHTML = "";
+      const dates = (manualAvailableDates[professionalSelect.value] || []).slice(0, 6);
+      dates.forEach((item) => nextDaysList.appendChild(button(item.label, { day: item.value })));
+      nextDays.hidden = dates.length === 0;
+      [...nextDaysList.children].forEach((chip) => chip.classList.toggle("is-active", chip.dataset.day === dateInput.value));
     };
 
     // Cada profesional arranca con su duración habitual (45 min en ortodoncia, por ejemplo).
@@ -330,21 +379,26 @@
 
     professionalSelect.addEventListener("change", () => {
       useProfessionalDuration();
-      const dates = manualAvailableDates[professionalSelect.value] || [];
-      fill(
-        dateSelect,
-        dates.map((item) => ({ value: item.value, label: `${item.label} · ${item.slots} libres` })),
-        dates.length ? "Elegí un día" : "Sin días con disponibilidad"
-      );
-      dayPlan = null;
-      plan.hidden = true;
-      timeInput.value = "";
-      timeInput.disabled = true;
+      renderNextDays();
+      loadDayPlan();
+    });
+    nextDaysList.addEventListener("click", (event) => {
+      const chip = event.target.closest("[data-day]");
+      if (!chip) return;
+      dateInput.value = chip.dataset.day;
+      renderNextDays();
+      loadDayPlan();
+    });
+    dateInput.addEventListener("change", () => {
+      renderNextDays();
+      loadDayPlan();
+    });
+    timeInput.addEventListener("input", check);
+    timeInput.addEventListener("change", check);
+    durationSelect.addEventListener("change", () => {
+      renderChips();
       check();
     });
-    dateSelect.addEventListener("change", () => dateSelect.value && loadDayPlan());
-    timeInput.addEventListener("input", check);
-    durationSelect.addEventListener("change", check);
   });
 </script>
 {% endif %}

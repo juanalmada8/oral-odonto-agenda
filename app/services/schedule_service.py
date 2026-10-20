@@ -162,7 +162,11 @@ class ScheduleService:
         followup_service: FollowUpService,
         actor: str = "schedule_service",
     ) -> Appointment:
-        """Staff/API booking: no deposit, lands directly as reserved."""
+        """Staff/API booking: no deposit, lands directly as reserved.
+
+        Any day and time, inside the published availability or not (spec 0004): availability is
+        what is offered online, the agenda belongs to the clinic. It never overlaps another appointment.
+        """
         professional = self.lock_professional(db, payload.professional_id)
         patient = reception_service.resolve_patient(
             db,
@@ -183,6 +187,7 @@ class ScheduleService:
             notes=payload.notes,
             created_by=payload.created_by,
             actor=actor,
+            within_availability=False,
         )
         followup_service.queue_confirmation(db, appointment, actor=actor)
         followup_service.queue_professional_booking(db, appointment, actor=actor)
@@ -267,6 +272,7 @@ class ScheduleService:
         hold_expires_at: datetime | None = None,
         deposit_amount: Decimal | None = None,
         public_rules: bool = False,
+        within_availability: bool = True,
     ) -> Appointment:
         """Validate and add an appointment to the session. The caller must hold the professional lock."""
         ends_at = calculate_end(starts_at, duration_minutes)
@@ -278,6 +284,7 @@ class ScheduleService:
             ends_at=ends_at,
             patient_id=patient_id,
             public_rules=public_rules,
+            within_availability=within_availability,
         )
         appointment = Appointment(
             patient_id=patient_id,
@@ -343,6 +350,7 @@ class ScheduleService:
                     ends_at=ends_at,
                     patient_id=appointment.patient_id,
                     exclude_appointment_id=appointment.id,
+                    within_availability=False,
                 )
                 previous_when = f"{format_long_date(appointment.starts_at)} a las {appointment.starts_at:%H:%M} h"
                 appointment.starts_at = starts_at
@@ -960,7 +968,9 @@ class ScheduleService:
         patient_id: int | None = None,
         exclude_appointment_id: int | None = None,
         public_rules: bool = False,
+        within_availability: bool = True,
     ) -> None:
+        """`within_availability=False`: the clinic loading or moving one by hand may go outside its hours."""
         if starts_at >= ends_at:
             raise DomainError("El horario de fin debe ser posterior al de inicio.", status_code=422)
         now = clock.now()
@@ -980,7 +990,9 @@ class ScheduleService:
                 )
             if not self._is_published_slot(db, professional=professional, starts_at=starts_at, ends_at=ends_at):
                 raise DomainError(SLOT_TAKEN_MESSAGE, status_code=409)
-        elif not self._fits_availability_windows(db, professional_id=professional.id, starts_at=starts_at, ends_at=ends_at):
+        elif within_availability and not self._fits_availability_windows(
+            db, professional_id=professional.id, starts_at=starts_at, ends_at=ends_at
+        ):
             raise DomainError("El horario está fuera de la disponibilidad del profesional para esa fecha.", status_code=409)
         self._assert_slot_free(
             db,

@@ -34,12 +34,12 @@ def _clinic_with_a_40_minute_grid(db_session, make_professional):
     return professional_id, patient.id
 
 
-def _load_by_hand(client, professional_id, patient_id, *, at: str, minutes: int):
+def _load_by_hand(client, professional_id, patient_id, *, at: str, minutes: int, day: str = MONDAY.isoformat()):
     return client.post(
         "/app/appointments",
         data={
             "patient_id": patient_id, "professional_id": professional_id,
-            "manual_date": MONDAY.isoformat(), "manual_time": at, "duration_minutes": minutes,
+            "manual_date": day, "manual_time": at, "duration_minutes": minutes,
         },
         follow_redirects=False,
     )
@@ -156,14 +156,73 @@ def test_a_manual_appointment_shortened_to_end_where_the_next_starts_is_saved(cl
     assert len(db_session.scalars(select(Appointment)).all()) == 2
 
 
-def test_a_manual_appointment_still_has_to_fit_the_availability(client, db_session, make_professional, outbox):  # noqa: F811
+def test_a_manual_appointment_can_go_outside_the_availability(client, db_session, make_professional, outbox):  # noqa: F811
+    """La disponibilidad es lo que se ofrece online; la agenda la maneja el consultorio (sobreturnos, urgencias)."""
     professional_id, patient_id = _clinic_with_a_40_minute_grid(db_session, make_professional)
     login(client, "admin")
 
-    response = _load_by_hand(client, professional_id, patient_id, at="12:30", minutes=60)
+    past_closing = _load_by_hand(client, professional_id, patient_id, at="12:30", minutes=60)
+    no_hours_that_day = _load_by_hand(client, professional_id, patient_id, at="17:15", minutes=45, day="2026-04-04")
 
-    assert "fuera de la disponibilidad" in _flash(response)
+    assert "error=" not in past_closing.headers["location"], _flash(past_closing)
+    assert "error=" not in no_hours_that_day.headers["location"], _flash(no_hours_that_day)
+    starts = sorted(a.starts_at for a in db_session.scalars(select(Appointment)))
+    assert starts == [datetime(2026, 3, 30, 12, 30), datetime(2026, 4, 4, 17, 15)]
+
+
+def test_moving_an_appointment_outside_the_availability_is_saved(client, db_session, make_professional, outbox):  # noqa: F811
+    professional_id, patient_id = _clinic_with_a_40_minute_grid(db_session, make_professional)
+    login(client, "admin")
+    _load_by_hand(client, professional_id, patient_id, at="09:00", minutes=60)
+    manual = db_session.scalars(select(Appointment)).one()
+
+    response = client.post(
+        f"/app/appointments/{manual.id}/edit",
+        data={"edit_date": "2026-03-31", "edit_time": "18:30", "duration_minutes": "60", "status": "reserved"},
+        follow_redirects=False,
+    )
+
+    assert "error=" not in response.headers["location"], _flash(response)
+    db_session.expire_all()
+    assert db_session.get(Appointment, manual.id).starts_at == datetime(2026, 3, 31, 18, 30)
+
+
+def test_a_manual_appointment_in_the_past_is_rejected(client, db_session, make_professional, outbox):  # noqa: F811
+    professional_id, patient_id = _clinic_with_a_40_minute_grid(db_session, make_professional)
+    login(client, "admin")
+
+    response = _load_by_hand(client, professional_id, patient_id, at="09:00", minutes=30, day="2026-03-27")
+
+    assert "ya pasaron" in _flash(response)
     assert db_session.scalars(select(Appointment)).all() == []
+
+
+def test_a_badly_written_time_is_rejected(client, db_session, make_professional, outbox):  # noqa: F811
+    professional_id, patient_id = _clinic_with_a_40_minute_grid(db_session, make_professional)
+    login(client, "admin")
+
+    for written in ("25:00", "10.15", "diez", ""):
+        response = _load_by_hand(client, professional_id, patient_id, at=written, minutes=30)
+        assert "Escribí la hora en formato 24 h, por ejemplo 10:15." in _flash(response), written
+    assert db_session.scalars(select(Appointment)).all() == []
+
+
+def test_a_series_takes_date_and_24h_time(client, db_session, make_professional, outbox):  # noqa: F811
+    professional_id, patient_id = _clinic_with_a_40_minute_grid(db_session, make_professional)
+    login(client, "admin")
+
+    response = client.post(
+        "/app/appointments/series",
+        data={
+            "patient_id": patient_id, "professional_id": professional_id, "series_date": MONDAY.isoformat(),
+            "series_time": "10:00", "duration_minutes": "40", "every_weeks": "4", "occurrences": "2",
+        },
+        follow_redirects=False,
+    )
+
+    # Solo el lunes 30/03 tiene atención: la segunda fecha se saltea, como siempre en una serie.
+    assert "error=" not in response.headers["location"], _flash(response)
+    assert [a.starts_at for a in db_session.scalars(select(Appointment))] == [datetime(2026, 3, 30, 10, 0)]
 
 
 def test_an_online_patient_never_sees_who_has_the_slot(client, db_session, make_professional, outbox):  # noqa: F811
@@ -201,7 +260,13 @@ def test_the_manual_appointment_form_takes_any_start_time(client, db_session, ma
 
     body = client.get("/app/appointments").text
 
-    assert '<input type="time" name="manual_time" id="manual-time" step="300"' in body
+    assert '<input type="date" name="manual_date" id="manual-date"' in body  # calendario, cualquier día
+    assert 'name="manual_time" id="manual-time"' in body
+    assert 'inputmode="numeric"' in body
+    assert 'type="time"' not in body  # el selector con a.m./p.m. no aparece en ningún formulario
+    assert 'type="datetime-local"' not in body
+    assert 'id="manual-time-chips"' in body
+    assert 'id="manual-next-days"' in body
     assert 'id="manual-starts-at"' not in body  # ya no hay lista de horarios de la grilla
     assert 'id="manual-day-plan"' in body
 
@@ -220,6 +285,28 @@ def test_the_day_plan_lists_availability_and_busy_times(client, db_session, make
         "spans": [{"start": "09:00", "end": "13:00"}],
         "busy": [{"start": "11:00", "end": "11:40"}],
     }
+
+
+def test_the_day_plan_of_a_day_without_hours_is_empty(client, db_session, make_professional):
+    professional_id, _ = _clinic_with_a_40_minute_grid(db_session, make_professional)
+    login(client, "admin")
+
+    response = client.get("/api/v1/availability/day-plan", params={"professional_id": professional_id, "date": "2026-04-04"})
+
+    assert response.json()["spans"] == [] and response.json()["busy"] == []
+
+
+def test_the_edit_form_uses_a_calendar_and_24h_time(client, db_session, make_professional, outbox):  # noqa: F811
+    professional_id, patient_id = _clinic_with_a_40_minute_grid(db_session, make_professional)
+    login(client, "admin")
+    _load_by_hand(client, professional_id, patient_id, at="10:00", minutes=90)
+    manual = db_session.scalars(select(Appointment)).one()
+
+    body = client.get(f"/app/appointments/{manual.id}/edit").text
+
+    assert 'type="date" name="edit_date"' in body and 'value="2026-03-30"' in body
+    assert 'name="edit_time"' in body and 'value="10:00"' in body
+    assert 'type="datetime-local"' not in body
 
 
 def test_the_day_plan_is_for_staff_only(client, db_session, make_professional):

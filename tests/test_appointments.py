@@ -303,7 +303,8 @@ def test_a_long_appointment_can_span_two_blocks_that_touch(client, db_session, m
     assert respuesta.json()["duration_minutes"] == 120
 
 
-def test_a_long_appointment_cannot_cross_a_gap_in_the_availability(client, db_session, make_professional, auth_headers):
+def test_a_long_appointment_is_not_offered_across_a_gap_in_the_availability(client, db_session, make_professional, auth_headers):
+    """La consulta de horarios no lo propone; cargarlo a mano igual se puede (spec 0004, regla 4)."""
     professional_id, patient_id = _long_job_setup(db_session, make_professional, windows=[((9, 0), (11, 0)), ((12, 0), (14, 0))])
 
     assert ("10:00", "12:00") not in _horarios(client, auth_headers, professional_id, duration_minutes=120)
@@ -313,8 +314,7 @@ def test_a_long_appointment_cannot_cross_a_gap_in_the_availability(client, db_se
               "starts_at": "2026-03-30T10:00:00", "duration_minutes": 120},
         headers=auth_headers,
     )
-    assert respuesta.status_code == 409
-    assert "disponibilidad" in respuesta.text
+    assert respuesta.status_code == 201, respuesta.text
 
 
 def test_a_long_manual_appointment_takes_every_slot_it_covers(client, db_session, make_professional, auth_headers):

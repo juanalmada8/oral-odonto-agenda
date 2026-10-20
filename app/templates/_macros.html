@@ -75,3 +75,22 @@
 </details>
 {% endif %}
 {%- endmacro %}
+
+{# Hora en 24 h sin el selector a.m./p.m. del navegador; la normaliza app/static/time-field.js (spec 0004). #}
+{% macro time_input(name, id, value="", required=True) -%}
+<input type="text" name="{{ name }}" id="{{ id }}" value="{{ value }}" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="Ej: 10:15" pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]" title="Hora en formato 24 h, por ejemplo 10:15" data-time-24h{% if required %} required{% endif %} />
+{%- endmacro %}
+
+{# Una limpieza dura 30 minutos y un tratamiento largo, dos horas: la duración la elige quien carga el turno. #}
+{% set DURATION_OPTIONS = [(15, "15 min"), (30, "30 min"), (40, "40 min"), (45, "45 min"), (60, "1 h"), (75, "1 h 15"), (90, "1 h 30"), (105, "1 h 45"), (120, "2 h"), (150, "2 h 30"), (180, "3 h"), (240, "4 h")] %}
+
+{% macro duration_select(name, id, selected=30) -%}
+<select name="{{ name }}" id="{{ id }}" required>
+  {% for minutes, label in DURATION_OPTIONS %}
+  <option value="{{ minutes }}" {% if minutes == selected %}selected{% endif %}>{{ label }}</option>
+  {% endfor %}
+  {% if selected not in DURATION_OPTIONS | map('first') | list %}
+  <option value="{{ selected }}" selected>{{ selected }} min</option>
+  {% endif %}
+</select>
+{%- endmacro %}

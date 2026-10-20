@@ -2,8 +2,10 @@
 
 **Estado:** Implementada · **Fecha:** octubre de 2026
 
-> **Actualización:** la [0004](0004-turnos-manuales-a-cualquier-hora.md) reemplaza las reglas 2 y 6: el
-> horario ya no se elige de una lista de la grilla, se escribe la hora de inicio libre.
+> **Actualización:** la [0004](0004-turnos-manuales-a-cualquier-hora.md) reemplaza las reglas 2 y 6 (el
+> horario ya no se elige de una lista de la grilla) y resuelve la decisión pendiente: un turno cargado a
+> mano puede salirse de la disponibilidad. Las reglas 2 a 5 siguen valiendo para la consulta de horarios
+> de la API con `duration_minutes`.
 
 ## Objetivo
 
@@ -40,7 +42,7 @@ hora y media, dos horas o más. Antes la duración se fijaba sola al largo de ca
 | 2 | Se ofrecen solo los inicios donde el turno largo entra entero | `test_availability_can_be_asked_for_a_longer_appointment` |
 | 3 | No se ofrecen inicios que pisan otro turno | `test_a_long_appointment_is_only_offered_where_it_does_not_collide` |
 | 4 | Un turno largo puede cruzar dos bloques que se tocan | `test_a_long_appointment_can_span_two_blocks_that_touch` |
-| 5 | No puede cruzar un hueco de la disponibilidad | `test_a_long_appointment_cannot_cross_a_gap_in_the_availability` |
+| 5 | No puede cruzar un hueco de la disponibilidad | `test_a_long_appointment_is_not_offered_across_a_gap_in_the_availability` |
 | 6 | Ocupa todos los horarios que cubre | `test_a_long_manual_appointment_takes_every_slot_it_covers` |
 
 ## Decisiones pendientes
