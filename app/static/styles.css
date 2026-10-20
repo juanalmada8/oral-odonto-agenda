@@ -645,6 +645,39 @@ fieldset {
   color: var(--success-fg);
 }
 
+/* Atajos de un toque (días que atiende, horarios libres) debajo de un campo. */
+.quick-picks {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.quick-picks[hidden] {
+  display: none;
+}
+
+.quick-picks__label {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.quick-picks__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick-picks__list:empty {
+  display: none;
+}
+
+.time-chip {
+  min-width: 64px;
+  min-height: 36px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Agenda del día en el formulario de turno manual: qué horas atiende y qué ya está tomado. */
 .day-plan {
   display: grid;

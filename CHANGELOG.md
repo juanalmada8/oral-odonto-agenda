@@ -97,6 +97,15 @@ y versionado semántico.
   turno y su hora con `SECRET_KEY`, así que si el turno se reprograma el link viejo deja de servir, la
   confirmación anterior se borra y el paciente recibe un pedido nuevo. No requiere migración. Rotar
   `SECRET_KEY` invalida los links de confirmación ya enviados.
+- **Turnos manuales a cualquier día y hora, también fuera del horario de atención** (especificación 0004,
+  ampliada). El día se elige en un **calendario** (con atajos a los próximos días en que atiende el
+  profesional) y el turno se guarda aunque caiga fuera de la disponibilidad o en un día sin horario
+  cargado, con un aviso que no bloquea: la disponibilidad limita solo lo que se ofrece online. La hora deja
+  de usar el selector del navegador (que en una Mac en inglés mostraba a.m./p.m.): se escribe en 24 h
+  ("1015" queda 10:15) o se toca uno de los **horarios libres**, que incluyen la hora en que termina cada
+  turno para encadenar sin huecos. Lo mismo en *Editar turno* y *Turnos en serie*, y las tres pantallas
+  eligen la duración de la misma lista. Siguen sin permitirse los turnos en el pasado y pisar otro turno;
+  la serie sigue salteando las fechas sin atención.
 - **Turnos manuales a cualquier hora** (especificación 0004). El formulario del panel pide hora de inicio
   libre (de a 5 minutos) y duración, en lugar de ofrecer solo los horarios de la grilla online: un
   tratamiento de 10:00 a 11:30 con una grilla de 40 minutos se carga en un paso y el paciente recibe un

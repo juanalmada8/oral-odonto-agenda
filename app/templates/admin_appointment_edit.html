@@ -1,5 +1,5 @@
 {% extends "base_admin.html" %}
-{% from "_macros.html" import status_badge, payment_badge %}
+{% from "_macros.html" import status_badge, payment_badge, time_input, duration_select %}
 
 {% block content %}
 <section class="surface narrow-surface">
@@ -14,14 +14,19 @@
   <form method="post" action="/app/appointments/{{ appointment.id }}/edit" class="form-grid">
     <div class="two-cols">
       <label class="field">
-        <span class="field-label">Fecha y hora</span>
-        <input name="starts_at" type="datetime-local" step="300" value="{{ appointment.starts_at.strftime('%Y-%m-%dT%H:%M') }}" required />
+        <span class="field-label">Día</span>
+        <input type="date" name="edit_date" value="{{ appointment.starts_at.strftime('%Y-%m-%d') }}" required />
       </label>
       <label class="field">
-        <span class="field-label">Duración (min)</span>
-        <input name="duration_minutes" type="number" min="10" max="240" value="{{ appointment.duration_minutes }}" />
+        <span class="field-label">Hora de inicio <em>24 h</em></span>
+        {{ time_input("edit_time", "edit-time", appointment.starts_at.strftime('%H:%M')) }}
       </label>
     </div>
+    <label class="field">
+      <span class="field-label">Duración</span>
+      {{ duration_select("duration_minutes", "edit-duration", appointment.duration_minutes) }}
+      <span class="field-hint">Puede quedar fuera del horario de atención; nunca puede pisar otro turno. Si cambia el horario, le avisamos al paciente por email y le pedimos que confirme el nuevo.</span>
+    </label>
     <label class="field">
       <span class="field-label">Estado</span>
       <select name="status" required>
@@ -47,7 +52,6 @@
       <span class="field-label">Notas internas</span>
       <textarea name="notes">{{ appointment.notes or '' }}</textarea>
     </label>
-    <p class="muted small">Si cambiás el horario se validan disponibilidad y superposiciones, se reprograman los recordatorios y se le avisa al paciente por email.</p>
     <div class="button-row">
       <button type="submit">Guardar cambios</button>
       <a class="ghost-button" href="/app/appointments?selected_date={{ appointment.starts_at.date().isoformat() }}">Volver</a>
