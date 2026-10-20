@@ -1,7 +1,7 @@
 """Guarantees that only exist on PostgreSQL (run with TEST_DATABASE_URL pointing to PostgreSQL)."""
 
 import threading
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 import pytest
 from alembic.autogenerate import compare_metadata
@@ -171,3 +171,29 @@ def test_concurrent_bookings_for_two_professionals_only_one_wins(db_session):
     assert outcomes.count("booked") == 1
     [loser] = [outcome for outcome in outcomes if outcome != "booked"]
     assert loser.startswith("Atención, el sillón está ocupado:")
+
+
+def test_database_rejects_overlap_between_professionals(db_session):
+    """Un solo sillón (spec 0006, ADR 0010): la base misma impide dos turnos a la vez, aunque se salteen la app."""
+    professional_id, (first_patient, second_patient) = seed_calendar(db_session)
+    other = Professional(first_name="Nazarena", last_name="Almada", default_appointment_duration=30)
+    db_session.add(other)
+    db_session.flush()
+
+    def appointment(professional, patient_id, hour, minute, status=AppointmentStatus.RESERVED):
+        starts_at = datetime(2026, 3, 30, hour, minute)
+        return Appointment(
+            patient_id=patient_id, professional_id=professional, starts_at=starts_at,
+            ends_at=starts_at + timedelta(minutes=30), duration_minutes=30, status=status, created_by="test",
+        )
+
+    db_session.add(appointment(professional_id, first_patient, 9, 0))
+    db_session.add(appointment(other.id, second_patient, 9, 30))  # pegado: se permite
+    db_session.add(appointment(other.id, second_patient, 10, 0, AppointmentStatus.CANCELLED))
+    db_session.add(appointment(professional_id, first_patient, 10, 0))  # encima de uno cancelado: se permite
+    db_session.commit()
+
+    db_session.add(appointment(other.id, second_patient, 9, 15))
+    with pytest.raises(IntegrityError, match="no_overlap"):
+        db_session.commit()
+    db_session.rollback()
