@@ -31,3 +31,4 @@ La especificación dice **qué**; el [ADR](../decisions/) dice **por qué se eli
 | [0004](0004-turnos-manuales-a-cualquier-hora.md) | Turnos manuales a cualquier día y hora, sin pisar nunca otro turno | Implementada |
 | [0005](0005-confirmacion-del-paciente.md) | El paciente confirma su turno desde el email; aviso a la profesional si no lo hace | Implementada |
 | [0006](0006-un-solo-sillon.md) | Un solo sillón: nunca dos turnos a la vez en el consultorio | Implementada |
+| [0007](0007-nombres-con-mayuscula.md) | Nombres y apellidos con mayúscula inicial | Implementada |

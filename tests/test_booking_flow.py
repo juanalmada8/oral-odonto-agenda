@@ -368,3 +368,13 @@ def test_the_landing_page_does_not_show_the_clinic_phone(client, monkeypatch):
 
     assert "+54 9 2243 40-7958" not in portada
     assert "+54 9 2243 40-7958" in privacidad
+
+
+def test_an_online_booking_saves_the_name_capitalized(client, db_session, make_professional):
+    """Spec 0007: el paciente lo tipea como sale; en el panel y en los emails se ve bien."""
+    professional_id = make_professional(deposit=Decimal("0"))
+
+    book(client, professional_id, first_name="lucía belén", last_name="FERNÁNDEZ de la torre")
+
+    patient = db_session.scalars(select(Patient)).one()
+    assert (patient.first_name, patient.last_name) == ("Lucía Belén", "Fernández de la Torre")
