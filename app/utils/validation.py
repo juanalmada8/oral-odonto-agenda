@@ -10,6 +10,35 @@ from decimal import Decimal, InvalidOperation
 import phonenumbers
 
 NAME_PATTERN = re.compile(r"^[^\W\d_]+(?:[ '\-.][^\W\d_]+)*\.?$", re.UNICODE)
+# Stay lowercase inside a name ("María de los Ángeles"), never at its start ("De la Fuente").
+NAME_PARTICLES = frozenset({"de", "del", "la", "las", "los", "y", "e", "van", "von"})
+_NAME_SEPARATORS = re.compile(r"([ '\-.])")
+
+
+def capitalize_name(value: str) -> str:
+    """Capitalize words typed all lowercase or all uppercase; leave intentional casing ("McDonald") alone.
+
+    Spec 0007. A frozen copy lives in the data migration `20261021_14`: keep them in step.
+    """
+    result: list[str] = []
+    previous_separator = None
+    first_word = True
+    for piece in _NAME_SEPARATORS.split(value):
+        if not piece:
+            continue
+        if _NAME_SEPARATORS.fullmatch(piece):
+            result.append(piece)
+            previous_separator = piece
+            continue
+        if piece.islower() or piece.isupper():
+            lower = piece.lower()
+            if not first_word and previous_separator == " " and lower in NAME_PARTICLES:
+                piece = lower
+            else:
+                piece = lower[:1].upper() + lower[1:]
+        result.append(piece)
+        first_word = False
+    return "".join(result)
 
 
 def normalize_dni(value: str, *, strict: bool) -> str:
@@ -35,7 +64,7 @@ def normalize_person_name(value: str, *, label: str = "El nombre") -> str:
         raise ValueError(f"{label} no puede superar los 80 caracteres.")
     if not NAME_PATTERN.fullmatch(cleaned):
         raise ValueError(f"{label} solo puede tener letras, espacios, apóstrofes o guiones.")
-    return cleaned
+    return capitalize_name(cleaned)
 
 
 def normalize_mobile_phone(value: str) -> str:

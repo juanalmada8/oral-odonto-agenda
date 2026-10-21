@@ -42,6 +42,11 @@ y versionado semántico.
   `.env`, aunque se fuerce con `git add -f`.
 
 ### Fixed
+- **Nombres en minúscula o todo en mayúscula** (especificación 0007). Pacientes y profesionales cargaban
+  "juan martín" o "ALMADA ORTIZ" y así aparecían en el panel y en los emails. Ahora cada nombre y apellido se
+  guarda con inicial mayúscula ("Juan Martín", "Almada Ortiz", "María de los Ángeles", "O'Connor-Díaz"),
+  respetando lo escrito con mayúsculas a propósito ("McDonald"). La migración `20261021_14` corrige una vez
+  los nombres ya cargados (solo datos, sin vuelta atrás).
 - **Un solo sillón: dos turnos ya no pueden superponerse aunque sean de profesionales distintos**
   (especificación 0006, ADR 0010). La regla era por profesional, así que se podía cargar a Sabina y a Nazarena
   a la misma hora y, si las dos atendían el mismo día, la reserva online ofrecía el mismo horario a dos

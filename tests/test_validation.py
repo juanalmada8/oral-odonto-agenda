@@ -46,6 +46,42 @@ def test_person_name_rules():
         normalize_person_name("R2D2")
 
 
+def test_names_are_capitalized():
+    assert normalize_person_name("juan martín") == "Juan Martín"
+    assert normalize_person_name("ALMADA ORTIZ") == "Almada Ortiz"
+    assert normalize_person_name("nazarena") == "Nazarena"
+    assert normalize_person_name("j.") == "J."
+
+
+def test_name_particles_stay_lowercase_except_first():
+    assert normalize_person_name("maría de los ángeles") == "María de los Ángeles"
+    assert normalize_person_name("de la fuente") == "De la Fuente"
+    assert normalize_person_name("PEDRO Y PABLO") == "Pedro y Pablo"
+
+
+def test_names_after_apostrophe_or_hyphen_are_capitalized():
+    assert normalize_person_name("o'connor-díaz") == "O'Connor-Díaz"
+    assert normalize_person_name("d'angelo") == "D'Angelo"
+
+
+def test_mixed_case_names_are_kept():
+    assert normalize_person_name("McDonald") == "McDonald"
+    assert normalize_person_name("DiMaría") == "DiMaría"
+
+
+def test_the_data_migration_capitalizes_like_the_app():
+    """La migración lleva su propia copia de la regla (las migraciones no importan código de la app)."""
+    import importlib.util
+    from pathlib import Path
+
+    path = next(Path("alembic/versions").glob("*_capitalize_names.py"))
+    spec = importlib.util.spec_from_file_location("capitalize_names", path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    for raw in ("juan martín", "ALMADA ORTIZ", "maría de los ángeles", "de la fuente", "o'connor-díaz", "McDonald", "j."):
+        assert migration.capitalize_name(raw) == normalize_person_name(raw), raw
+
+
 def test_names_match_ignores_accents_case_and_compound_surnames():
     assert names_match("Fernández García", "fernandez")
     assert names_match("PEREZ", "Pérez")
