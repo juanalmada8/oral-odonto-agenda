@@ -2,7 +2,7 @@
 
 
 Día: {{ date_long_capitalized }}
-Horario: {{ time }} a {{ end_time }} h
+Horario: {{ time }} h
 Profesional: {{ professional_name }}
 {% if clinic_address %}
 Dirección: {{ clinic_address }}
@@ -15,6 +15,7 @@ Confirmá tu turno: {{ confirm_url }}
 Ver tu turno: {{ status_url }}
 
 {% if confirm_url %}
+Elegir otro horario: {{ reschedule_url }}
 No voy a poder ir: {{ confirm_url }}#no-puedo
 {% else %}
 Si no vas a poder venir, avisanos desde el link así otra persona puede usar el horario.

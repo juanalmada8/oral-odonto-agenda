@@ -483,6 +483,82 @@ def confirm_booking_by_patient(
     return redirect_with_message(status_url, message="Confirmaste tu turno. ¡Te esperamos!")
 
 
+RESCHEDULE_DAYS_SHOWN = 10
+
+
+@router.get("/reservar/turno/{public_token}/reprogramar", response_class=HTMLResponse)
+def reschedule_page(
+    request: Request,
+    public_token: str,
+    db: Session = Depends(get_db),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    booking_service: BookingService = Depends(get_booking_service),
+):
+    """The patient picks another free slot (spec 0008): the next ones of the same professional, by day."""
+    appointment = _get_public_appointment(db, schedule_service, public_token)
+    if appointment is None:
+        return templates.TemplateResponse(request, "public_booking_missing.html", {}, status_code=404)
+    active = appointment.status in {AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED}
+    allowed = active and booking_service.can_cancel_online(appointment)
+    days: list[dict] = []
+    if allowed:
+        earliest, last_date = schedule_service.public_booking_bounds()
+        availability = schedule_service.compute_availability(
+            db,
+            professional_id=appointment.professional_id,
+            date_from=earliest.date(),
+            date_to=last_date,
+            earliest_start=earliest,
+        )
+        for day, slots in sorted(availability.items()):
+            if slots and len(days) < RESCHEDULE_DAYS_SHOWN:
+                days.append(
+                    {
+                        "label": format_long_date(day).capitalize(),
+                        "slots": [{"value": slot.starts_at.isoformat(), "label": f"{slot.starts_at:%H:%M}"} for slot in slots],
+                    }
+                )
+    return templates.TemplateResponse(
+        request,
+        "public_booking_reschedule.html",
+        {
+            "appointment": appointment,
+            "active": active,
+            "allowed": allowed,
+            "days": days,
+            "notice_hours": get_settings().cancellation_notice_hours,
+            "error": request.query_params.get("error"),
+        },
+    )
+
+
+@router.post("/reservar/turno/{public_token}/reprogramar")
+def reschedule_by_patient(
+    public_token: str,
+    background_tasks: BackgroundTasks,
+    starts_at: str = Form(""),
+    db: Session = Depends(get_db),
+    schedule_service: ScheduleService = Depends(get_schedule_service),
+    booking_service: BookingService = Depends(get_booking_service),
+    followup_service: FollowUpService = Depends(get_followup_service),
+):
+    appointment = _get_public_appointment(db, schedule_service, public_token)
+    if appointment is None:
+        return RedirectResponse("/reservar", status_code=303)
+    try:
+        booking_service.reschedule_by_patient(db, appointment, datetime.fromisoformat(starts_at))
+    except ValueError:
+        db.rollback()
+        return redirect_with_message(f"/reservar/turno/{public_token}/reprogramar", error="Elegí uno de los horarios.")
+    except DomainError as exc:
+        db.rollback()
+        return redirect_with_message(f"/reservar/turno/{public_token}/reprogramar", error=exc.detail)
+    background_tasks.add_task(dispatch_due_notifications, followup_service)
+    return redirect_with_message(
+        f"/reservar/turno/{public_token}", message="Listo, movimos tu turno. Te enviamos el cambio por email."
+    )
+
+
 @router.get("/reservar/turno/{public_token}/calendario.ics")
 def booking_calendar_file(
     public_token: str,

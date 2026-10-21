@@ -100,6 +100,11 @@ y versionado semántico.
   turnos, no una historia clínica. Migración `20261001_11` borra la columna.
 
 ### Added
+- **El paciente puede reprogramar desde su link** (especificación 0008). Los emails que piden confirmar traen
+  **Elegir otro horario** (y la página del turno, el mismo botón): muestra los próximos horarios libres online
+  del mismo profesional, por día. Elegir uno **mueve el turno** (no crea otro), lo deja confirmado para ese
+  horario y avisa al paciente y a la profesional. Mismas reglas que la reserva (anticipación mínima, un solo
+  sillón) y mismo plazo que cancelar cuando hay seña.
 - **El paciente confirma su turno desde el email** (especificación 0005). El recordatorio de 24 h
   (`REMINDER_HOURS_AHEAD`) pasa a ser el pedido de confirmación: trae el botón *Confirmar turno*, que abre la
   página del turno con un botón *Sí, voy a ir*. Al tocarlo, el turno queda **confirmado** en el panel sin
@@ -158,6 +163,11 @@ y versionado semántico.
   cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
 
 ### Changed
+- **Al paciente solo se le muestra la hora de inicio** ("Horario: 14:00 h", no "14:00 a 15:00") en emails y en
+  la página del turno; la hora de fin sigue en el panel, en los avisos a la profesional y en el calendario.
+- **Cambiar solo el final de un turno ya no avisa al paciente**: se le avisa únicamente si cambia el día o la hora
+  de inicio. Si cambia solo la duración, tampoco se borra su confirmación ni se reinicia su recordatorio. La
+  profesional sí se entera de cualquier cambio.
 - **"Confirmar" deja de ser el botón principal del turno** (especificación 0005, regla 10): ahora confirma el
   paciente. Antes de la hora, un turno reservado o confirmado no tiene botón principal (*Confirmar* queda en
   el menú ⋯ por si el paciente llama); desde que empieza, el principal es *Atendido*.

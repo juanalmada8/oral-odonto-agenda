@@ -352,24 +352,29 @@ class ScheduleService:
                     exclude_appointment_id=appointment.id,
                     within_availability=False,
                 )
+                # The patient cares about when it starts, not when it ends (spec 0008): a change of duration alone
+                # is not news to them and keeps their confirmation and reminder.
+                start_changed = starts_at != appointment.starts_at
                 previous_when = f"{format_long_date(appointment.starts_at)} a las {appointment.starts_at:%H:%M} h"
                 appointment.starts_at = starts_at
                 appointment.ends_at = ends_at
                 appointment.duration_minutes = duration
-                # A confirmation was for the old time (spec 0005): the patient confirms the new one.
-                appointment.attendance_confirmed_at = None
-                if appointment.status == AppointmentStatus.CONFIRMED:
-                    appointment.status = AppointmentStatus.RESERVED
-                    appointment.confirmed_at = None
+                if start_changed:
+                    # A confirmation was for the old time (spec 0005): the patient confirms the new one.
+                    appointment.attendance_confirmed_at = None
+                    if appointment.status == AppointmentStatus.CONFIRMED:
+                        appointment.status = AppointmentStatus.RESERVED
+                        appointment.confirmed_at = None
                 if followup_service:
-                    followup_service.discard_pending_reminders(db, appointment)
-                    # Sin este aviso el paciente se presenta en el horario viejo.
-                    if appointment.status in UPCOMING_APPOINTMENT_STATUSES:
-                        followup_service.queue_reschedule(db, appointment, previous_when=previous_when, actor=actor)
+                    if start_changed:
+                        followup_service.discard_pending_reminders(db, appointment)
+                        # Sin este aviso el paciente se presenta en el horario viejo.
+                        if appointment.status in UPCOMING_APPOINTMENT_STATUSES:
+                            followup_service.queue_reschedule(db, appointment, previous_when=previous_when, actor=actor)
                     # A held (unpaid) slot is not on the professional's agenda yet, so there is nothing to move.
                     if appointment.status in (AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED):
                         followup_service.queue_professional_reschedule(
-                            db, appointment, previous_when=previous_when, actor=actor
+                            db, appointment, previous_when=previous_when if start_changed else None, actor=actor
                         )
 
         for field in ("reason", "notes", "charged_amount"):

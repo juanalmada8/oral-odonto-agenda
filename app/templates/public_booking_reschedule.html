@@ -1,0 +1,66 @@
+{% set brand_logo = asset_url('brand/oral-logo-blue-cropped.png') %}
+{% set professional_name = appointment.professional.first_name ~ ' ' ~ appointment.professional.last_name %}
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>ORAL | Elegir otro horario</title>
+    <link rel="icon" href="{{ asset_url('icons/favicon.ico') }}" sizes="any" />
+    <link rel="icon" type="image/png" href="{{ asset_url('icons/favicon-32.png') }}" sizes="32x32" />
+    <link rel="apple-touch-icon" href="{{ asset_url('icons/apple-touch-icon.png') }}" />
+    <link rel="stylesheet" href="{{ asset_url('styles.css') }}" />
+  </head>
+  <body class="public-body">
+    <div class="public-shell status-shell">
+      <header class="status-header">
+        <a class="site-header__brand" href="/reservar" aria-label="ORAL odontología familiar, reservar turno">
+          <img src="{{ brand_logo }}" alt="ORAL odontología familiar" width="120" height="55" />
+        </a>
+      </header>
+
+      <main class="status-layout">
+        <section class="panel status-card">
+          {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+          <div class="status-head">
+            <div>
+              <span class="eyebrow">Reprogramar</span>
+              <h1>Elegí otro horario</h1>
+            </div>
+          </div>
+          <p class="status-lead">
+            Tu turno con {{ professional_name }} es el
+            <strong>{{ appointment.starts_at | long_date }} a las {{ appointment.starts_at.strftime('%H:%M') }} h</strong>.
+          </p>
+
+          {% if not active %}
+          <p class="muted">Este turno ya no está activo. Podés <a class="inline-link" href="/reservar?professional_id={{ appointment.professional_id }}#booking-flow">reservar uno nuevo</a>.</p>
+          {% elif not allowed %}
+          <p class="muted">Faltan menos de {{ notice_hours }} horas para el turno, así que no se puede reprogramar online. Comunicate con el consultorio{% if settings.clinic_phone %} al {{ settings.clinic_phone }}{% endif %}.</p>
+          {% elif not days %}
+          <p class="muted">Por ahora no hay horarios libres online. Llamanos{% if settings.clinic_phone %} al {{ settings.clinic_phone }}{% endif %} y lo resolvemos.</p>
+          {% else %}
+          <form method="post" action="/reservar/turno/{{ appointment.public_token }}/reprogramar" class="reschedule-days">
+            {% for day in days %}
+            <div class="reschedule-day">
+              <p class="reschedule-day__label">{{ day.label }}</p>
+              <div class="quick-picks__list">
+                {% for slot in day.slots %}
+                <button type="submit" class="chip time-chip" name="starts_at" value="{{ slot.value }}">{{ slot.label }}</button>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </form>
+          <p class="muted small">Al elegir uno, movemos tu turno y te avisamos por email.</p>
+          {% endif %}
+
+          <div class="status-actions">
+            <a class="cta-link" href="/reservar/turno/{{ appointment.public_token }}">Volver a mi turno</a>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

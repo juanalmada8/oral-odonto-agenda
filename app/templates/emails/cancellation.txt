@@ -1,7 +1,7 @@
 {{ patient_first_name }}, tu turno fue cancelado.
 
 Día: {{ date_long_capitalized }}
-Horario: {{ time }} a {{ end_time }} h
+Horario: {{ time }} h
 Profesional: {{ professional_name }}
 
 Podés reservar otro turno en {{ booking_url }}

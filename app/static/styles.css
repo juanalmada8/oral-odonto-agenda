@@ -645,6 +645,19 @@ fieldset {
   color: var(--success-fg);
 }
 
+/* Reprogramar desde el link del turno: un renglón por día con sus horarios. */
+.reschedule-days {
+  display: grid;
+  gap: 16px;
+}
+
+.reschedule-day__label {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
 /* Atajos de un toque (días que atiende, horarios libres) debajo de un campo. */
 .quick-picks {
   display: grid;
