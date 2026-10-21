@@ -20,7 +20,8 @@ from app.services.reception_service import ReceptionService
 from app.services.schedule_service import SLOT_TAKEN_MESSAGE, ScheduleService
 from app.services.waitlist_service import WaitlistService
 from app.utils.audit import create_audit_log
-from app.utils.datetime import ensure_local_naive
+from app.utils.datetime import calculate_end, ensure_local_naive
+from app.utils.formatting import format_long_date
 
 PUBLIC_ACTOR = "public_booking"
 
@@ -113,6 +114,58 @@ class BookingService:
             return appointment.starts_at > clock.now()
         notice = timedelta(hours=self.settings.cancellation_notice_hours)
         return appointment.starts_at - clock.now() >= notice
+
+    def reschedule_by_patient(self, db: Session, appointment: Appointment, starts_at) -> Appointment:
+        """The patient picks another free slot from their link (spec 0008): the appointment moves, it is not recreated.
+
+        Same rules as booking (published slot, lead time, one chair) and the same notice period as cancelling.
+        Having chosen the new time themselves, they are confirmed for it.
+        """
+        if appointment.status not in {AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED}:
+            raise DomainError("Este turno ya no está activo.", status_code=409)
+        if not self.can_cancel_online(appointment):
+            phone = f" al {self.settings.clinic_phone}" if self.settings.clinic_phone else ""
+            raise DomainError(
+                f"Faltan menos de {self.settings.cancellation_notice_hours} horas para el turno, así que no se puede "
+                f"reprogramar online. Comunicate con el consultorio{phone}.",
+                status_code=409,
+            )
+        professional = self.schedule_service.lock_professional(db, appointment.professional_id)
+        starts_at = ensure_local_naive(starts_at, self.settings.app_timezone)
+        duration = self.schedule_service.published_slot_duration(db, professional=professional, starts_at=starts_at)
+        if duration is None:
+            raise DomainError(SLOT_TAKEN_MESSAGE, status_code=409)
+        self.schedule_service.validate_slot(
+            db,
+            professional=professional,
+            starts_at=starts_at,
+            ends_at=calculate_end(starts_at, duration),
+            patient_id=appointment.patient_id,
+            exclude_appointment_id=appointment.id,
+            public_rules=True,
+        )
+        previous_when = f"{format_long_date(appointment.starts_at)} a las {appointment.starts_at:%H:%M} h"
+        now = clock.now()
+        appointment.starts_at = starts_at
+        appointment.ends_at = calculate_end(starts_at, duration)
+        appointment.duration_minutes = duration
+        appointment.status = AppointmentStatus.CONFIRMED
+        appointment.confirmed_at = now
+        appointment.attendance_confirmed_at = now
+        self.followup_service.discard_pending_reminders(db, appointment)
+        self.followup_service.queue_reschedule(db, appointment, previous_when=previous_when, actor=PUBLIC_ACTOR)
+        self.followup_service.queue_professional_reschedule(db, appointment, previous_when=previous_when, actor=PUBLIC_ACTOR)
+        create_audit_log(
+            db,
+            action="appointment.rescheduled_by_patient",
+            entity_name="appointment",
+            entity_id=str(appointment.id),
+            actor=PUBLIC_ACTOR,
+            description="Appointment moved by the patient",
+            details={"from": previous_when, "to": starts_at.isoformat()},
+        )
+        self.schedule_service.commit(db)
+        return appointment
 
     def cancel_by_patient(self, db: Session, appointment: Appointment, *, channel: str) -> Appointment:
         """Self-service cancellation (booking link or WhatsApp), honouring the notice period."""

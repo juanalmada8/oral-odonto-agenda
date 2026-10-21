@@ -230,6 +230,7 @@ class MessageComposer:
             "confirm_url": (
                 f"{base_url}{confirmation_path(self.settings.secret_key, appointment)}" if ask_to_confirm else None
             ),
+            "reschedule_url": f"{base_url}/reservar/turno/{appointment.public_token}/reprogramar",
             "reminder_hours": self.settings.reminder_hours_ahead,
             "whatsapp_enabled": bool(self.settings.whatsapp_access_token and self.settings.whatsapp_phone_number_id),
         }

@@ -124,7 +124,7 @@
           <dl class="status-details">
             <div><dt>Profesional</dt><dd>{{ professional_name }}</dd></div>
             <div><dt>Día</dt><dd>{{ appointment.starts_at | long_date | capitalize }}</dd></div>
-            <div><dt>Horario</dt><dd>{{ appointment.starts_at.strftime('%H:%M') }} a {{ appointment.ends_at.strftime('%H:%M') }} h</dd></div>
+            <div><dt>Horario</dt><dd>{{ appointment.starts_at.strftime('%H:%M') }} h</dd></div>
             {% if appointment.deposit_amount %}
             <div><dt>Seña</dt><dd>{{ appointment.deposit_amount | money }}{% if payment %} · {{ payment.status | status_label }}{% endif %}</dd></div>
             {% endif %}
@@ -149,6 +149,7 @@
           <div class="status-cancel" id="no-puedo">
             {% if can_cancel %}
             <p class="status-cancel__title">¿No vas a poder venir?</p>
+            <a class="cta-link" href="/reservar/turno/{{ appointment.public_token }}/reprogramar">Elegir otro horario</a>
             <form method="post" action="/reservar/turno/{{ appointment.public_token }}/cancelar" data-confirm="¿Seguro que querés cancelar el turno del {{ appointment.starts_at | long_date }} a las {{ appointment.starts_at.strftime('%H:%M') }} h?">
               <button type="submit" class="ghost-button danger">Cancelar turno</button>
             </form>
