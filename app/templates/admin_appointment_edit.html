@@ -30,8 +30,8 @@
     <label class="field">
       <span class="field-label">Estado</span>
       <select name="status" required>
-        {% for status in status_options %}
-        <option value="{{ status.value }}" {% if appointment.status == status %}selected{% endif %}>{{ status | status_label }}</option>
+        {% for value, label in status_options %}
+        <option value="{{ value }}" {% if appointment.status.value == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
     </label>

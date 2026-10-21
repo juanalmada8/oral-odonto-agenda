@@ -100,6 +100,11 @@ y versionado semántico.
   turnos, no una historia clínica. Migración `20261001_11` borra la columna.
 
 ### Added
+- **Buscador de pacientes con alta en el mismo turno** (especificación 0009). En *Crear turno manual* y
+  *Turnos en serie* el paciente se busca escribiendo nombre, apellido o DNI (sin importar acentos ni
+  mayúsculas), en lugar de un desplegable con todos. *Crear turno manual* suma **+ Paciente nuevo** (DNI,
+  nombre, apellido y, opcionales, celular y email): se crea junto con el turno, y si el DNI ya existe se
+  reutiliza la ficha. Nueva ruta `GET /api/v1/patients/search`, solo para el consultorio.
 - **El paciente puede reprogramar desde su link** (especificación 0008). Los emails que piden confirmar traen
   **Elegir otro horario** (y la página del turno, el mismo botón): muestra los próximos horarios libres online
   del mismo profesional, por día. Elegir uno **mueve el turno** (no crea otro), lo deja confirmado para ese
@@ -163,6 +168,9 @@ y versionado semántico.
   cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
 
 ### Changed
+- **Editar turno: el estado ofrece solo lo que se puede hacer desde el estado actual**, con nombres de acción
+  (*Confirmado*, *Atendido*, *Ausente*, *Cancelar el turno*, *Reactivar el turno*). Ya no aparecen "Vencido" ni
+  "Pendiente de pago", que los pone el sistema.
 - **Al paciente solo se le muestra la hora de inicio** ("Horario: 14:00 h", no "14:00 a 15:00") en emails y en
   la página del turno; la hora de fin sigue en el panel, en los avisos a la profesional y en el calendario.
 - **Cambiar solo el final de un turno ya no avisa al paciente**: se le avisa únicamente si cambia el día o la hora

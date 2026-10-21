@@ -41,7 +41,7 @@ from app.models.user import User
 from app.schemas.appointment import AppointmentCreate, AppointmentSeriesCreate, AppointmentUpdate
 from app.schemas.auth import UserCreate, UserUpdate
 from app.schemas.availability import AvailabilityWindowCreate, RecurringAvailabilityCreate
-from app.schemas.patient import PatientCreate, PatientUpdate
+from app.schemas.patient import PatientCreate, PatientUpdate, PatientUpsert
 from app.schemas.professional import ProfessionalCreate, ProfessionalUpdate
 from app.services.analytics import AnalyticsService
 from app.services.auth_service import AuthService
@@ -62,6 +62,7 @@ from app.web.common import (
     redirect_with_message,
     render_admin,
     serialize_status_counts,
+    status_label,
     templates,
 )
 
@@ -130,6 +131,50 @@ def _parse_date(value: str | None, default: date) -> date:
 
 TIME_24H = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 BAD_TIME_MESSAGE = "Escribí la hora en formato 24 h, por ejemplo 10:15."
+
+
+def _patient_for_appointment(patient_id: str, dni: str, first_name: str, last_name: str, phone: str, email: str) -> dict:
+    """The patient picked in the search, or a new one typed in the same form (spec 0009)."""
+    if (patient_id or "").strip().isdigit():
+        return {"patient_id": int(patient_id)}
+    if not (dni.strip() or first_name.strip() or last_name.strip()):
+        raise DomainError("Elegí un paciente o cargá uno nuevo.", status_code=422)
+    return {
+        "patient": PatientUpsert(
+            dni=dni, first_name=first_name, last_name=last_name, phone=phone.strip() or None, email=email.strip() or None
+        )
+    }
+
+
+# What can be done by hand from each state, named as actions (spec 0009). "Vencido" and "Pendiente de pago"
+# are set by the system, never chosen.
+SYSTEM_ONLY_STATUSES = (AppointmentStatus.EXPIRED, AppointmentStatus.PENDING_PAYMENT)
+STATUS_CHOICE_LABELS = {
+    AppointmentStatus.CONFIRMED: "Confirmado",
+    AppointmentStatus.COMPLETED: "Atendido",
+    AppointmentStatus.NO_SHOW: "Ausente",
+    AppointmentStatus.CANCELLED: "Cancelar el turno (se le avisa al paciente)",
+    AppointmentStatus.RESERVED: "Reservado",
+}
+
+
+def _status_choices(current: AppointmentStatus) -> list[tuple[str, str]]:
+    choices = [(current.value, f"{status_label(current)} (sin cambios)")]
+    reachable = sorted(ALLOWED_TRANSITIONS.get(current, set()), key=lambda status: status.value)
+    for target in reachable:
+        if target in SYSTEM_ONLY_STATUSES:
+            continue
+        label = STATUS_CHOICE_LABELS[target]
+        if target == AppointmentStatus.RESERVED and current in (AppointmentStatus.CANCELLED, AppointmentStatus.EXPIRED):
+            label = "Reactivar el turno"
+        choices.append((target.value, label))
+    return choices
+
+
+def _series_patient(patient_id: str) -> int:
+    if not (patient_id or "").strip().isdigit():
+        raise DomainError("Elegí un paciente.", status_code=422)
+    return int(patient_id)
 
 
 def _start_from_form(starts_at: str, day: str, hhmm: str) -> datetime:
@@ -368,7 +413,6 @@ def appointments_page(
         page_subtitle=None,
         active_page="appointments",
         professionals=[] if scope else professionals,
-        patients=reception_service.list_patients(db) if scope is None else [],
         appointments=filtered,
         agenda_date=agenda_date.isoformat(),
         previous_date=(agenda_date - timedelta(days=1)).isoformat(),
@@ -393,7 +437,12 @@ def appointments_page(
 @router.post("/app/appointments")
 def create_manual_appointment(
     background_tasks: BackgroundTasks,
-    patient_id: int = Form(...),
+    patient_id: str = Form(""),
+    new_dni: str = Form(""),
+    new_first_name: str = Form(""),
+    new_last_name: str = Form(""),
+    new_phone: str = Form(""),
+    new_email: str = Form(""),
     professional_id: int = Form(...),
     starts_at: str = Form(""),
     manual_date: str = Form(""),
@@ -416,13 +465,13 @@ def create_manual_appointment(
         appointment = schedule_service.create_appointment(
             db,
             AppointmentCreate(
-                patient_id=patient_id,
                 professional_id=professional_id,
                 starts_at=selected_dt,
                 duration_minutes=duration_minutes,
                 reason=reason or None,
                 notes=notes or None,
                 created_by=current_user.username,
+                **_patient_for_appointment(patient_id, new_dni, new_first_name, new_last_name, new_phone, new_email),
             ),
             reception_service=reception_service,
             followup_service=followup_service,
@@ -448,7 +497,7 @@ def create_manual_appointment(
 @router.post("/app/appointments/series")
 def create_appointment_series(
     background_tasks: BackgroundTasks,
-    patient_id: int = Form(...),
+    patient_id: str = Form(""),
     professional_id: int = Form(...),
     starts_at: str = Form(""),
     series_date: str = Form(""),
@@ -471,7 +520,7 @@ def create_appointment_series(
         result = schedule_service.create_series(
             db,
             AppointmentSeriesCreate(
-                patient_id=patient_id,
+                patient_id=_series_patient(patient_id),
                 professional_id=professional_id,
                 starts_at=selected_dt,
                 duration_minutes=duration_minutes,
@@ -548,7 +597,7 @@ def edit_appointment_page(
         page_subtitle=None,
         active_page="appointments",
         appointment=appointment,
-        status_options=[appointment.status, *sorted(ALLOWED_TRANSITIONS.get(appointment.status, set()), key=lambda s: s.value)],
+        status_options=_status_choices(appointment.status),
     )
 
 

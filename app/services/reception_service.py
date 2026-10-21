@@ -1,5 +1,7 @@
 """Reception service: validates incoming requests and resolves patient identity."""
 
+import re
+
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
@@ -12,12 +14,33 @@ from app.models.payment import Payment
 from app.schemas.booking import PublicBookingRequest
 from app.schemas.patient import PatientCreate, PatientIdentity, PatientUpdate, PatientUpsert
 from app.utils.audit import create_audit_log
-from app.utils.validation import names_match
+from app.utils.validation import fold_text, names_match
 
 
 class ReceptionService:
     def list_patients(self, db: Session) -> list[Patient]:
         return list(db.scalars(select(Patient).order_by(Patient.last_name, Patient.first_name)))
+
+    def search_patients(self, db: Session, query: str, *, limit: int = 8) -> list[Patient]:
+        """Active patients whose name, surname or DNI match what was typed (spec 0009).
+
+        Accents and case are ignored; a DNI may be typed with dots. Fewer than 2 characters matches nothing.
+        """
+        typed = (query or "").strip()
+        if len(typed) < 2:
+            return []
+        digits = re.sub(r"\D", "", typed)
+        words = fold_text(typed).split()
+        found = []
+        for patient in db.scalars(select(Patient).where(Patient.is_active.is_(True)).order_by(Patient.last_name, Patient.first_name)):
+            haystack = fold_text(f"{patient.first_name} {patient.last_name}")
+            by_name = bool(words) and all(word in haystack for word in words)
+            by_dni = len(digits) >= 2 and digits in patient.dni
+            if by_name or by_dni:
+                found.append(patient)
+                if len(found) == limit:
+                    break
+        return found
 
     def get_patient(self, db: Session, patient_id: int) -> Patient:
         patient = db.get(Patient, patient_id)

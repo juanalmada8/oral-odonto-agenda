@@ -95,3 +95,34 @@
   {% endif %}
 </select>
 {%- endmacro %}
+
+{# Buscador de pacientes (spec 0009): se escribe nombre o DNI; "+ Paciente nuevo" carga uno en el mismo formulario. #}
+{% macro patient_picker(allow_new=False) -%}
+<div class="field patient-picker" data-patient-picker data-ready="0">
+  <span class="field-label">Paciente</span>
+  <input type="hidden" name="patient_id" value="" />
+  <div data-picker-searchbox>
+    <input type="search" data-picker-search placeholder="Escribí nombre, apellido o DNI" autocomplete="off" aria-label="Buscar paciente" />
+    <div class="picker-results" data-picker-results role="listbox" hidden></div>
+  </div>
+  <div class="picker-chosen" data-picker-chosen hidden>
+    <strong data-picker-chosen-name></strong>
+    <button type="button" class="ghost-button compact" data-picker-change>Cambiar</button>
+  </div>
+  <p class="field-hint" data-picker-message role="alert" hidden></p>
+  {% if allow_new %}
+  <button type="button" class="link-button" data-new-patient-toggle>+ Paciente nuevo</button>
+  <div class="picker-new" data-new-patient hidden>
+    <div class="two-cols">
+      <label class="field"><span class="field-label">DNI</span><input name="new_dni" inputmode="numeric" autocomplete="off" /></label>
+      <label class="field"><span class="field-label">Celular <em>(opcional)</em></span><input name="new_phone" inputmode="tel" autocomplete="off" /></label>
+    </div>
+    <div class="two-cols">
+      <label class="field"><span class="field-label">Nombre</span><input name="new_first_name" autocomplete="off" /></label>
+      <label class="field"><span class="field-label">Apellido</span><input name="new_last_name" autocomplete="off" /></label>
+    </div>
+    <label class="field"><span class="field-label">Email <em>(opcional)</em></span><input type="email" name="new_email" autocomplete="off" /></label>
+  </div>
+  {% endif %}
+</div>
+{%- endmacro %}
