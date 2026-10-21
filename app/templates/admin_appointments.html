@@ -1,7 +1,8 @@
 {% extends "base_admin.html" %}
-{% from "_macros.html" import status_badge, payment_badge, appointment_actions, time_input, duration_select %}
+{% from "_macros.html" import status_badge, payment_badge, appointment_actions, time_input, duration_select, patient_picker %}
 
 {% block content %}
+<script src="{{ asset_url('patient-picker.js') }}" defer></script>
 <section class="surface">
   <div class="surface-head">
     <div>
@@ -39,16 +40,7 @@
   <details class="foldout">
     <summary>Crear turno manual (teléfono / mostrador)</summary>
     <form method="post" action="/app/appointments" class="form-grid" id="manual-appointment-form">
-      <label class="field">
-        <span class="field-label">Paciente</span>
-        <select name="patient_id" required>
-          <option value="">Elegí un paciente</option>
-          {% for patient in patients if patient.is_active %}
-          <option value="{{ patient.id }}">{{ patient.last_name }}, {{ patient.first_name }} · DNI {{ patient.dni }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <p class="muted small">¿Paciente nuevo? Cargalo primero en <a class="inline-link" href="/app/patients">Pacientes</a>.</p>
+      {{ patient_picker(allow_new=True) }}
       <div class="two-cols">
         <label class="field">
           <span class="field-label">Profesional</span>
@@ -113,15 +105,7 @@
         Carga varios turnos iguales de una vez. Las fechas que caigan en un horario ocupado o sin
         atención se saltean y te avisamos cuáles. Al paciente le llega un solo email con todas.
       </p>
-      <label class="field">
-        <span class="field-label">Paciente</span>
-        <select name="patient_id" required>
-          <option value="">Elegí un paciente</option>
-          {% for patient in patients if patient.is_active %}
-          <option value="{{ patient.id }}">{{ patient.last_name }}, {{ patient.first_name }} · DNI {{ patient.dni }}</option>
-          {% endfor %}
-        </select>
-      </label>
+      {{ patient_picker() }}
       <div class="two-cols">
         <label class="field">
           <span class="field-label">Profesional</span>
@@ -247,6 +231,8 @@
     const outsideBox = $("manual-outside");
     const time = window.oralTime;
     if (!professionalSelect || !dateInput || !timeInput || !durationSelect || !submitButton || !plan || !time) return;
+    const picker = document.querySelector("#manual-appointment-form [data-patient-picker]");
+    const patientReady = () => !picker || picker.dataset.ready === "1";
 
     let dayPlan = null;
     const toMinutes = (hhmm) => {
@@ -312,7 +298,7 @@
       show(outsideBox, "");
       submitButton.disabled = true;
       const value = time.normalize(timeInput.value);
-      if (!dayPlan || !value) return;
+      if (!dayPlan || !value || !patientReady()) return;
       if (!time.isValid(value)) {
         show(conflictBox, "Escribí la hora en formato 24 h, por ejemplo 10:15.");
         return;
@@ -398,6 +384,7 @@
       renderNextDays();
       loadDayPlan();
     });
+    picker?.addEventListener("patientchange", check);
     timeInput.addEventListener("input", check);
     timeInput.addEventListener("change", check);
     durationSelect.addEventListener("change", () => {

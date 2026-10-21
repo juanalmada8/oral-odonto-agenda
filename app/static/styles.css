@@ -645,6 +645,103 @@ fieldset {
   color: var(--success-fg);
 }
 
+/* Buscador de pacientes en los formularios de turno. */
+.patient-picker {
+  position: relative;
+}
+
+.picker-results {
+  display: grid;
+  margin-top: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(18, 36, 49, 0.08);
+  overflow: hidden;
+}
+
+.picker-results[hidden],
+.picker-new[hidden],
+.picker-chosen[hidden],
+[data-picker-message][hidden] {
+  display: none;
+}
+
+.picker-option {
+  display: grid;
+  gap: 2px;
+  justify-content: stretch;
+  justify-items: start;
+  width: 100%;
+  min-height: 0;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.picker-option strong {
+  color: var(--ink);
+}
+
+.picker-option:last-child {
+  border-bottom: 0;
+}
+
+.picker-option:hover,
+.picker-option:focus-visible {
+  background: var(--ocean-50);
+}
+
+.picker-option span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.picker-empty {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.picker-chosen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--ocean-200);
+  border-radius: var(--radius);
+  background: var(--ocean-50);
+}
+
+.picker-new {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.link-button {
+  justify-self: start;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ocean-700);
+  cursor: pointer;
+}
+
 /* Reprogramar desde el link del turno: un renglón por día con sus horarios. */
 .reschedule-days {
   display: grid;

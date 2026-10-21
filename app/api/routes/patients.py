@@ -23,6 +23,24 @@ def list_patients(
     return reception_service.list_patients(db)
 
 
+@router.get("/search")
+def search_patients(
+    q: str = "",
+    db: Session = Depends(get_db),
+    reception_service: ReceptionService = Depends(get_reception_service),
+) -> list[dict]:
+    """Quick search for the appointment form: a few matches with just what identifies each one."""
+    return [
+        {
+            "id": patient.id,
+            "label": f"{patient.last_name}, {patient.first_name}",
+            "dni": patient.dni,
+            "contact": patient.phone or patient.email or "",
+        }
+        for patient in reception_service.search_patients(db, q)
+    ]
+
+
 @router.get("/{patient_id}", response_model=PatientRead)
 def get_patient(
     patient_id: int,
