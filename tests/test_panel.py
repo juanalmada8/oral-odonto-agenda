@@ -516,15 +516,27 @@ def test_editing_a_professional_deposit_does_not_break_the_audit_log(client, db_
     assert db_session.get(Professional, clinic["laura"]).deposit_amount == Decimal("12500")
 
 
-def test_row_shows_only_the_next_step_and_hides_the_rest_in_a_menu(client, db_session, clinic):
-    """Five buttons per row were unreadable: the expected action stays out, the rest go behind ⋯."""
+def test_a_future_appointment_has_no_primary_button(client, db_session, clinic):
+    """Spec 0005, regla 10: confirma el paciente; "Confirmar" queda en el menú ⋯ por si llama por teléfono."""
     add_appointment(db_session, clinic["laura"], starts_at=datetime(2026, 3, 30, 9, 0), status=AppointmentStatus.RESERVED)
     login(client, "admin")
 
     page = client.get("/app/appointments?selected_date=2026-03-30").text
 
+    assert 'class="primary-button' not in page
+    assert 'class="row-menu"' in page
+    assert ">Confirmar</button>" in page
+
+
+def test_a_started_appointment_offers_atendido(client, db_session, clinic, frozen_clock):
+    """Five buttons per row were unreadable: the expected action stays out, the rest go behind ⋯."""
+    add_appointment(db_session, clinic["laura"], starts_at=datetime(2026, 3, 27, 9, 30), status=AppointmentStatus.RESERVED)
+    login(client, "admin")
+
+    page = client.get("/app/appointments?selected_date=2026-03-27").text
+
     assert page.count('class="primary-button compact ') == 1
-    assert "Confirmar" in page
+    assert 'class="primary-button compact " type="submit">Atendido</button>' in page
     assert 'class="row-menu"' in page
 
 

@@ -48,10 +48,10 @@
 
 {# El siguiente paso natural de cada estado. Un turno ya atendido o ausente no tiene
    paso siguiente: lo que queda son correcciones, y esas van adentro del menú. #}
+{# Confirma el paciente (spec 0005): antes de la hora no hay paso principal en un turno reservado o
+   confirmado, "Confirmar" queda en el menú. Desde que empieza, el paso es "Atendido". #}
 {% set PRIMARY_ACTION = {
   "pending_payment": "confirm",
-  "reserved": "confirm",
-  "confirmed": "complete",
   "cancelled": "reserve",
   "expired": "reserve",
 } %}
@@ -60,6 +60,7 @@
    para que una fila de turno no sea una pared de cinco botones. #}
 {% macro appointment_actions(appointment, actions, return_to, edit_url=None) -%}
 {% set primary = PRIMARY_ACTION.get(appointment.status.value) %}
+{% if appointment.status.value in ['reserved', 'confirmed'] and appointment.starts_at <= clock_now() %}{% set primary = "complete" %}{% endif %}
 {% if primary not in actions %}{% set primary = none %}{% endif %}
 {% if primary %}
 {{ action_form(appointment, primary, return_to, primary=True) }}

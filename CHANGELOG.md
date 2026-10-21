@@ -158,6 +158,17 @@ y versionado semántico.
   cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
 
 ### Changed
+- **"Confirmar" deja de ser el botón principal del turno** (especificación 0005, regla 10): ahora confirma el
+  paciente. Antes de la hora, un turno reservado o confirmado no tiene botón principal (*Confirmar* queda en
+  el menú ⋯ por si el paciente llama); desde que empieza, el principal es *Atendido*.
+- **El paciente puede avisar que no va desde el email de confirmación** (regla 9): junto a *Confirmar turno*
+  hay un enlace *No voy a poder ir* que lleva al botón de cancelar de la página del turno (pide confirmación
+  en pantalla). Sin seña pagada se puede cancelar online **hasta que empiece el turno** (antes, hasta 24 h
+  antes: justo cuando llega el pedido de confirmación ya era tarde); con seña se mantiene el plazo, porque de
+  él depende la política de la seña. La página del turno deja de mostrar el texto de la seña cuando no hay.
+- El email de la reserva ya pide confirmar si el turno es dentro de las próximas **26 h** (24 h del
+  recordatorio más 2 h de margen). Antes, quien reservaba para mañana a la misma hora recibía dos emails con
+  minutos de diferencia: la reserva, y el recordatorio en cuanto se cumplían las 24 h.
 - El panel abre en un **Overview**: título *Resumen*, la agenda de hoy (con su filtro de fecha) y una
   sección **Próximos 7 días** con los turnos agrupados por día. Las tarjetas cuentan lo que importa sin
   seña activa (*Sin confirmar* en lugar de *Reservados sin seña*); *Esperando seña* aparece solo si hay alguno.

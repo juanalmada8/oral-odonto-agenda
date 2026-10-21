@@ -362,3 +362,50 @@ def test_availability_fixture_is_monday_morning(db_session, make_professional):
     professional_id = make_professional()
     window = db_session.scalars(select(AvailabilityWindow).where(AvailabilityWindow.professional_id == professional_id)).one()
     assert (window.availability_date, window.start_time) == (MONDAY_9.date(), time(9, 0))
+
+
+def test_a_booking_just_over_24h_asks_right_away(client, db_session, make_professional, outbox, frozen_clock):  # noqa: F811
+    """Reservar para mañana a la misma hora daba dos emails con minutos de diferencia."""
+    frozen_clock.set(datetime(2026, 3, 29, 8, 0))  # el lunes 9:00 queda a 25 h
+    _booked(client, db_session, make_professional)
+
+    [booking_email] = _to_patient(outbox)
+    assert "Confirmar turno" in booking_email["html"]
+    assert _remind(db_session, outbox, frozen_clock, datetime(2026, 3, 29, 9, 10)) == 0
+    assert len(_to_patient(outbox)) == 1
+
+
+def test_a_booking_well_ahead_waits_for_the_reminder(client, db_session, make_professional, outbox, frozen_clock):  # noqa: F811
+    frozen_clock.set(datetime(2026, 3, 29, 6, 0))  # 27 h antes
+    _booked(client, db_session, make_professional)
+
+    [booking_email] = _to_patient(outbox)
+    assert "/confirmar" not in booking_email["text"]
+
+
+def test_the_request_lets_the_patient_say_they_cannot_come(client, db_session, make_professional, outbox, frozen_clock):  # noqa: F811
+    appointment = _booked(client, db_session, make_professional)
+    _remind(db_session, outbox, frozen_clock, datetime(2026, 3, 29, 9, 0))
+
+    reminder = _to_patient(outbox)[-1]
+    link = _link_in(reminder)
+    page = client.get(link).text
+
+    assert "No voy a poder ir" in reminder["html"]
+    assert f"{link}#no-puedo" in reminder["html"].replace("&amp;", "&")
+    assert "No voy a poder ir:" in reminder["text"]
+    assert 'id="no-puedo"' in page
+    assert f'action="/reservar/turno/{appointment.public_token}/cancelar"' in page
+
+
+def test_the_patient_cancels_from_the_confirmation_page(client, db_session, make_professional, outbox, frozen_clock):  # noqa: F811
+    """Llega 24 h antes, dentro del plazo de 24 h: sin seña igual tiene que poder avisar que no va."""
+    appointment = _booked(client, db_session, make_professional)
+    _remind(db_session, outbox, frozen_clock, datetime(2026, 3, 29, 9, 0))
+    frozen_clock.set(datetime(2026, 3, 29, 20, 0))
+
+    response = client.post(f"/reservar/turno/{appointment.public_token}/cancelar", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert _reload(db_session, appointment).status == AppointmentStatus.CANCELLED
+    assert any(message["subject"].startswith("Turno cancelado") for message in notices(outbox))

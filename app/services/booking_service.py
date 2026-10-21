@@ -108,6 +108,9 @@ class BookingService:
     def can_cancel_online(self, appointment: Appointment) -> bool:
         if appointment.status not in {AppointmentStatus.RESERVED, AppointmentStatus.CONFIRMED}:
             return False
+        if not appointment.deposit_amount:
+            # Sin seña no hay plazo que proteger: avisar tarde es mejor que no venir (spec 0001, regla 8).
+            return appointment.starts_at > clock.now()
         notice = timedelta(hours=self.settings.cancellation_notice_hours)
         return appointment.starts_at - clock.now() >= notice
 

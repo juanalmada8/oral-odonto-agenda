@@ -13,6 +13,7 @@ Dirección: {{ clinic_address }}
 
 {% if confirm_url %}
 Como el turno es muy pronto, confirmanos ahora que venís: {{ confirm_url }}
+No voy a poder ir: {{ confirm_url }}#no-puedo
 
 {% endif %}
 Ver tu turno: {{ status_url }}
