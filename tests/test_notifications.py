@@ -433,6 +433,33 @@ def test_patient_can_cancel_from_the_booking_link(client, db_session, make_profe
     assert outbox.sent[-1]["subject"].startswith("Turno cancelado")
 
 
+def test_without_deposit_the_patient_can_cancel_late(client, db_session, make_professional, outbox, frozen_clock):
+    """Spec 0001, regla 8: sin seña, avisar tarde es mejor que no venir."""
+    professional_id = make_professional(deposit=Decimal("0"))
+    book(client, professional_id, starts_at="2026-03-30T09:00:00")
+    appointment = db_session.scalars(select(Appointment)).one()
+    frozen_clock.set(datetime(2026, 3, 30, 8, 0))
+
+    page = client.get(f"/reservar/turno/{appointment.public_token}")
+    response = client.post(f"/reservar/turno/{appointment.public_token}/cancelar", follow_redirects=False)
+
+    assert "Faltan menos de" not in page.text
+    assert response.status_code == 303
+    db_session.expire_all()
+    assert appointment.status == AppointmentStatus.CANCELLED
+
+
+def test_without_deposit_the_status_page_does_not_mention_one(client, db_session, make_professional):
+    professional_id = make_professional(deposit=Decimal("0"))
+    book(client, professional_id, starts_at="2026-03-30T09:00:00")
+    appointment = db_session.scalars(select(Appointment)).one()
+
+    page = client.get(f"/reservar/turno/{appointment.public_token}").text
+
+    assert settings.deposit_policy not in page
+    assert "seña" not in page.lower()
+
+
 def test_cancel_link_is_blocked_inside_the_notice_period(client, db_session, make_professional, frozen_clock):
     appointment = confirmed_booking(client, db_session, make_professional)
     frozen_clock.set(datetime(2026, 3, 29, 20, 0))

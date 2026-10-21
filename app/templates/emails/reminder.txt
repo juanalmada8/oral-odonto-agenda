@@ -14,6 +14,10 @@ Confirmá tu turno: {{ confirm_url }}
 {% endif %}
 Ver tu turno: {{ status_url }}
 
+{% if confirm_url %}
+No voy a poder ir: {{ confirm_url }}#no-puedo
+{% else %}
 Si no vas a poder venir, avisanos desde el link así otra persona puede usar el horario.
+{% endif %}
 
 {{ clinic_name }}{% if clinic_phone %} · Tel: {{ clinic_phone }}{% endif %}

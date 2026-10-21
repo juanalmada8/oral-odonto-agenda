@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app import __version__
+from app.core import clock
 from app.core.config import get_settings
 from app.core.enums import (
     APPOINTMENT_STATUS_LABELS,
@@ -73,6 +74,7 @@ templates.env.filters["percent"] = lambda value: "—" if value is None else f"{
 # Para un <input>: número pelado, sin símbolo ni separadores, y vacío cuando no hay dato.
 templates.env.filters["money_input"] = lambda value: "" if value is None else f"{value:.2f}".rstrip("0").rstrip(".")
 templates.env.globals["settings"] = get_settings()
+templates.env.globals["clock_now"] = lambda: clock.now()
 templates.env.globals["asset_url"] = asset_url
 
 

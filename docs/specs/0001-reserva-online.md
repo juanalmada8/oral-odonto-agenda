@@ -28,7 +28,9 @@ Reprogramar desde el link (hoy lo hace recepción); pagar el total de la consult
    *reservado* de inmediato. Sin pasarela configurada no se pide seña
    ([ADR 0003](../decisions/0003-lanzamiento-sin-sena-ni-whatsapp.md)).
 7. Enviar dos veces el mismo horario reutiliza la reserva; elegir otro libera la retención anterior.
-8. El paciente puede cancelar desde el link de su turno hasta cierto tiempo antes.
+8. El paciente puede cancelar desde el link de su turno. Si pagó seña, hasta `CANCELLATION_NOTICE_HOURS`
+   antes (la política de la seña depende de ese plazo); sin seña, hasta que empiece el turno: avisar tarde
+   es mejor que no venir, y el horario se puede ofrecer a otra persona.
 9. Hay protección contra abuso: campo trampa para bots y límite de intentos por dirección.
 
 ## Criterios de aceptación
@@ -52,7 +54,8 @@ Reprogramar desde el link (hoy lo hace recepción); pagar el total de la consult
 | 15 | La base rechaza turnos superpuestos | `test_database_rejects_overlapping_active_appointments` |
 | 16 | Dos reservas simultáneas del mismo horario: gana una sola | `test_concurrent_bookings_of_the_same_slot_only_one_wins` |
 | 17 | El paciente cancela desde el link | `test_patient_can_cancel_from_the_booking_link` |
-| 18 | El link no deja cancelar dentro del plazo mínimo | `test_cancel_link_is_blocked_inside_the_notice_period` |
+| 18 | Con seña pagada, el link no deja cancelar dentro del plazo mínimo | `test_cancel_link_is_blocked_inside_the_notice_period` |
+| 18b | Sin seña, se cancela online aunque falte poco | `test_without_deposit_the_patient_can_cancel_late` |
 | 19 | No se piden datos de salud | `test_la_reserva_publica_no_pide_datos_de_salud` |
 | 20 | La política enlazada y publicada | `test_la_politica_de_privacidad_esta_publicada_y_enlazada` |
 | 21 | Sin seña, el texto no habla de seña | `test_without_a_deposit_the_policy_does_not_talk_about_one` |

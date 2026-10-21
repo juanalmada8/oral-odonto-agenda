@@ -31,6 +31,9 @@ INACTIVE_STATUSES = (AppointmentStatus.CANCELLED, AppointmentStatus.EXPIRED)
 AGENDA_STATUSES = REMINDABLE_STATUSES
 RETRY_BASE_MINUTES = 5
 # Patient emails that may carry the "confirm your appointment" button (spec 0005).
+# A booking made this much before the reminder time already asks to confirm: otherwise whoever books for
+# tomorrow at the same hour gets two emails minutes apart.
+CONFIRMATION_MARGIN_HOURS = 2
 CONFIRMATION_REQUEST_TYPES = (NotificationType.REMINDER, NotificationType.CONFIRMATION, NotificationType.RESCHEDULE)
 
 
@@ -57,7 +60,8 @@ class FollowUpService:
         if appointment.status != AppointmentStatus.RESERVED or not appointment.notification_email:
             return False
         now = clock.now()
-        return now < appointment.starts_at <= now + timedelta(hours=self.settings.reminder_hours_ahead)
+        horizon = timedelta(hours=self.settings.reminder_hours_ahead + CONFIRMATION_MARGIN_HOURS)
+        return now < appointment.starts_at <= now + horizon
 
     @staticmethod
     def _for_time(appointment: Appointment, asks_confirmation: bool) -> dict:
