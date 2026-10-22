@@ -74,7 +74,7 @@ jobs:
           echo "version=$(python3 ops/release.py current)" >> "$GITHUB_OUTPUT"
 
       - id: auth
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
