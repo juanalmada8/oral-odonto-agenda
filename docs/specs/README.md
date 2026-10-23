@@ -34,4 +34,4 @@ La especificación dice **qué**; el [ADR](../decisions/) dice **por qué se eli
 | [0007](0007-nombres-con-mayuscula.md) | Nombres y apellidos con mayúscula inicial | Implementada |
 | [0008](0008-horario-de-inicio-y-reprogramar.md) | El paciente ve solo la hora de inicio y puede reprogramar | Implementada |
 | [0009](0009-buscador-de-pacientes-y-estado.md) | Buscador de pacientes con alta en el turno; estados claros al editar | Implementada |
-| [0010](0010-base-en-neon.md) | La base vive en Neon y se respalda sola | Borrador |
+| [0010](0010-base-en-neon.md) | La base vive en Neon y se respalda sola | Implementada |

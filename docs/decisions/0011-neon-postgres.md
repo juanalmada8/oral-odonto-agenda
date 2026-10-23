@@ -1,6 +1,6 @@
 # 0011 · La base pasa de Cloud SQL a Neon, con copia diaria propia
 
-**Estado:** vigente (la mudanza se ejecuta con [MIGRACION_A_NEON.md](../MIGRACION_A_NEON.md)) · **Fecha:** octubre de 2026
+**Estado:** vigente (mudanza ejecutada el 23/10/2026 con [MIGRACION_A_NEON.md](../MIGRACION_A_NEON.md); Cloud SQL se eliminó el mismo día) · **Fecha:** octubre de 2026
 **Reemplaza en parte a:** [0004](0004-google-cloud-run.md) (la base) y [0009](0009-disponibilidad-y-acceso-a-la-base.md) (acceso y protección de la instancia).
 
 ## Contexto
@@ -53,6 +53,11 @@ instancia encendida.
 - **Menos garantías operativas que Cloud SQL:** el plan gratuito de Neon no tiene SLA, y hubo incidentes
   menores en 2026 (arranques lentos de bases en una región). Para un consultorio, unos minutos sin reservas
   online son tolerables: se atiende por teléfono. No hay datos de salud ([ADR 0002](0002-sin-datos-de-salud.md)).
+- **Orden alfabético:** Neon crea las bases con collation `C.UTF-8` y Cloud SQL usa `en_US.UTF8`. Con `C`, los
+  apellidos con tilde o ñ y los que empiezan en minúscula («de la Torre») salen desordenados en las listas
+  del panel, que ordenan en la base. Se evita creando la base de producción con collation ICU `en-US`, que
+  ordena igual (verificado el 23/10/2026 con una consulta de prueba en ambas). Hay que hacerlo al crearla:
+  la collation de una base no se cambia después.
 - **Primer pedido tras una pausa:** unos segundos más lento. El pool ya prueba cada conexión antes de usarla.
 - **Se pierde la autenticación IAM y el proxy** para entrar a mano. Se reemplaza por un rol propio en Neon
   ([DATABASE_ACCESS.md](../DATABASE_ACCESS.md)). A diferencia de la cuenta IAM, ese rol puede alterar la

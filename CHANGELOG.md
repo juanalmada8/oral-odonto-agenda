@@ -107,6 +107,7 @@ y versionado semántico.
   `"cloud_sql"` en Terraform, sin tocar el código. El costo mensual baja de ~USD 20 a ~USD 2-5. Guías paso a
   paso para la mudanza y para la vuelta: `docs/MIGRACION_A_NEON.md` y `docs/VOLVER_A_CLOUD_SQL.md`.
   Los recursos de Cloud SQL conservan su estado (`moved`) y no se destruyen al aplicar.
+  La base de Neon se crea con collation ICU `en-US` para que las listas por apellido mantengan el orden de hoy.
 - **Copia diaria propia de la base** a un bucket del proyecto, con retención de 30 días: `ops/neon_backup.sh`
   corre en un job de Cloud Run, valida que el volcado se pueda leer antes de guardarlo y nunca deja un
   archivo vacío o a medias. El plan gratuito de Neon solo conserva ~6 horas de historia.

@@ -7,6 +7,12 @@ Contraparte de [MIGRACION_A_NEON.md](MIGRACION_A_NEON.md).
 > ⚠ Los volcados contienen datos de pacientes: se guardan fuera del repositorio, en un disco cifrado, y se
 > borran al terminar. Nada de esto se pega en chats ni commits.
 
+> **Estado de esta instalación (23/10/2026):** la instancia `oral-pg` ya fue eliminada, así que el camino
+> aplicable es el **B**. Google **reserva el nombre de una instancia borrada por hasta una semana**: durante
+> ese tiempo `terraform apply` falla al crear `oral-pg`. Si hubiera que volver en esa primera semana, hay que
+> crear la instancia con otro nombre (cambiar `service_name` o el nombre en `database.tf`), con el cambio de
+> código correspondiente. Pasada la semana, el procedimiento es el de abajo sin cambios.
+
 ## Qué camino seguir
 
 | Situación | Camino |
@@ -32,7 +38,7 @@ Con Neon respondiendo, volcar directo:
 
 ```bash
 pg_dump --format=custom --no-owner --no-privileges \
-  -d "postgresql://oral_app:CLAVE@HOST/oral?sslmode=require" -f ~/oral-vuelta.dump
+  -d "postgresql://oral_owner:CLAVE@HOST/oral?sslmode=require" -f ~/oral-vuelta.dump
 pg_restore --list ~/oral-vuelta.dump | head          # lista tablas, sin errores
 ```
 

@@ -28,7 +28,7 @@ Siempre sobre una base **nueva**, nunca encima de la que está en uso:
 gcloud storage cp gs://oral-odonto-agenda-oral-backups/oral_AAAAMMDD_HHMMSS.dump ~/restaurar.dump
 # En Neon: creá una base nueva (p. ej. oral_restaurada) o una rama, y restaurá ahí
 pg_restore --no-owner --no-privileges --exit-on-error \
-  -d "postgresql://oral_app:CLAVE@HOST/oral_restaurada?sslmode=require" ~/restaurar.dump
+  -d "postgresql://oral_owner:CLAVE@HOST/oral_restaurada?sslmode=require" ~/restaurar.dump
 ```
 
 Para volver a usarla en producción, cargá la URL de esa base como versión nueva de `oral-database-url` y
