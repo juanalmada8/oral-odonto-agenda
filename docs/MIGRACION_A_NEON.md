@@ -264,10 +264,12 @@ Anotá acá fecha y hora de la mudanza: `__________`. Desde ese momento los dato
 | Día 7 | **Ensayo de restauración**: bajar la última copia y restaurarla en `oral_ensayo` ([BACKUPS.md](BACKUPS.md)) | la app levanta contra ella |
 | Día 14 | Facturación de Google Cloud: el gasto diario bajó | el costo de Cloud SQL sigue ahí hasta la fase 7 |
 
-## Fase 7 · Retirar Cloud SQL (no antes de los 14 días)
+## Fase 7 · Retirar Cloud SQL
 
-Condiciones: copias diarias sin huecos, restauración probada, plan de cómputo de Neon dentro del límite y
-cero incidentes sin explicar.
+Condiciones mínimas: la copia diaria existe en el bucket y **se probó restaurarla** (en `oral_ensayo`, con filas
+iguales a producción), y la app ya escribe en Neon (el turno de prueba lo confirma). Esperar más tiempo solo
+ahorra unos minutos si hubiera que volver, y cuesta alrededor de USD 9 por quincena; en esta instalación se retiró
+el mismo día de la mudanza (23/10/2026).
 
 1. **Copia final** de Cloud SQL, guardada fuera de Google si es posible:
 
@@ -288,9 +290,24 @@ cero incidentes sin explicar.
 
    `terraform plan` → solo cambia las dos protecciones de la instancia (cero `destroy`) → `terraform apply`.
 
-3. **Eliminar la instancia.** En `terraform.tfvars`: `keep_cloud_sql_instance = false`. `terraform plan` debe
-   destruir exactamente: la instancia `oral-pg`, la base, el usuario de la app, su contraseña, los usuarios
-   IAM de `db_iam_users` y sus roles. Con tu visto bueno: `terraform apply`.
+3. **Eliminar la instancia, con `gcloud` y no con Terraform.** Borrar con Terraform la base, el usuario y la
+   instancia en un solo apply suele fallar: el usuario de la app es dueño de las tablas y no se puede borrar
+   con ellas dentro. `gcloud` lo borra todo junto (irreversible; confirmá que dice `oral-pg`):
+
+   ```bash
+   gcloud sql instances delete oral-pg
+   ```
+
+   Después, dejá a Terraform en sincronía. Al no existir la instancia, leer sus hijos da un 404
+   (`instanceDoesNotExist`), así que se sacan del estado (no toca nada en la nube; el estado remoto está
+   versionado):
+
+   ```bash
+   echo 'keep_cloud_sql_instance = false' >> terraform.tfvars
+   terraform state rm 'google_sql_database.app[0]' 'google_sql_user.app[0]' 'google_sql_user.people["TU_EMAIL"]'
+   terraform plan      # debe destruir solo random_password.db[0] y los permisos IAM de db_iam_users, sin errores
+   terraform apply
+   ```
 
 4. **Actualizar la documentación**: la tabla *Esta instalación* de [DEPLOYMENT.md](DEPLOYMENT.md) (base,
    costo) y pasar la especificación 0010 de *Borrador* a *Implementada*.

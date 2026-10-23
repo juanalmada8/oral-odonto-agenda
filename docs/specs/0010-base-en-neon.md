@@ -1,6 +1,6 @@
 # 0010 · La base vive en Neon y se respalda sola
 
-**Estado:** Borrador · **Fecha:** octubre de 2026
+**Estado:** Implementada (mudanza ejecutada el 23/10/2026) · **Fecha:** octubre de 2026
 
 ## Objetivo
 

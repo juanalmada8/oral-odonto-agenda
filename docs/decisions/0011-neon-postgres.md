@@ -1,6 +1,6 @@
 # 0011 · La base pasa de Cloud SQL a Neon, con copia diaria propia
 
-**Estado:** vigente (la mudanza se ejecuta con [MIGRACION_A_NEON.md](../MIGRACION_A_NEON.md)) · **Fecha:** octubre de 2026
+**Estado:** vigente (mudanza ejecutada el 23/10/2026 con [MIGRACION_A_NEON.md](../MIGRACION_A_NEON.md); Cloud SQL se eliminó el mismo día) · **Fecha:** octubre de 2026
 **Reemplaza en parte a:** [0004](0004-google-cloud-run.md) (la base) y [0009](0009-disponibilidad-y-acceso-a-la-base.md) (acceso y protección de la instancia).
 
 ## Contexto

@@ -26,7 +26,8 @@ Costo aproximado, según dónde esté la base (verificalo en la facturación: lo
 | Proyecto de GCP | `oral-odonto-agenda` |
 | Región | `us-central1` |
 | Servicio web / jobs | `oral-web` / `oral-migrate`, `oral-scheduled` |
-| Base de datos | Cloud SQL `oral-pg` (PostgreSQL 16, `db-f1-micro`, zonal, 10 GB). *Se muda a Neon según [ADR 0011](decisions/0011-neon-postgres.md); actualizar esta fila al terminar la mudanza* |
+| Base de datos | Neon, proyecto `oral` (PostgreSQL 16, AWS US East 2, plan gratuito, collation ICU `en-US`), desde el 23/10/2026. Antes: Cloud SQL `oral-pg` ([ADR 0011](decisions/0011-neon-postgres.md)) |
+| Copias de la base | job `oral-backup` cada día 03:30 → `gs://oral-odonto-agenda-oral-backups/` (30 días) |
 | Instancias mínimas | 1 |
 | Estado de Terraform | bucket `gs://oral-odonto-agenda-tfstate`, prefijo `prod` |
 | Dominio | `oral.com.ar` (registrado en nic.ar, DNS en Cloudflare) |
