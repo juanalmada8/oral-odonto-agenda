@@ -40,6 +40,9 @@ Decisión y alternativas: [ADR 0011](../decisions/0011-neon-postgres.md).
 8. **La instancia de Cloud SQL no se borra el día de la mudanza.** Queda apagada de la aplicación pero
    existente un mínimo de 14 días como red de seguridad, y recién se elimina con una copia final guardada.
 
+9. **El orden alfabético no cambia.** Las listas ordenadas por apellido salen igual que con Cloud SQL
+   (`en_US`): la base de Neon se crea con collation ICU `en-US`, no con la `C.UTF-8` por defecto.
+
 ## Criterios de aceptación
 
 | # | Criterio | Test |
@@ -58,7 +61,7 @@ Decisión y alternativas: [ADR 0011](../decisions/0011-neon-postgres.md).
 | 12 | Dado un `terraform validate` y un `plan` revisado, entonces la infraestructura es coherente en los dos modos (`neon` y `cloud_sql`) | CI → job *Terraform* + revisión del plan |
 | 13 | Dadas las migraciones de ida y vuelta y la suite sobre PostgreSQL, entonces pasan sobre la base de Neon | `make test-pg` contra Neon (paso 3 de la migración) |
 
-Los criterios 12 y 13 y las reglas 5 y 8 no se pueden probar con un test unitario: se verifican con los
+Los criterios 12 y 13 y las reglas 5, 8 y 9 no se pueden probar con un test unitario: se verifican con los
 pasos de [MIGRACION_A_NEON.md](../MIGRACION_A_NEON.md), que dejan constancia de cada comprobación.
 
 ## Casos límite y errores

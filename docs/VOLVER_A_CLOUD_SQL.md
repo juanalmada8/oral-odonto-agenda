@@ -32,7 +32,7 @@ Con Neon respondiendo, volcar directo:
 
 ```bash
 pg_dump --format=custom --no-owner --no-privileges \
-  -d "postgresql://oral_app:CLAVE@HOST/oral?sslmode=require" -f ~/oral-vuelta.dump
+  -d "postgresql://oral_owner:CLAVE@HOST/oral?sslmode=require" -f ~/oral-vuelta.dump
 pg_restore --list ~/oral-vuelta.dump | head          # lista tablas, sin errores
 ```
 

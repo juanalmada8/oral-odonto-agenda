@@ -68,7 +68,7 @@ Al quitarla de Terraform pierde el acceso de inmediato.
 
 Neon no usa cuentas de Google para la base: se entra con un **rol de la base** y su contraseña.
 
-1. **No uses el rol de la aplicación** (`oral_app`). En la consola de Neon → *Roles & Databases* creá un rol
+1. **No uses el rol de la aplicación** (`oral_owner`). En la consola de Neon → *Roles & Databases* creá un rol
    propio por persona (p. ej. `juan`) y anotá su contraseña en tu gestor.
 2. Conectate con DBeaver/psql a la dirección **directa** (sin `-pooler`) con SSL obligatorio:
 

@@ -67,20 +67,43 @@ sigue usando Cloud SQL.
    email que no dependa de una sola persona). Activá la verificación en dos pasos.
 2. **Crear proyecto:** nombre `oral`, **Postgres 16**, región **AWS US East 2 (Ohio)** (la más cercana a
    `us-central1` entre las que ofrece el plan gratuito; si no está, la de Virginia).
-3. En *Roles & Databases* dejá: base **`oral`** y un rol **`oral_app`** que la use (si el formulario inicial
-   no deja elegir los nombres, creá la base y el rol desde esa pantalla). Creá además una segunda base,
-   **`oral_test`**, y otra, **`oral_ensayo`**.
-4. En *Connection Details* elegí la base `oral`, el rol `oral_app` y **desmarcá "Connection pooling"**: la
+3. En *Roles & Databases* dejá: base **`oral`** con su rol dueño (en esta instalación Neon creó **`oral_owner`**;
+   ese es el rol de la aplicación, y en esta guía donde diga `oral_owner` va el que corresponda en tu caso).
+   Creá además **`oral_test`** y **`oral_ensayo`**, con el mismo dueño. Comprobá con `\l` que las tres tengan
+   ese dueño: sin eso las migraciones no pueden crear tablas.
+4. **Recrear `oral` y `oral_ensayo` con el orden alfabético de Cloud SQL.** Neon crea las bases con collation
+   `C.UTF-8` y Cloud SQL usa `en_US.UTF8`: con `C`, «Álvarez» se ordena después de «Zapata» y «de la Torre»
+   antes que todos. Se resuelve creándolas con collation ICU, mientras todavía están vacías (conectado a la
+   base `postgres`, con la URL directa):
+
+   ```bash
+   psql "postgresql://oral_owner:CLAVE@HOST/postgres?sslmode=require" <<'SQL'
+   DROP DATABASE oral;
+   DROP DATABASE oral_ensayo;
+   CREATE DATABASE oral         TEMPLATE template0 LOCALE_PROVIDER icu ICU_LOCALE 'en-US' LOCALE 'C.UTF-8' ENCODING 'UTF8';
+   CREATE DATABASE oral_ensayo  TEMPLATE template0 LOCALE_PROVIDER icu ICU_LOCALE 'en-US' LOCALE 'C.UTF-8' ENCODING 'UTF8';
+   SQL
+   ```
+
+   Comprobar, en Neon y en Cloud SQL (por el proxy), que el orden es el mismo:
+
+   ```sql
+   SELECT n FROM unnest(ARRAY['Zapata','Álvarez','de la Torre','Ñandú','Acosta']) n ORDER BY n;
+   -- Acosta, Álvarez, de la Torre, Ñandú, Zapata
+   ```
+   Hacelo **antes** de cargar los datos de producción. La collation de una base no se puede cambiar después:
+   si ya tiene datos (por ejemplo, el ensayo), hay que borrarla, recrearla así y restaurar de nuevo.
+5. En *Connection Details* elegí la base `oral`, el rol `oral_owner` y **desmarcá "Connection pooling"**: la
    dirección directa no lleva `-pooler` en el nombre. Con esa dirección armá estas dos formas, cambiando
    `CLAVE` y `HOST` por los reales:
 
    | Para | Forma |
    | --- | --- |
-   | `psql`, `pg_dump`, `pg_restore` | `postgresql://oral_app:CLAVE@HOST/oral?sslmode=require` |
-   | La aplicación (Secret Manager) | `postgresql+psycopg://oral_app:CLAVE@HOST/oral?sslmode=require&connect_timeout=15` |
+   | `psql`, `pg_dump`, `pg_restore` | `postgresql://oral_owner:CLAVE@HOST/oral?sslmode=require` |
+   | La aplicación (Secret Manager) | `postgresql+psycopg://oral_owner:CLAVE@HOST/oral?sslmode=require&connect_timeout=15` |
 
    Quitá `channel_binding=require` si aparece. Guardalas en tu gestor de contraseñas.
-5. Comprobar: [ ] `psql "postgresql://oral_app:CLAVE@HOST/oral?sslmode=require" -c "select version();"` muestra
+6. Comprobar: [ ] `psql "postgresql://oral_owner:CLAVE@HOST/oral?sslmode=require" -c "select version();"` muestra
    PostgreSQL 16 (la primera consulta puede tardar unos segundos: la base estaba dormida).
 
 ## Fase 3 · Probar que Neon cumple las reglas de la agenda
@@ -89,7 +112,7 @@ Es el criterio 13 de la especificación: las migraciones y la suite completa sob
 
 ```bash
 # base de PRUEBAS (oral_test), nunca "oral"
-export TEST_DATABASE_URL='postgresql+psycopg://oral_app:CLAVE@HOST/oral_test?sslmode=require'
+export TEST_DATABASE_URL='postgresql+psycopg://oral_owner:CLAVE@HOST/oral_test?sslmode=require'
 make test-pg
 unset TEST_DATABASE_URL
 ```
@@ -121,7 +144,7 @@ Se hace exactamente lo que se hará de verdad, pero contra la base `oral_ensayo`
 
    ```bash
    pg_restore --no-owner --no-privileges --exit-on-error \
-     -d "postgresql://oral_app:CLAVE@HOST/oral_ensayo?sslmode=require" ~/oral-migracion.dump
+     -d "postgresql://oral_owner:CLAVE@HOST/oral_ensayo?sslmode=require" ~/oral-migracion.dump
    ```
 
    Contar filas en **las dos** bases con esta consulta (en Cloud SQL por el proxy, en Neon con la URL de psql):
@@ -139,6 +162,7 @@ Se hace exactamente lo que se hará de verdad, pero contra la base `oral_ensayo`
    - [ ] Las filas por tabla coinciden.
    - [ ] `alembic_version` es igual en ambas.
    - [ ] La restricción de exclusión aparece en Neon.
+   - [ ] El orden alfabético coincide (consulta del paso 4 de la fase 2) y `datcollate` de Cloud SQL es `en_US.UTF8`.
 
 4. Borrar el ensayo: `psql "…/oral_ensayo?sslmode=require" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"`.
 
@@ -167,7 +191,7 @@ Elegí una ventana que no sea el domingo de 03:00 a 06:00 (mantenimiento de Clou
 
    ```bash
    pg_restore --no-owner --no-privileges --exit-on-error \
-     -d "postgresql://oral_app:CLAVE@HOST/oral?sslmode=require" ~/oral-migracion.dump
+     -d "postgresql://oral_owner:CLAVE@HOST/oral?sslmode=require" ~/oral-migracion.dump
    ```
 
    - [ ] Todo coincide. Si no, **no sigas**: la app todavía usa Cloud SQL y no pasó nada.
