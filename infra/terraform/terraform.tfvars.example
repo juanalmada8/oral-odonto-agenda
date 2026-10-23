@@ -31,3 +31,9 @@ optional_secrets = [
 # db_iam_users             = ["vos@gmail.com"]  # acceso a la base con tu cuenta de Google (sin contraseña)
 # alert_email              = "vos@tu-dominio.com.ar"
 # min_instances            = 1   # sin cold start (~USD 10/mes extra)
+
+# Base de datos. "cloud_sql" es lo que hay hoy; "neon" es el destino de docs/MIGRACION_A_NEON.md.
+# El DATABASE_URL de Neon NO va acá: se carga en Secret Manager (ver ese documento).
+# database_backend        = "neon"
+# keep_cloud_sql_instance = true   # dejar en true al menos 14 días después de mudar; ver VOLVER_A_CLOUD_SQL.md
+# scheduler_cron          = "*/15 * * * *"

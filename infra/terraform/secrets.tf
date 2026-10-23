@@ -37,10 +37,19 @@ resource "google_secret_manager_secret" "database_url" {
   depends_on = [google_project_service.enabled]
 }
 
+# Managed here only while the app runs on Cloud SQL. On Neon the connection string carries Neon's password,
+# so the operator loads it with `gcloud secrets versions add` and it never touches Terraform or its state.
+# The secret itself always exists, which is what lets the jobs and the service reference it in both modes.
+moved {
+  from = google_secret_manager_secret_version.database_url
+  to   = google_secret_manager_secret_version.database_url[0]
+}
+
 resource "google_secret_manager_secret_version" "database_url" {
+  count  = local.use_cloud_sql ? 1 : 0
   secret = google_secret_manager_secret.database_url.id
   # Unix socket provided by the Cloud SQL volume mounted in Cloud Run.
-  secret_data = "postgresql+psycopg://${google_sql_user.app.name}:${random_password.db.result}@/${google_sql_database.app.name}?host=/cloudsql/${google_sql_database_instance.main.connection_name}"
+  secret_data = "postgresql+psycopg://${google_sql_user.app[0].name}:${random_password.db[0].result}@/${google_sql_database.app[0].name}?host=/cloudsql/${google_sql_database_instance.main[0].connection_name}"
 }
 
 resource "google_secret_manager_secret" "optional" {

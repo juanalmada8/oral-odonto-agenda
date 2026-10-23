@@ -36,7 +36,7 @@ prueba que respalda cada regla, está en [docs/specs/0001-reserva-online.md](doc
 ## Stack
 
 Python 3.12 · FastAPI · Jinja2 · SQLAlchemy 2 + Alembic · PostgreSQL 16 · Pytest · Docker ·
-Terraform · GitHub Actions · Google Cloud Run + Cloud SQL.
+Terraform · GitHub Actions · Google Cloud Run + PostgreSQL (Cloud SQL o Neon).
 
 ## Arranque local
 

@@ -1,5 +1,9 @@
 # Acceso manual a la base de datos
 
+> Este documento describe el acceso con **Cloud SQL**. Si la base está en **Neon** (ADR 0011), ver primero
+> la sección [Con Neon](#con-neon).
+
+
 Para mirar o corregir datos de producción a mano (DBeaver, psql, TablePlus, Cloud SQL Studio).
 
 **No se usa la contraseña de la aplicación.** Cada persona entra con **su propia cuenta de Google**
@@ -59,3 +63,28 @@ existe recuperación a un punto en el tiempo de los últimos 7 días ([BACKUPS.m
 2. Al sumar, dale permisos sobre las tablas: `ops/grant_db_access.sh <email>`.
 
 Al quitarla de Terraform pierde el acceso de inmediato.
+
+## Con Neon
+
+Neon no usa cuentas de Google para la base: se entra con un **rol de la base** y su contraseña.
+
+1. **No uses el rol de la aplicación** (`oral_app`). En la consola de Neon → *Roles & Databases* creá un rol
+   propio por persona (p. ej. `juan`) y anotá su contraseña en tu gestor.
+2. Conectate con DBeaver/psql a la dirección **directa** (sin `-pooler`) con SSL obligatorio:
+
+   ```bash
+   psql "postgresql://juan:CLAVE@HOST/oral?sslmode=require"
+   ```
+
+   O sin instalar nada: **SQL Editor** en la consola de Neon (base `oral`).
+3. La primera conexión después de un rato tarda unos segundos: la base estaba dormida.
+
+**Diferencias con Cloud SQL, a tener presentes:**
+
+- Los roles creados desde la consola de Neon tienen permisos amplios, **incluida la estructura**. La regla de
+  "solo las migraciones cambian la estructura" pasa a ser una convención de equipo, no un permiso. No hagas
+  `CREATE`, `ALTER` ni `DROP` a mano.
+- Para sacar a alguien, borrá su rol en la consola. No hay nada que sacar de Terraform.
+- Antes de corregir datos: `SELECT` con el mismo filtro. Si algo sale mal, la copia diaria está en el bucket
+  ([BACKUPS.md](BACKUPS.md)) y Neon permite restaurar las últimas horas desde su consola.
+- `ops/grant_db_access.sh` y `db_iam_users` solo aplican a Cloud SQL.

@@ -58,6 +58,28 @@ variable "custom_domain_mode" {
 
 # ----------------------------------------------------------------- database
 
+variable "database_backend" {
+  description = <<-EOT
+    Where the application's database lives.
+      cloud_sql: Cloud SQL (this module creates and manages it).
+      neon:      Neon. The DATABASE_URL is loaded by hand into Secret Manager, never into Terraform.
+    Cutting over and going back: docs/MIGRACION_A_NEON.md and docs/VOLVER_A_CLOUD_SQL.md.
+  EOT
+  type        = string
+  default     = "cloud_sql"
+
+  validation {
+    condition     = contains(["cloud_sql", "neon"], var.database_backend)
+    error_message = "database_backend must be \"cloud_sql\" or \"neon\"."
+  }
+}
+
+variable "keep_cloud_sql_instance" {
+  description = "Keep the Cloud SQL instance (and its backups) even while the app runs on Neon: the safety net for the first weeks. Ignored when database_backend = cloud_sql."
+  type        = bool
+  default     = true
+}
+
 variable "db_tier" {
   description = "Cloud SQL machine type. db-f1-micro is the cheapest (~USD 9/month, 25 connections)."
   type        = string
@@ -107,9 +129,29 @@ variable "db_max_overflow" {
 }
 
 variable "scheduler_cron" {
-  description = "How often holds are expired, reminders queued and pending messages retried."
+  description = "How often holds are expired, reminders queued and pending messages retried. Every run wakes a suspended Neon database, so keep it at 15 minutes or more while on Neon's free plan."
   type        = string
-  default     = "*/10 * * * *"
+  default     = "*/15 * * * *"
+}
+
+# ----------------------------------------------------------------- backup (own copy, outside the database provider)
+
+variable "backup_cron" {
+  description = "When the daily dump runs (Buenos Aires time)."
+  type        = string
+  default     = "30 3 * * *"
+}
+
+variable "backup_retention_days" {
+  description = "Days each dump is kept in the bucket."
+  type        = number
+  default     = 30
+}
+
+variable "backup_image" {
+  description = "Image with pg_dump. Its major version must be the same as, or newer than, the database's (Neon project created on PostgreSQL 16)."
+  type        = string
+  default     = "postgres:16-alpine"
 }
 
 # ----------------------------------------------------------------- application settings

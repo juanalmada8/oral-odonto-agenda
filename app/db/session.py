@@ -16,7 +16,7 @@ else:
         future=True,
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,
-        # Cloud SQL and serverless instances drop idle connections; test them before use.
+        # Cloud SQL and Neon (which suspends when idle) drop connections; test each one before use.
         pool_pre_ping=True,
         pool_recycle=1800,
     )

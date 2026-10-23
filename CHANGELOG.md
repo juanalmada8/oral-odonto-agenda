@@ -15,6 +15,9 @@ y versionado semántico.
 ## [Unreleased]
 
 ### Security
+- **En producción, una base por red debe conectarse cifrada**: la app no arranca si el `DATABASE_URL` remoto
+  no pide `sslmode=require` (o `verify-ca`/`verify-full`). El socket de Cloud SQL queda exento.
+- Los volcados de la base (`*.dump`) se agregaron al `.gitignore`: tienen datos de pacientes.
 - **Protección contra eliminación** activada en Cloud SQL (además de la de Terraform).
 - **Acceso manual a la base con la cuenta de Google** (autenticación IAM), sin compartir la contraseña de la
   app: permisos de datos pero no de estructura. `ops/grant_db_access.sh` y `docs/DATABASE_ACCESS.md`.
@@ -100,6 +103,14 @@ y versionado semántico.
   turnos, no una historia clínica. Migración `20261001_11` borra la columna.
 
 ### Added
+- **Base en Neon, preparada para mudar** (especificación 0010, ADR 0011): `database_backend = "neon"` o
+  `"cloud_sql"` en Terraform, sin tocar el código. El costo mensual baja de ~USD 20 a ~USD 2-5. Guías paso a
+  paso para la mudanza y para la vuelta: `docs/MIGRACION_A_NEON.md` y `docs/VOLVER_A_CLOUD_SQL.md`.
+  Los recursos de Cloud SQL conservan su estado (`moved`) y no se destruyen al aplicar.
+- **Copia diaria propia de la base** a un bucket del proyecto, con retención de 30 días: `ops/neon_backup.sh`
+  corre en un job de Cloud Run, valida que el volcado se pueda leer antes de guardarlo y nunca deja un
+  archivo vacío o a medias. El plan gratuito de Neon solo conserva ~6 horas de historia.
+- **Alerta por email si falla la tarea programada o la copia** (antes un fallo de la base solo se veía en los logs).
 - **Buscador de pacientes con alta en el mismo turno** (especificación 0009). En *Crear turno manual* y
   *Turnos en serie* el paciente se busca escribiendo nombre, apellido o DNI (sin importar acentos ni
   mayúsculas), en lugar de un desplegable con todos. *Crear turno manual* suma **+ Paciente nuevo** (DNI,
@@ -168,6 +179,10 @@ y versionado semántico.
   cargar datos de demostración. Es idempotente, así que reintentar el job no cambia contraseñas.
 
 ### Changed
+- **La tarea programada corre cada 15 minutos** (antes 10): cada ejecución despierta la base de Neon y el plan
+  gratuito tiene un tope de horas de cómputo. Las señas impagas se liberan hasta 15 minutos más tarde.
+- **El monitor de disponibilidad consulta `/health` en vez de `/health/ready`**: este último consulta la base y,
+  cada 5 minutos, la habría mantenido despierta las 24 horas.
 - **Editar turno: el estado ofrece solo lo que se puede hacer desde el estado actual**, con nombres de acción
   (*Confirmado*, *Atendido*, *Ausente*, *Cancelar el turno*, *Reactivar el turno*). Ya no aparecen "Vencido" ni
   "Pendiente de pago", que los pone el sistema.

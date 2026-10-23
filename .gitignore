@@ -33,3 +33,9 @@ crash.log
 # Planes de Terraform: traen los valores de los secretos en texto plano.
 infra/terraform/tfplan*
 infra/terraform/*.tfplan
+
+# Copias de la base: tienen datos de pacientes, nunca se versionan.
+*.dump
+*.dump.gz
+oral-migracion*
+backups/

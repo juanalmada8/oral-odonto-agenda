@@ -9,7 +9,7 @@ sensibles viven en Secret Manager. Referencia completa: `.env.production.example
 | --- | --- |
 | `APP_ENV=production`, `DEBUG=false` | la app valida ambas al arrancar |
 | `SECRET_KEY` | [secreto] ≥ 32 caracteres aleatorios (lo genera Terraform) |
-| `DATABASE_URL` | [secreto] PostgreSQL (la app rechaza SQLite en producción) |
+| `DATABASE_URL` | [secreto] PostgreSQL (la app rechaza SQLite en producción). Una base por red exige `sslmode=require` (o `verify-ca`/`verify-full`); con Neon agregar también `connect_timeout=15` y usar la dirección **directa**, sin `-pooler`. Se carga en Secret Manager con `gcloud secrets versions add oral-database-url` ([MIGRACION_A_NEON.md](MIGRACION_A_NEON.md)) |
 | `PUBLIC_BASE_URL` | https; se usa en links de emails y callbacks de pago |
 | `TRUST_PROXY_HEADERS=true` | detrás de Cloud Run; `TRUSTED_PROXY_COUNT=2` si hay balanceador |
 | `LOG_FORMAT=json` | logs estructurados para Cloud Logging |
