@@ -111,6 +111,6 @@ seña, y sin WhatsApp el recordatorio sale por email.
 ## Entrega
 
 - Una imagen Docker sirve para los tres roles: web, job de migraciones y job programado.
-- Cloud Run + Cloud SQL, con Cloud Scheduler disparando la tarea periódica cada 10 minutos.
+- Cloud Run + PostgreSQL (Cloud SQL, o Neon según la [ADR 0011](decisions/0011-neon-postgres.md)), con Cloud Scheduler disparando la tarea periódica cada 15 minutos. Con Neon, un job diario copia la base a un bucket propio.
 - Detalle en [DEPLOYMENT.md](DEPLOYMENT.md); el porqué de estas elecciones, en
   [decisions/0004-google-cloud-run.md](decisions/0004-google-cloud-run.md).

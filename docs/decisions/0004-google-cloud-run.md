@@ -1,5 +1,7 @@
 # 0004 · Cloud Run + Cloud SQL en `us-central1`, con dominio por mapeo
 
+> La parte de la base fue reemplazada por la [ADR 0011](0011-neon-postgres.md) (Neon). El resto sigue vigente.
+
 **Estado:** vigente · **Fecha:** octubre de 2026
 
 ## Contexto

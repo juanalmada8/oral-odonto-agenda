@@ -14,10 +14,13 @@ resource "google_cloud_run_v2_service" "web" {
       max_instance_count = var.max_instances
     }
 
-    volumes {
-      name = "cloudsql"
-      cloud_sql_instance {
-        instances = [google_sql_database_instance.main.connection_name]
+    dynamic "volumes" {
+      for_each = local.use_cloud_sql ? [1] : []
+      content {
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = [local.cloud_sql_connection_name]
+        }
       }
     }
 
@@ -37,9 +40,12 @@ resource "google_cloud_run_v2_service" "web" {
         startup_cpu_boost = true
       }
 
-      volume_mounts {
-        name       = "cloudsql"
-        mount_path = "/cloudsql"
+      dynamic "volume_mounts" {
+        for_each = local.use_cloud_sql ? [1] : []
+        content {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
       }
 
       dynamic "env" {
@@ -127,10 +133,13 @@ resource "google_cloud_run_v2_job" "migrate" {
       max_retries     = 0
       timeout         = "900s"
 
-      volumes {
-        name = "cloudsql"
-        cloud_sql_instance {
-          instances = [google_sql_database_instance.main.connection_name]
+      dynamic "volumes" {
+        for_each = local.use_cloud_sql ? [1] : []
+        content {
+          name = "cloudsql"
+          cloud_sql_instance {
+            instances = [local.cloud_sql_connection_name]
+          }
         }
       }
 
@@ -139,9 +148,12 @@ resource "google_cloud_run_v2_job" "migrate" {
         command = ["alembic"]
         args    = ["upgrade", "head"]
 
-        volume_mounts {
-          name       = "cloudsql"
-          mount_path = "/cloudsql"
+        dynamic "volume_mounts" {
+          for_each = local.use_cloud_sql ? [1] : []
+          content {
+            name       = "cloudsql"
+            mount_path = "/cloudsql"
+          }
         }
 
         dynamic "env" {
@@ -186,10 +198,13 @@ resource "google_cloud_run_v2_job" "scheduled" {
       max_retries     = 1
       timeout         = "600s"
 
-      volumes {
-        name = "cloudsql"
-        cloud_sql_instance {
-          instances = [google_sql_database_instance.main.connection_name]
+      dynamic "volumes" {
+        for_each = local.use_cloud_sql ? [1] : []
+        content {
+          name = "cloudsql"
+          cloud_sql_instance {
+            instances = [local.cloud_sql_connection_name]
+          }
         }
       }
 
@@ -198,9 +213,12 @@ resource "google_cloud_run_v2_job" "scheduled" {
         command = ["python"]
         args    = ["-m", "app.tasks.run_scheduled"]
 
-        volume_mounts {
-          name       = "cloudsql"
-          mount_path = "/cloudsql"
+        dynamic "volume_mounts" {
+          for_each = local.use_cloud_sql ? [1] : []
+          content {
+            name       = "cloudsql"
+            mount_path = "/cloudsql"
+          }
         }
 
         dynamic "env" {

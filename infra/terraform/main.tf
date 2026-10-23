@@ -46,6 +46,7 @@ resource "google_project_service" "enabled" {
   for_each = toset([
     "run.googleapis.com",
     "sqladmin.googleapis.com",
+    "storage.googleapis.com",
     "artifactregistry.googleapis.com",
     "secretmanager.googleapis.com",
     "cloudscheduler.googleapis.com",
@@ -101,7 +102,14 @@ resource "google_service_account" "scheduler" {
   display_name = "Cloud Scheduler trigger for the periodic job"
 }
 
+# Only needed to open the Cloud SQL socket; on Neon the app reaches the database over TLS with its own URL.
+moved {
+  from = google_project_iam_member.run_sql_client
+  to   = google_project_iam_member.run_sql_client[0]
+}
+
 resource "google_project_iam_member" "run_sql_client" {
+  count   = local.use_cloud_sql ? 1 : 0
   project = var.project_id
   role    = "roles/cloudsql.client"
   member  = "serviceAccount:${google_service_account.run.email}"

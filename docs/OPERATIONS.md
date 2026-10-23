@@ -14,7 +14,7 @@
 | **Aviso al profesional**: turno nuevo, cancelado o movido | en el momento, al email de su ficha |
 | **Agenda de mañana** al profesional | cada tarde, desde las 18 h (`PROFESSIONAL_DIGEST_HOUR`), solo si tiene turnos |
 
-Todo eso lo dispara la tarea programada (Cloud Scheduler cada 10 minutos) y, además, cada operación
+Todo eso lo dispara la tarea programada (Cloud Scheduler cada 15 minutos) y, además, cada operación
 despacha lo suyo en el momento.
 
 Queda a cargo del consultorio: cargar disponibilidad, atender los avisos del dashboard (señas a
@@ -86,6 +86,17 @@ paciente que dejó de recibir recordatorios sin que nadie lo sepa.
 **Nunca activar** en Brevo el bloqueo de IP no autorizadas para las claves SMTP: Cloud Run no tiene IP
 de salida fija y los envíos dejarían de salir.
 
+**Llegó un email de alerta: "falló la tarea programada o la copia de la base".**
+Casi siempre es la base (Neon o Cloud SQL) que no respondió. Mirá su estado en la consola del proveedor y los
+logs del job: `gcloud run jobs executions list --job=oral-scheduled --region us-central1`. Si fue un tropiezo
+puntual, la ejecución siguiente (15 minutos después) lo resuelve sola. Si falló la **copia**, correla a mano:
+`gcloud run jobs execute oral-backup --region us-central1 --wait`; hasta entonces el último volcado bueno sigue
+en el bucket ([BACKUPS.md](BACKUPS.md)).
+
+**El sitio abre pero no deja reservar o muestra error al guardar.**
+La web responde pero la base no. `curl https://oral.com.ar/health/ready` devuelve 503. Con Neon puede ser que la
+base esté despertando (esperá unos segundos y reintentá) o un incidente del proveedor (su página de estado).
+
 ## Diagnóstico
 
 | Síntoma | Dónde mirar |
@@ -95,6 +106,7 @@ de salida fija y los envíos dejarían de salir.
 | El paciente no ve horarios | `/app/availability`: que haya bloques futuros; la reserva online exige anticipación mínima |
 | Falla un pago | [MERCADOPAGO.md](MERCADOPAGO.md) |
 | Error inesperado en pantalla | logs: `gcloud run services logs tail oral-web --region ...` |
+| La base no responde | `/health/ready` devuelve 503; con Neon, estado del proveedor y consumo de cómputo (*Usage* en su consola) |
 
 ## Comandos
 

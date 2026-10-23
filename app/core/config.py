@@ -4,6 +4,7 @@ from functools import lru_cache
 
 from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 
 class Settings(BaseSettings):
@@ -17,7 +18,8 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://postgres:postgres@db:5432/odonto_agenda"
     test_database_url: str = "sqlite+pysqlite:///:memory:"
-    # Per instance. Cloud SQL db-f1-micro allows ~25 connections: keep (pool+overflow) x instances below it.
+    # Per instance. Keep (pool+overflow) x instances below the database's connection limit
+    # (Cloud SQL db-f1-micro: ~25; Neon free: far more, but the pool stays small on purpose).
     db_pool_size: int = Field(default=5, ge=1, le=50)
     db_max_overflow: int = Field(default=5, ge=0, le=50)
 
@@ -146,6 +148,8 @@ class Settings(BaseSettings):
             raise ValueError("SECRET_KEY must have at least 32 characters in production")
         if self.database_url.startswith("sqlite"):
             raise ValueError("DATABASE_URL must use PostgreSQL in production")
+        if not self._database_is_encrypted():
+            raise ValueError("DATABASE_URL must set sslmode=require (or verify-ca/verify-full) in production")
         if not self.public_base_url.startswith("https://"):
             raise ValueError("PUBLIC_BASE_URL must be an https:// URL in production")
         if self.whatsapp_access_token and not self.whatsapp_app_secret:
@@ -153,6 +157,13 @@ class Settings(BaseSettings):
         if self.deposit_default_amount > 0 and not self.mercadopago_access_token:
             raise ValueError("MERCADOPAGO_ACCESS_TOKEN is required when DEPOSIT_DEFAULT_AMOUNT > 0 in production")
         return self
+
+    def _database_is_encrypted(self) -> bool:
+        """A database reached over the network must be reached over TLS; the Cloud SQL socket already is."""
+        query = make_url(self.database_url).query
+        if str(query.get("host", "")).startswith("/"):
+            return True
+        return query.get("sslmode") in {"require", "verify-ca", "verify-full"}
 
     @field_validator("public_base_url")
     @classmethod

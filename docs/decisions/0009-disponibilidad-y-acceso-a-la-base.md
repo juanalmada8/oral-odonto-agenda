@@ -1,5 +1,7 @@
 # 0009 · Disponibilidad, protección y acceso manual a la base
 
+> Aplica mientras la base sea Cloud SQL. Con Neon, ver la [ADR 0011](0011-neon-postgres.md).
+
 **Estado:** vigente · **Fecha:** octubre de 2026
 
 ## Contexto

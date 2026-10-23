@@ -4,16 +4,20 @@ La infraestructura está descrita en Terraform (`infra/terraform`) y los desplie
 Actions con identidad federada (OIDC): **no hay claves de servicio en ningún lado**.
 
 ```
-GitHub Actions ──OIDC──► Workload Identity ──► Cloud Run (web)  ──► Cloud SQL (PostgreSQL)
+GitHub Actions ──OIDC──► Workload Identity ──► Cloud Run (web)  ──► PostgreSQL (Cloud SQL o Neon)
                                                Cloud Run (job migrate / job scheduled)
                                                Secret Manager
-Cloud Scheduler ──cada 10 min──► job scheduled (vencer señas, recordatorios, reintentos)
+Cloud Scheduler ──cada 15 min──► job scheduled (vencer señas, recordatorios, reintentos)
+Cloud Scheduler ──cada día────► job backup (solo con Neon: copia de la base a un bucket propio)
 ```
 
 Por qué se eligió esta arquitectura y qué se descartó: [ADR 0004](decisions/0004-google-cloud-run.md).
-Costo aproximado con la configuración actual: **USD 20-23 por mes** (Cloud SQL `db-f1-micro` ~USD 10,
-instancia web siempre encendida ~USD 10, el resto son centavos). Verificalo en la calculadora de
-Google Cloud: los precios cambian.
+Costo aproximado, según dónde esté la base (verificalo en la facturación: los precios cambian):
+
+- **Cloud SQL** (`database_backend = "cloud_sql"`): **~USD 20 por mes**, casi todo la base (`db-f1-micro`,
+  disco, IPv4 pública y copias).
+- **Neon** (`database_backend = "neon"`): **~USD 2-5 por mes** (Cloud Run, bucket de copias y centavos).
+  La mudanza y la vuelta: [MIGRACION_A_NEON.md](MIGRACION_A_NEON.md) y [VOLVER_A_CLOUD_SQL.md](VOLVER_A_CLOUD_SQL.md).
 
 ## Esta instalación
 
@@ -22,7 +26,7 @@ Google Cloud: los precios cambian.
 | Proyecto de GCP | `oral-odonto-agenda` |
 | Región | `us-central1` |
 | Servicio web / jobs | `oral-web` / `oral-migrate`, `oral-scheduled` |
-| Base de datos | Cloud SQL `oral-pg` (PostgreSQL 16, `db-f1-micro`, zonal, 10 GB) |
+| Base de datos | Cloud SQL `oral-pg` (PostgreSQL 16, `db-f1-micro`, zonal, 10 GB). *Se muda a Neon según [ADR 0011](decisions/0011-neon-postgres.md); actualizar esta fila al terminar la mudanza* |
 | Instancias mínimas | 1 |
 | Estado de Terraform | bucket `gs://oral-odonto-agenda-tfstate`, prefijo `prod` |
 | Dominio | `oral.com.ar` (registrado en nic.ar, DNS en Cloudflare) |
@@ -277,7 +281,7 @@ Después comprobar `/health/ready` (confirma que la base conecta con la contrase
 
 - Logs: `gcloud run services logs tail oral-web --region us-central1` (salen en JSON y se filtran por
   severidad en Cloud Logging).
-- La tarea programada corre sola cada 10 minutos. A mano:
+- La tarea programada corre sola cada 15 minutos. A mano:
   `gcloud run jobs execute oral-scheduled --region us-central1 --wait`.
 - Backups y restauración: [BACKUPS.md](BACKUPS.md).
 - Chequeo de configuración: `make prod-check` con las variables de producción exportadas.

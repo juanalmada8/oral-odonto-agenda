@@ -19,7 +19,13 @@ output "domain_dns_records" {
 }
 
 output "sql_connection_name" {
-  value = google_sql_database_instance.main.connection_name
+  description = "Cloud SQL connection name (empty once the instance is gone)."
+  value       = local.cloud_sql_connection_name
+}
+
+output "database_backend" {
+  description = "Where the application's database lives right now."
+  value       = var.database_backend
 }
 
 output "github_variables" {
