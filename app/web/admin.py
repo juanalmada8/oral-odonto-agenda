@@ -56,6 +56,7 @@ from app.utils.formatting import format_money
 from app.utils.validation import parse_money
 from app.web.common import (
     active_professionals,
+    appointment_origins,
     filter_patients_collection,
     format_long_date,
     format_short_date,
@@ -331,6 +332,7 @@ def dashboard(
         active_page="dashboard",
         professionals=[] if scope else active_professionals(db, professional_service),
         appointments=appointments,
+        origins=appointment_origins(db, appointments),
         agenda_date=agenda_date.isoformat(),
         agenda_is_today=agenda_date == today,
         agenda_label=format_long_date(agenda_date),
@@ -414,6 +416,7 @@ def appointments_page(
         active_page="appointments",
         professionals=[] if scope else professionals,
         appointments=filtered,
+        origins=appointment_origins(db, filtered),
         agenda_date=agenda_date.isoformat(),
         previous_date=(agenda_date - timedelta(days=1)).isoformat(),
         next_date=(agenda_date + timedelta(days=1)).isoformat(),

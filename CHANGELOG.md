@@ -103,6 +103,10 @@ y versionado semántico.
   turnos, no una historia clínica. Migración `20261001_11` borra la columna.
 
 ### Added
+- **El panel dice quién creó cada turno** (especificación 0011): «Reservó el paciente» si fue por la web, o «Cargó
+  Laura Gómez (recepción)» si lo cargó alguien del equipo. Va como una línea de texto bajo el estado, en la lista de
+  turnos y en la agenda de hoy del resumen. Si el usuario ya no existe o el turno viene de una carga técnica, dice
+  «Cargado en el consultorio». El paciente no lo ve. No cambia la base: usa el dato que ya se guardaba.
 - **Base en Neon, preparada para mudar** (especificación 0010, ADR 0011): `database_backend = "neon"` o
   `"cloud_sql"` en Terraform, sin tocar el código. El costo mensual baja de ~USD 20 a ~USD 2-5. Guías paso a
   paso para la mudanza y para la vuelta: `docs/MIGRACION_A_NEON.md` y `docs/VOLVER_A_CLOUD_SQL.md`.

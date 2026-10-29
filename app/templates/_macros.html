@@ -2,6 +2,10 @@
 <span class="status-badge status-{{ status.value }}">{{ status | status_label }}</span>
 {%- endmacro %}
 
+{% macro origin_line(origin) -%}
+{% if origin %}<div class="small origin{% if origin.online %} origin--online{% endif %}">{{ origin.label }}</div>{% endif %}
+{%- endmacro %}
+
 {% macro payment_badge(appointment) -%}
 {% set payment = appointment.latest_payment %}
 {% if appointment.deposit_amount %}

@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import __version__
@@ -23,6 +24,7 @@ from app.core.enums import (
 )
 from app.core.exceptions import DomainError
 from app.models.user import User
+from app.services.booking_service import PUBLIC_ACTOR
 from app.services.professional_service import ProfessionalService
 from app.utils.formatting import DAY_LABELS, format_long_date, format_money, format_short_date, mask_email
 from app.utils.validation import format_phone_for_display
@@ -130,6 +132,28 @@ def ensure_admin(current_user: User) -> None:
 
 def active_professionals(db: Session, professional_service: ProfessionalService):
     return [professional for professional in professional_service.list_professionals(db) if professional.is_active]
+
+
+def appointment_origins(db: Session, appointments: list) -> dict[int, dict]:
+    """Quién creó cada turno, listo para mostrar (spec 0011). Una sola consulta para toda la lista.
+
+    El texto nunca lleva el nombre de usuario ni valores técnicos como "seed_demo": si no hay una
+    persona del equipo detrás, dice que se cargó en el consultorio.
+    """
+    usernames = {item.created_by for item in appointments if item.created_by != PUBLIC_ACTOR}
+    users = {}
+    if usernames:
+        users = {user.username: user for user in db.scalars(select(User).where(User.username.in_(usernames)))}
+    origins = {}
+    for item in appointments:
+        user = users.get(item.created_by)
+        if item.created_by == PUBLIC_ACTOR:
+            origins[item.id] = {"online": True, "label": "Reservó el paciente"}
+        elif user:
+            origins[item.id] = {"online": False, "label": f"Cargó {user.full_name} ({ROLE_LABELS[user.role].lower()})"}
+        else:
+            origins[item.id] = {"online": False, "label": "Cargado en el consultorio"}
+    return origins
 
 
 def serialize_status_counts(appointments: list) -> dict[str, int]:

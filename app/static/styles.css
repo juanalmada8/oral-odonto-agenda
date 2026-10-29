@@ -645,6 +645,16 @@ fieldset {
   color: var(--success-fg);
 }
 
+/* Quién creó el turno (spec 0011): texto, no etiqueta. El azul solo marca lo que reservó el paciente. */
+.origin {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.origin--online {
+  color: var(--info-fg);
+}
+
 /* Buscador de pacientes en los formularios de turno. */
 .patient-picker {
   position: relative;

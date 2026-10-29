@@ -1,5 +1,5 @@
 {% extends "base_admin.html" %}
-{% from "_macros.html" import status_badge, payment_badge, appointment_actions, time_input, duration_select, patient_picker %}
+{% from "_macros.html" import status_badge, payment_badge, appointment_actions, origin_line, time_input, duration_select, patient_picker %}
 
 {% block content %}
 <script src="{{ asset_url('patient-picker.js') }}" defer></script>
@@ -188,7 +188,7 @@
           <td data-label="Estado">
             {{ status_badge(appointment.status) }}
             {% if appointment.attendance_confirmed_at %}<div class="muted small attendance-ok">✓ Confirmó el paciente</div>{% endif %}
-            <div class="muted small">{{ 'Online' if appointment.created_by == 'public_booking' else 'Consultorio' }}</div>
+            {{ origin_line(origins.get(appointment.id)) }}
           </td>
           <td data-label="Seña">{{ payment_badge(appointment) }}</td>
           <td data-label="Acciones">
