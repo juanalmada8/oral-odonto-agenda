@@ -1,5 +1,5 @@
 {% extends "base_admin.html" %}
-{% from "_macros.html" import status_badge, payment_badge, appointment_actions %}
+{% from "_macros.html" import status_badge, payment_badge, appointment_actions, origin_line %}
 
 {% block content %}
 {% for alert in alerts %}
@@ -81,6 +81,7 @@
           <td data-label="Estado">
             {{ status_badge(appointment.status) }}
             {% if appointment.attendance_confirmed_at %}<div class="muted small attendance-ok">✓ Confirmó el paciente</div>{% endif %}
+            {{ origin_line(origins.get(appointment.id)) }}
           </td>
           <td data-label="Seña">{{ payment_badge(appointment) }}</td>
           <td data-label="Motivo">{{ appointment.reason or "—" }}</td>
